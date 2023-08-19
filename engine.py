@@ -74,7 +74,7 @@ def minimax(board , depth , maximize):
     return best_value, nodes_visited
 
 # Alpha beta pruning
-def alphaBeta(board , depth , alpha , beta , maximize):
+def alphaBeta(board , depth , alpha , beta , maximize, verbose=False):
     if(board.is_checkmate ()):
         if(board.turn == chess.WHITE):
             return -99999, 1
@@ -89,52 +89,81 @@ def alphaBeta(board , depth , alpha , beta , maximize):
     if(maximize):
         bestVal = -99999
         for move in legals:
+            if verbose:
+                print("move = " + str(move))
             board.push(move)
             val, nodes = alphaBeta(board , depth -1, alpha, beta, not maximize)
             bestVal = max(bestVal , val)
             board.pop()
             nodes_visited += nodes
             alpha = max(alpha , bestVal)
+            if verbose:
+                print("maximize: alpha = " + str(alpha) + " beta = " + str(beta))
             if alpha >= beta:
                 return bestVal, nodes_visited
     else:
         bestVal = 99999
         for move in legals:
+            if verbose:
+                print("move = " + str(move))
             board.push(move)
             val, nodes = alphaBeta(board , depth -1, alpha, beta, not maximize)
-            bestVal = max(bestVal , val)
+            bestVal = min(bestVal , val)
             board.pop()
             nodes_visited += nodes
             beta = min(beta , bestVal)
+            if verbose:
+                print("minimize: alpha = " + str(alpha) + " beta = " + str(beta))
             if beta <= alpha:
                 return bestVal, nodes_visited
     return bestVal, nodes_visited
 
 # Move generator
-def getNextMove(depth , board , maximize):
+def getNextMove(depth , board , maximize, verbose=False):
+    use_alpha_beta = True
     legals = board.legal_moves
     bestMove = None
-    bestValue = -99999
     nodes_visited = 0
+    bestValue = -99999
     if(not maximize):
         bestValue = 99999
+    if use_alpha_beta:
+        alpha = -99999
+        beta = 99999
     for move in legals:
+        if verbose:
+            print("move = " + str(move))
         board.push(move)
-        # Minimax
-        #value, nodes = minimax(board , depth - 1, (not maximize))
-        # Alpha beta pruning
-        value, nodes = alphaBeta(board , depth - 1, -99999, 99999, (not maximize))
+        if use_alpha_beta:
+            # Alpha beta pruning
+            value, nodes = alphaBeta(board , depth - 1, alpha, beta, (not maximize), verbose)
+        else:
+            # Minimax
+            value, nodes = minimax(board , depth - 1, (not maximize), verbose)
         board.pop()
+        if verbose:
+            print("value = " + str(value))
+        nodes_visited += nodes
         if maximize:
             if value > bestValue:
                 bestValue = value
                 bestMove = move
+                alpha = max(alpha , bestValue)
+                if verbose:
+                    print("alpha = " + str(alpha) + " beta = " + str(beta))
+                if alpha >= beta:
+                    return bestMove, bestValue, nodes_visited
         else:
             if value < bestValue:
                 bestValue = value
                 bestMove = move
-        nodes_visited += nodes
-        print("After move " + str(move) + " nodes visited = " + str(nodes_visited))
+                beta = min(beta , bestValue)
+                if verbose:
+                    print("alpha = " + str(alpha) + " beta = " + str(beta))
+                if beta <= alpha:
+                    return bestMove, bestValue, nodes_visited
+        if verbose:
+            print("After move " + str(move) + " nodes visited = " + str(nodes_visited))
     return (bestMove , bestValue, nodes_visited)
 
 
@@ -145,4 +174,4 @@ print(board)
 print(" current evaluation ")
 print(eval(board))
 print(" move generator ")
-print(getNextMove(3 , board , True))
+print(getNextMove(5 , board , True))
