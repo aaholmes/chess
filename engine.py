@@ -74,7 +74,7 @@ def minimax(board , depth , maximize):
     return best_value, nodes_visited
 
 # Alpha beta pruning
-def alphaBeta(board , depth , alpha , beta , maximize, verbose=False):
+def alphaBeta(board , depth , alpha , beta , maximize, use_quiescence_search, verbose=False):
     if(board.is_checkmate ()):
         if(board.turn == chess.WHITE):
             return -99999, 1
@@ -83,7 +83,10 @@ def alphaBeta(board , depth , alpha , beta , maximize, verbose=False):
     if(board.is_stalemate () or board.is_insufficient_material ()):
         return 0, 1
     if depth == 0:
-        return eval(board), 1
+        if use_quiescence_search:
+            raise ValueError("Quiescence search not implemented")
+        else
+            return eval(board), 1
     nodes_visited = 0
     legals = board.legal_moves
     if(maximize):
@@ -92,7 +95,7 @@ def alphaBeta(board , depth , alpha , beta , maximize, verbose=False):
             if verbose:
                 print("move = " + str(move))
             board.push(move)
-            val, nodes = alphaBeta(board , depth -1, alpha, beta, not maximize)
+            val, nodes = alphaBeta(board , depth -1, alpha, beta, not maximize, use_quiescence_search, verbose)
             bestVal = max(bestVal , val)
             board.pop()
             nodes_visited += nodes
@@ -107,7 +110,7 @@ def alphaBeta(board , depth , alpha , beta , maximize, verbose=False):
             if verbose:
                 print("move = " + str(move))
             board.push(move)
-            val, nodes = alphaBeta(board , depth -1, alpha, beta, not maximize)
+            val, nodes = alphaBeta(board , depth -1, alpha, beta, not maximize, use_quiescence_search, verbose)
             bestVal = min(bestVal , val)
             board.pop()
             nodes_visited += nodes
@@ -121,6 +124,7 @@ def alphaBeta(board , depth , alpha , beta , maximize, verbose=False):
 # Move generator
 def getNextMove(depth , board , maximize, verbose=False):
     use_alpha_beta = True
+    use_quiescence_search = False
     legals = board.legal_moves
     bestMove = None
     nodes_visited = 0
@@ -136,7 +140,7 @@ def getNextMove(depth , board , maximize, verbose=False):
         board.push(move)
         if use_alpha_beta:
             # Alpha beta pruning
-            value, nodes = alphaBeta(board , depth - 1, alpha, beta, (not maximize), verbose)
+            value, nodes = alphaBeta(board , depth - 1, alpha, beta, (not maximize), use_quiescence_search, verbose)
         else:
             # Minimax
             value, nodes = minimax(board , depth - 1, (not maximize), verbose)
