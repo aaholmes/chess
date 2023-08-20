@@ -1,0 +1,9 @@
+1. Bootstrap with a fast NN trained on lots of good games (OTB/corr/computer)
+2. Can have several components to choosing a move: e.g., first exhaustively search for mate in 3, then perform MCTS rollout
+3. We can use several different NNs: e.g., a fast one for generating moves during training (bootstrapped and updated), and a large one for the final agent (no need to bootstrap, but can be updated in parallel to the training games). Use the fast NN both for move ordering (bootstrapped) and for position eval (bootstrapped to be something simple like material counting).
+4. During training, can we actually use alpha beta search?
+5. After training, we may have an alpha beta search and/or an MCTS search
+6. Is NNUE only used to eval positions? Not for move ordering?
+7. Train NNUE strictly to learn to rank, use it for move ordering?
+8. NNUE with additional layers: after the 512->32 layer use a densenet of 32 -> 32 layers such that the total computation time is no more than that of the 512->32 layer. Makes the NN much more powerful for not much more computation time. So e.g. the first layer is 32x32, the next is 32x64, then 32x96, so it's like 32x32*(1+2+3...) or 32x32*(L+1)*L/2, so solving for L to keep that 32x512 or less, we would get L = 5. So, we would replace the 512->32->32->1 NN with a 512->(5 layer densenet with 32 neurons per layer)->1 NN. This is much more powerful while being less than double the calculation time!
+9. Julia based humanlike player that uses human rating as input and tries to predict human move, also uses MCTS tree search but has a differentiable, rating dependent prob of early stopping, can also perform a deterministic win search up to a depth or total node count that is also differentiable and rating dependent
