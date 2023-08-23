@@ -7,7 +7,7 @@ use std::ptr::write;
 // We will use a 64-bit unsigned integer to represent the bitboard for each piece.
 #[derive(Copy, Clone)]
 pub struct Bitboard {
-    w_to_move: bool,
+    pub(crate) w_to_move: bool,
     w_castle_k: bool,
     w_castle_q: bool,
     b_castle_k: bool,

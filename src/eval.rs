@@ -219,7 +219,7 @@ impl PestoEval {
 
     pub fn eval(&self, board: Bitboard) -> i32
     // Computes the eval according to the Pesto evaluation function
-    // For now, assumes that player to move is white
+    // Relative to the side to move
     {
         let mut mg: [i32; 2] = [0, 0];
         let mut eg: [i32; 2] = [0, 0];
@@ -237,8 +237,15 @@ impl PestoEval {
         }
 
         // Tapered eval
-        let mg_score: i32 = mg[0] - mg[1];
-        let eg_score: i32 = eg[0] - eg[1];
+        let mg_score: i32;
+        let eg_score: i32;
+        if board.w_to_move {
+            mg_score = mg[1] - mg[0];
+            eg_score = eg[1] - eg[0];
+        } else {
+            mg_score = mg[0] - mg[1];
+            eg_score = eg[0] - eg[1];
+        }
         let mg_phase: i32 = min(24, game_phase); // Can exceed 24 in case of early promotion
         let eg_phase: i32 = 24 - mg_phase;
         return (mg_score * mg_phase + eg_score * eg_phase) / 24;
