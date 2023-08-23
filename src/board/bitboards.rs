@@ -11,7 +11,7 @@ pub struct Bitboard {
     w_castle_q: bool,
     b_castle_k: bool,
     b_castle_q: bool,
-    en_passant: u8, // file of en passant square (-1 if none)
+    en_passant: i8, // file of en passant square (-1 if none)
     halfmove_clock: u8, // number of halfmoves since last capture or pawn advance
     wk: u64,
     wq: u64,
@@ -70,4 +70,71 @@ pub fn algebraic_to_bit(algebraic: &str) -> u64 {
 pub fn bit_to_algebraic(bit: u64) -> String {
     let sq_ind = bit_to_sq_ind(bit);
     sq_ind_to_algebraic(sq_ind)
+}
+
+impl Bitboard {
+    pub(crate) fn new() -> Bitboard {
+        Bitboard {
+            w_to_move: true,
+            w_castle_k: true,
+            w_castle_q: true,
+            b_castle_k: true,
+            b_castle_q: true,
+            en_passant: -1,
+            halfmove_clock: 0,
+            wk: 0x0000000000000010,
+            wq: 0x0000000000000008,
+            wr: 0x0000000000000081,
+            wb: 0x0000000000000024,
+            wn: 0x0000000000000042,
+            wp: 0x000000000000FF00,
+            bk: 0x1000000000000000,
+            bq: 0x0800000000000000,
+            br: 0x8100000000000000,
+            bb: 0x2400000000000000,
+            bn: 0x4200000000000000,
+            bp: 0x00FF000000000000,
+        }
+    }
+
+    pub fn print(self) {
+        println!("  +-----------------+");
+        for rank in (0..8).rev() {
+            print!("{} | ", rank + 1);
+            for file in 0..8 {
+                let sq_ind = coords_to_sq_ind(file, rank);
+                let bit = sq_ind_to_bit(sq_ind);
+                if bit & self.wk != 0 {
+                    print!("K ");
+                } else if bit & self.wq != 0 {
+                    print!("Q ");
+                } else if bit & self.wr != 0 {
+                    print!("R ");
+                } else if bit & self.wb != 0 {
+                    print!("B ");
+                } else if bit & self.wn != 0 {
+                    print!("N ");
+                } else if bit & self.wp != 0 {
+                    print!("P ");
+                } else if bit & self.bk != 0 {
+                    print!("k ");
+                } else if bit & self.bq != 0 {
+                    print!("q ");
+                } else if bit & self.br != 0 {
+                    print!("r ");
+                } else if bit & self.bb != 0 {
+                    print!("b ");
+                } else if bit & self.bn != 0 {
+                    print!("n ");
+                } else if bit & self.bp != 0 {
+                    print!("p ");
+                } else {
+                    print!(". ");
+                }
+            }
+            println!("|");
+        }
+        println!("  +-----------------+");
+        println!("    a b c d e f g h");
+    }
 }
