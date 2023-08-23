@@ -1,6 +1,7 @@
 // Define the bitboard data type and its methods.
 
 use std::fmt;
+use std::ptr::write;
 
 // Define the bitboard data type.
 // We will use a 64-bit unsigned integer to represent the bitboard for each piece.
@@ -25,6 +26,7 @@ pub struct Bitboard {
     bb: u64,
     bn: u64,
     bp: u64,
+    pub(crate) pieces: [u64; 12], // just for now, specify everything twice. once it's working, we can choose one of the two representations
 }
 
 // Little Endian Rank Mapping
@@ -72,6 +74,10 @@ pub fn bit_to_algebraic(bit: u64) -> String {
     sq_ind_to_algebraic(sq_ind)
 }
 
+pub fn flip_sq_ind_vertically(sq_ind: u8) -> u8 {
+    8 * (7 - sq_ind / 8) + sq_ind % 8
+}
+
 pub fn flip_vertically(bit: u64) -> u64 {
     return  ( (bit << 56)                           ) |
         ( (bit << 40) & (0x00ff000000000000) ) |
@@ -85,6 +91,18 @@ pub fn flip_vertically(bit: u64) -> u64 {
 
 impl Bitboard {
     pub(crate) fn new() -> Bitboard {
+        let wk: u64 = 0x0000000000000010;
+        let wq: u64 = 0x0000000000000008;
+        let wr: u64 = 0x0000000000000081;
+        let wb: u64 = 0x0000000000000024;
+        let wn: u64 = 0x0000000000000042;
+        let wp: u64 = 0x000000000000FF00;
+        let bk: u64 = 0x1000000000000000;
+        let bq: u64 = 0x0800000000000000;
+        let br: u64 = 0x8100000000000000;
+        let bb: u64 = 0x2400000000000000;
+        let bn: u64 = 0x4200000000000000;
+        let bp: u64 = 0x00FF000000000000;
         Bitboard {
             w_to_move: true,
             w_castle_k: true,
@@ -93,18 +111,19 @@ impl Bitboard {
             b_castle_q: true,
             en_passant: None,
             halfmove_clock: 0,
-            wk: 0x0000000000000010,
-            wq: 0x0000000000000008,
-            wr: 0x0000000000000081,
-            wb: 0x0000000000000024,
-            wn: 0x0000000000000042,
-            wp: 0x000000000000FF00,
-            bk: 0x1000000000000000,
-            bq: 0x0800000000000000,
-            br: 0x8100000000000000,
-            bb: 0x2400000000000000,
-            bn: 0x4200000000000000,
-            bp: 0x00FF000000000000,
+            wk,
+            wq,
+            wr,
+            wb,
+            wn,
+            wp,
+            bk,
+            bq,
+            br,
+            bb,
+            bn,
+            bp,
+            pieces: [wp, bp, wn, bn, wb, bb, wr, br, wq, bq, wk, bk]
         }
     }
 
@@ -151,26 +170,31 @@ impl Bitboard {
 
     pub fn flip_vertically(self) -> Bitboard {
         // Flip the board vertically, returning a new board.
+        let mut flipped_pieces: [u64; 12] = [0; 12];
+        for i in 0..12 {
+            flipped_pieces[i] = flip_vertically(self.pieces[i]);
+        }
         Bitboard {
             w_to_move: !self.w_to_move,
             w_castle_k: self.b_castle_k,
             w_castle_q: self.b_castle_q,
             b_castle_k: self.w_castle_k,
             b_castle_q: self.w_castle_q,
-            en_passant: self.en_passant,
+            en_passant: {if self.en_passant == None {None} else {Some(flip_sq_ind_vertically(self.en_passant.unwrap()))}},
             halfmove_clock: self.halfmove_clock,
-            wk: flip_vertically(self.wk),
-            wq: flip_vertically(self.wq),
-            wr: flip_vertically(self.wr),
-            wb: flip_vertically(self.wb),
-            wn: flip_vertically(self.wn),
-            wp: flip_vertically(self.wp),
-            bk: flip_vertically(self.bk),
-            bq: flip_vertically(self.bq),
-            br: flip_vertically(self.br),
-            bb: flip_vertically(self.bb),
-            bn: flip_vertically(self.bn),
-            bp: flip_vertically(self.bp)
+            wk: flipped_pieces[10],
+            wq: flipped_pieces[8],
+            wr: flipped_pieces[6],
+            wb: flipped_pieces[4],
+            wn: flipped_pieces[2],
+            wp: flipped_pieces[0],
+            bk: flipped_pieces[11],
+            bq: flipped_pieces[9],
+            br: flipped_pieces[7],
+            bb: flipped_pieces[5],
+            bn: flipped_pieces[3],
+            bp: flipped_pieces[1],
+            pieces: flipped_pieces
         }
     }
 }
