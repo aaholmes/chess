@@ -3,7 +3,7 @@
 // opening and endgame, optimized by Texel tuning.
 
 use std::cmp::min;
-use crate::board::bitboards::{Bitboard, flip_sq_ind_vertically};
+use crate::bitboard::{Bitboard, flip_sq_ind_vertically};
 
 pub(crate) struct PestoEval {
     mg_table: [[i32; 64]; 12],
