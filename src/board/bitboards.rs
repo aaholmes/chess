@@ -11,7 +11,7 @@ pub struct Bitboard {
     w_castle_q: bool,
     b_castle_k: bool,
     b_castle_q: bool,
-    en_passant: i8, // file of en passant square (-1 if none)
+    en_passant: Option<u8>, // index of square where en passant is possible
     halfmove_clock: u8, // number of halfmoves since last capture or pawn advance
     wk: u64,
     wq: u64,
@@ -72,6 +72,17 @@ pub fn bit_to_algebraic(bit: u64) -> String {
     sq_ind_to_algebraic(sq_ind)
 }
 
+pub fn flip_vertically(bit: u64) -> u64 {
+    return  ( (bit << 56)                           ) |
+        ( (bit << 40) & (0x00ff000000000000) ) |
+        ( (bit << 24) & (0x0000ff0000000000) ) |
+        ( (bit <<  8) & (0x000000ff00000000) ) |
+        ( (bit >>  8) & (0x00000000ff000000) ) |
+        ( (bit >> 24) & (0x0000000000ff0000) ) |
+        ( (bit >> 40) & (0x000000000000ff00) ) |
+        ( (bit >> 56) );
+}
+
 impl Bitboard {
     pub(crate) fn new() -> Bitboard {
         Bitboard {
@@ -80,7 +91,7 @@ impl Bitboard {
             w_castle_q: true,
             b_castle_k: true,
             b_castle_q: true,
-            en_passant: -1,
+            en_passant: None,
             halfmove_clock: 0,
             wk: 0x0000000000000010,
             wq: 0x0000000000000008,
@@ -136,5 +147,30 @@ impl Bitboard {
         }
         println!("  +-----------------+");
         println!("    a b c d e f g h");
+    }
+
+    pub fn flip_vertically(self) -> Bitboard {
+        // Flip the board vertically, returning a new board.
+        Bitboard {
+            w_to_move: !self.w_to_move,
+            w_castle_k: self.b_castle_k,
+            w_castle_q: self.b_castle_q,
+            b_castle_k: self.w_castle_k,
+            b_castle_q: self.w_castle_q,
+            en_passant: self.en_passant,
+            halfmove_clock: self.halfmove_clock,
+            wk: flip_vertically(self.wk),
+            wq: flip_vertically(self.wq),
+            wr: flip_vertically(self.wr),
+            wb: flip_vertically(self.wb),
+            wn: flip_vertically(self.wn),
+            wp: flip_vertically(self.wp),
+            bk: flip_vertically(self.bk),
+            bq: flip_vertically(self.bq),
+            br: flip_vertically(self.br),
+            bb: flip_vertically(self.bb),
+            bn: flip_vertically(self.bn),
+            bp: flip_vertically(self.bp)
+        }
     }
 }
