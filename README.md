@@ -31,3 +31,6 @@ The goal is to make a reasonably good chess engine inspired by
 
 ## Programming language
 We will use Rust for the first version. In the long term we may want to use Rust for the search, Python for the neural network, and Julia as a driver.
+
+## Credits
+Image generated using Canva
