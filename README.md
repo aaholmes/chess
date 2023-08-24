@@ -1,5 +1,6 @@
-![kingfisher_logo](https://github.com/aaholmes/chess/assets/4913443/bcca7d62-cfd0-407c-9e17-fbcbe403dfcf)
 # Kingfisher
+![kingfisher_logo](https://github.com/aaholmes/chess/assets/4913443/059cd779-912b-439b-8eee-e4f513c25b01)
+
 
 The goal is to make a reasonably good chess engine inspired by
 1. The book "Neural Networks for Chess" by Dominik Klein - they say that the future best engines will continue to be alpha-beta pruning with a fast neural network evaluation function.
