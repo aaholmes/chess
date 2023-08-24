@@ -1,4 +1,6 @@
-# Chess engine
+![kingfisher_logo](https://github.com/aaholmes/chess/assets/4913443/bcca7d62-cfd0-407c-9e17-fbcbe403dfcf)
+# Kingfisher
+
 The goal is to make a reasonably good chess engine inspired by
 1. The book "Neural Networks for Chess" by Dominik Klein - they say that the future best engines will continue to be alpha-beta pruning with a fast neural network evaluation function.
 2. The Berserk chess engine - one of the best open source engines, and appears to be only a few years old.
