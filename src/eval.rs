@@ -9,28 +9,6 @@ pub(crate) struct PestoEval {
     mg_table: [[i32; 64]; 12],
     eg_table: [[i32; 64]; 12]
 }
-const PAWN: usize = 0;
-const KNIGHT: usize = 1;
-const BISHOP: usize = 2;
-const ROOK: usize = 3;
-const QUEEN: usize = 4;
-const KING: usize = 5;
-
-const WHITE: usize = 0;
-const BLACK: usize = 1;
-
-const WHITE_PAWN: usize = 2 * PAWN + WHITE;
-const BLACK_PAWN: usize = 2 * PAWN + BLACK;
-const WHITE_KNIGHT: usize = 2 * KNIGHT + WHITE;
-const BLACK_KNIGHT: usize = 2 * KNIGHT + BLACK;
-const WHITE_BISHOP: usize = 2 * BISHOP + WHITE;
-const BLACK_BISHOP: usize = 2 * BISHOP + BLACK;
-const WHITE_ROOK: usize = 2 * ROOK + WHITE;
-const BLACK_ROOK: usize = 2 * ROOK + BLACK;
-const WHITE_QUEEN: usize = 2 * QUEEN + WHITE;
-const BLACK_QUEEN: usize = 2 * QUEEN + BLACK;
-const WHITE_KING: usize = 2 * KING + WHITE;
-const BLACK_KING: usize = 2 * KING + BLACK;
 
 fn player(piece: usize) -> usize {piece & 1}
 
@@ -203,10 +181,10 @@ impl PestoEval {
     {
         let mut mg_table: [[i32; 64]; 12] = [[0; 64]; 12];
         let mut eg_table: [[i32; 64]; 12] = [[0; 64]; 12];
-        for p in PAWN..=KING {
+        for p in 0..6 {
             for sq in 0..64 {
-                mg_table[2 * p][sq] = MG_VALUE[p] + MG_PESTO_TABLE[p][flip_sq_ind_vertically(sq as u8) as usize];
-                eg_table[2 * p][sq] = EG_VALUE[p] + EG_PESTO_TABLE[p][flip_sq_ind_vertically(sq as u8) as usize];
+                mg_table[2 * p][sq] = MG_VALUE[p] + MG_PESTO_TABLE[p][flip_sq_ind_vertically(sq)];
+                eg_table[2 * p][sq] = EG_VALUE[p] + EG_PESTO_TABLE[p][flip_sq_ind_vertically(sq)];
                 mg_table[2 * p + 1][sq] = MG_VALUE[p] + MG_PESTO_TABLE[p][sq];
                 eg_table[2 * p + 1][sq] = EG_VALUE[p] + EG_PESTO_TABLE[p][sq];
             }
@@ -217,7 +195,7 @@ impl PestoEval {
         }
     }
 
-    pub fn eval(&self, board: Bitboard) -> i32
+    pub fn eval(&self, board: &Bitboard) -> i32
     // Computes the eval according to the Pesto evaluation function
     // Relative to the side to move
     {
@@ -228,7 +206,7 @@ impl PestoEval {
         // Evaluate each piece
         for piece in 0..12 {
             for sq in 0..64 {
-                if board.pieces[piece as usize] & (1 << sq) != 0 {
+                if board.pieces[piece] & (1 << sq) != 0 {
                     mg[player(piece)] += self.mg_table[piece][sq];
                     eg[player(piece)] += self.eg_table[piece][sq];
                     game_phase += GAMEPHASE_INC[piece];
