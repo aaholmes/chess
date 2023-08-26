@@ -26,21 +26,14 @@ fn main() {
     board.print();
     // Move a2a4, g8f6, a1a2, d7d5
     println!("{}", pesto.eval(&board));
-    board.pieces[WP] ^= bitboard::sq_ind_to_bit(bitboard::algebraic_to_sq_ind("a2"));
-    board.pieces[WP] ^= bitboard::sq_ind_to_bit(bitboard::algebraic_to_sq_ind("a4"));
-    board.w_to_move = !board.w_to_move;
+    board = board.make_move(bitboard::algebraic_to_sq_ind("a2"), bitboard::algebraic_to_sq_ind("a4"), None);
     println!("{}", pesto.eval(&board));
-    board.pieces[BN] ^= bitboard::sq_ind_to_bit(bitboard::algebraic_to_sq_ind("g8"));
-    board.pieces[BN] ^= bitboard::sq_ind_to_bit(bitboard::algebraic_to_sq_ind("f6"));
-    board.w_to_move = !board.w_to_move;
+    board = board.make_move(bitboard::algebraic_to_sq_ind("g8"), bitboard::algebraic_to_sq_ind("f6"), None);
     println!("{}", pesto.eval(&board));
-    board.pieces[WR] ^= bitboard::sq_ind_to_bit(bitboard::algebraic_to_sq_ind("a1"));
-    board.pieces[WR] ^= bitboard::sq_ind_to_bit(bitboard::algebraic_to_sq_ind("a2"));
-    board.w_to_move = !board.w_to_move;
+    board = board.make_move(bitboard::algebraic_to_sq_ind("a1"), bitboard::algebraic_to_sq_ind("a2"), None);
     println!("{}", pesto.eval(&board));
-    board.pieces[BP] ^= bitboard::sq_ind_to_bit(bitboard::algebraic_to_sq_ind("d7"));
-    board.pieces[BP] ^= bitboard::sq_ind_to_bit(bitboard::algebraic_to_sq_ind("d5"));
-    board.w_to_move = !board.w_to_move;
+    board = board.make_move(bitboard::algebraic_to_sq_ind("d7"), bitboard::algebraic_to_sq_ind("d5"), None);
     println!("{}", pesto.eval(&board));
     assert_eq!(pesto.eval(&board), 88);
+    board.print();
 }

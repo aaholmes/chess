@@ -2,10 +2,11 @@
 use crate::bitboard::{Bitboard, sq_ind_to_bit, WP, BP, WR, BR, WK, BK};
 
 impl Bitboard {
-    pub fn make_move(self, from_sq_ind: usize, to_sq_ind: usize, promotion: Option<usize>) -> Bitboard {
+    pub fn make_move(&self, from_sq_ind: usize, to_sq_ind: usize, promotion: Option<usize>) -> Bitboard {
         // Make a move, returning a new board.
 
         let mut new_board: Bitboard = self.clone();
+        new_board.halfmove_clock += 1;
 
         let from_bit = sq_ind_to_bit(from_sq_ind);
         let to_bit = sq_ind_to_bit(to_sq_ind);
@@ -28,7 +29,7 @@ impl Bitboard {
         if from_piece.unwrap() < 2 {
             // Pawn move: Reset halfmove clock.
             new_board.halfmove_clock = 0;
-            if ((to_sq_ind - from_sq_ind) as i8).abs() == 16 {
+            if ((to_sq_ind as i8) - (from_sq_ind as i8)).abs() == 16 {
                 // Pawn double move: Set en passant square.
                 new_board.en_passant = Some((from_sq_ind + to_sq_ind) / 2);
             }
@@ -80,14 +81,14 @@ impl Bitboard {
             }
             new_board.b_castle_k = false;
             new_board.b_castle_q = false;
-        } else if from_piece.unwrap() == 6 {
+        } else if from_piece.unwrap() == WR {
             // White rook
             if from_sq_ind == 0 {
                 new_board.w_castle_q = false;
             } else if from_sq_ind == 7 {
                 new_board.w_castle_k = false;
             }
-        } else if from_piece.unwrap() == 7 {
+        } else if from_piece.unwrap() == BR {
             // Black rook
             if from_sq_ind == 56 {
                 new_board.b_castle_q = false;
