@@ -218,7 +218,7 @@ impl MoveGen {
             // White to move
             for from_sq_ind in bits(&board.pieces[WP]) {
                 for to_sq_ind in &self.wp_captures_promotions[from_sq_ind] {
-                    if board.get_piece(*to_sq_ind) != None {
+                    if board.get_piece(*to_sq_ind) != None || board.en_passant == Some(*to_sq_ind) {
                         if from_sq_ind > 47 && from_sq_ind < 56 {
                             append_promotions(&mut captures, from_sq_ind, to_sq_ind, board.w_to_move);
                         } else {
@@ -231,7 +231,13 @@ impl MoveGen {
                         if from_sq_ind > 47 && from_sq_ind < 56 {
                             append_promotions(&mut captures, from_sq_ind, to_sq_ind, board.w_to_move);
                         } else {
-                            moves.push((from_sq_ind, *to_sq_ind, None));
+                            if from_sq_ind > 7 && from_sq_ind < 16 {
+                                if board.get_piece(*to_sq_ind + 8) == None {
+                                    moves.push((from_sq_ind, *to_sq_ind, None));
+                                }
+                            } else {
+                                moves.push((from_sq_ind, *to_sq_ind, None));
+                            }
                         }
                     }
                 }
@@ -240,7 +246,7 @@ impl MoveGen {
             // Black to move
             for from_sq_ind in bits(&board.pieces[BP]) {
                 for to_sq_ind in &self.bp_captures_promotions[from_sq_ind] {
-                    if board.get_piece(*to_sq_ind) != None {
+                    if board.get_piece(*to_sq_ind) != None || board.en_passant == Some(*to_sq_ind) {
                         if from_sq_ind > 7 && from_sq_ind < 16 {
                             append_promotions(&mut captures, from_sq_ind, to_sq_ind, board.w_to_move);
                         } else {
@@ -253,7 +259,13 @@ impl MoveGen {
                         if from_sq_ind > 7 && from_sq_ind < 16 {
                             append_promotions(&mut captures, from_sq_ind, to_sq_ind, board.w_to_move);
                         } else {
-                            moves.push((from_sq_ind, *to_sq_ind, None));
+                            if from_sq_ind > 47 && from_sq_ind < 56 {
+                                if board.get_piece(*to_sq_ind - 8) == None {
+                                    moves.push((from_sq_ind, *to_sq_ind, None));
+                                }
+                            } else {
+                                moves.push((from_sq_ind, *to_sq_ind, None));
+                            }
                         }
                     }
                 }
@@ -261,8 +273,6 @@ impl MoveGen {
         }
         (captures, moves)
     }
-
-
 
     fn gen_knight_moves(&self, board: &Bitboard) -> (Vec<(usize, usize, Option<usize>)>, Vec<(usize, usize, Option<usize>)>) {
         // Generate all possible knight moves for the current position.
@@ -325,6 +335,4 @@ impl MoveGen {
         }
         (captures, moves)
     }
-
-
 }
