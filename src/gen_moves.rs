@@ -154,6 +154,20 @@ fn init_pawn_moves(from_sq_ind: usize) -> (Vec<usize>, Vec<usize>) {
     (white, black)
 }
 
+fn append_promotions(captures: &mut Vec<(usize, usize, Option<usize>)>, from_sq_ind: usize, to_sq_ind: &usize, w_to_move: bool) {
+    if w_to_move {
+        captures.push((from_sq_ind, *to_sq_ind, Some(WQ)));
+        captures.push((from_sq_ind, *to_sq_ind, Some(WR)));
+        captures.push((from_sq_ind, *to_sq_ind, Some(WN)));
+        captures.push((from_sq_ind, *to_sq_ind, Some(WB)));
+    } else {
+        captures.push((from_sq_ind, *to_sq_ind, Some(BQ)));
+        captures.push((from_sq_ind, *to_sq_ind, Some(BR)));
+        captures.push((from_sq_ind, *to_sq_ind, Some(BN)));
+        captures.push((from_sq_ind, *to_sq_ind, Some(BB)));
+    }
+}
+
 impl MoveGen {
     pub fn new() -> MoveGen {
         // Initialize the move generator by creating the iterators for Pawn, Knight, and King moves.
@@ -190,8 +204,65 @@ impl MoveGen {
     }
 
     pub fn gen_moves(&self, board: &Bitboard) -> (Vec<(usize, usize, Option<usize>)>, Vec<(usize, usize, Option<usize>)>) {
-        self.gen_knight_moves(board)
+        self.gen_pawn_moves(board)
     }
+
+    fn gen_pawn_moves(&self, board: &Bitboard) -> (Vec<(usize, usize, Option<usize>)>, Vec<(usize, usize, Option<usize>)>) {
+        // Generate all possible pawn moves for the current position.
+        // Returns a vector of captures and a vector of non-captures, both in the form tuples (from_sq_ind, to_sq_ind, None).
+        // Treats promotions as captures.
+        // Lists promotions in the following order: queen, rook, knight, bishop, since bishop promotions are very rare.
+        let mut moves: Vec<(usize, usize, Option<usize>)> = Vec::new();
+        let mut captures: Vec<(usize, usize, Option<usize>)> = Vec::new();
+        if board.w_to_move {
+            // White to move
+            for from_sq_ind in bits(&board.pieces[WP]) {
+                for to_sq_ind in &self.wp_captures_promotions[from_sq_ind] {
+                    if board.get_piece(*to_sq_ind) != None {
+                        if from_sq_ind > 47 && from_sq_ind < 56 {
+                            append_promotions(&mut captures, from_sq_ind, to_sq_ind, board.w_to_move);
+                        } else {
+                            captures.push((from_sq_ind, *to_sq_ind, None));
+                        }
+                    }
+                }
+                for to_sq_ind in &self.wp_moves[from_sq_ind] {
+                    if board.get_piece(*to_sq_ind) == None {
+                        if from_sq_ind > 47 && from_sq_ind < 56 {
+                            append_promotions(&mut captures, from_sq_ind, to_sq_ind, board.w_to_move);
+                        } else {
+                            moves.push((from_sq_ind, *to_sq_ind, None));
+                        }
+                    }
+                }
+            }
+        } else {
+            // Black to move
+            for from_sq_ind in bits(&board.pieces[BP]) {
+                for to_sq_ind in &self.bp_captures_promotions[from_sq_ind] {
+                    if board.get_piece(*to_sq_ind) != None {
+                        if from_sq_ind > 7 && from_sq_ind < 16 {
+                            append_promotions(&mut captures, from_sq_ind, to_sq_ind, board.w_to_move);
+                        } else {
+                            captures.push((from_sq_ind, *to_sq_ind, None));
+                        }
+                    }
+                }
+                for to_sq_ind in &self.bp_moves[from_sq_ind] {
+                    if board.get_piece(*to_sq_ind) == None {
+                        if from_sq_ind > 7 && from_sq_ind < 16 {
+                            append_promotions(&mut captures, from_sq_ind, to_sq_ind, board.w_to_move);
+                        } else {
+                            moves.push((from_sq_ind, *to_sq_ind, None));
+                        }
+                    }
+                }
+            }
+        }
+        (captures, moves)
+    }
+
+
 
     fn gen_knight_moves(&self, board: &Bitboard) -> (Vec<(usize, usize, Option<usize>)>, Vec<(usize, usize, Option<usize>)>) {
         // Generate all possible knight moves for the current position.
