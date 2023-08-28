@@ -2,15 +2,12 @@
 // We divide it up into two functions: one for generating moves for a single piece, and one for generating moves for all pieces.
 // The latter will call the former for each piece.
 // For this version, we generate moves in the following order:
-// 1. Pawn captures and promotions
-// 2. Knight captures
-// 3. Bishop captures
-// 4. Rook captures
-// 5. Queen captures
-// 6. King captures
-// 7. All other moves, ordered by change in pesto eval (precomputed)
-// This is not the most efficient order, but it is easy to implement and has the effect of favoring captures.
-// Also it will be easy to incorporate MVV-LVA ordering later.
+// 1. Captures/promotions in MVV-LVA order
+// 2. All other moves, ordered by change in pesto eval (precomputed)
+// I think this is relatively easy to do, and may even be close to optimal, even if we later change the eval function, e.g. to NNUE.
+// We can also use quiescence search to only generate captures and promotions.
+// For capture move orders, we should use 10*victim_value - attacker_value, where PNBRQK = 123456 e.g., PxQ = 10*5 - 1 = 49, KxN = 10*3 - 6 = 24, etc.
+// For promotions, we should use 10*promoted_piece_value - attacker_value, so Q promotion = 10*5 - 1 = 49, etc.
 
 
 use crate::bitboard::{sq_ind_to_bit, WP, BP, WN, BN, WB, BB, WR, BR, WQ, BQ, WK, BK, Bitboard};
@@ -22,12 +19,12 @@ const NOT_AB_FILE: u64 = 0xfcfcfcfcfcfcfcfc;
 const NOT_GH_FILE: u64 = 0x3f3f3f3f3f3f3f3f;
 const NOT_1_RANK: u64 = 0xffffffffffffff00;
 const NOT_8_RANK: u64 = 0x00ffffffffffffff;
-const NOT_12_RANK: u64 = 0x0000ffffffffffff;
-const NOT_78_RANK: u64 = 0xffffffffff000000;
+const NOT_12_RANK: u64 = 0xffffffffffff0000;
+const NOT_78_RANK: u64 = 0x0000ffffffffffff;
 const RANK_2: u64 = 0x000000000000ff00;
 const RANK_7: u64 = 0x00ff000000000000;
 
-struct MoveGen {
+pub(crate) struct MoveGen {
     // Generate all possible moves for a given position.
     // For now, only non-sliding moves.
     wp_captures_promotions: Vec<Vec<usize>>,
@@ -114,24 +111,26 @@ fn init_pawn_captures_promotions(from_sq_ind: usize) -> (Vec<usize>, Vec<usize>)
     // Separate for white and black.
     let from_bit: u64 = sq_ind_to_bit(from_sq_ind);
     let mut white: Vec<usize> = Vec::new();
-    if from_bit & NOT_A_FILE != 0 {
-        white.push(from_sq_ind + 7);
-    }
-    if from_bit & NOT_H_FILE != 0 {
-        white.push(from_sq_ind + 9);
-    }
-    if from_bit & RANK_7 != 0 {
-        white.push(from_sq_ind + 8);
-    }
     let mut black: Vec<usize> = Vec::new();
-    if from_bit & NOT_A_FILE != 0 {
-        black.push(from_sq_ind - 9);
-    }
-    if from_bit & NOT_H_FILE != 0 {
-        black.push(from_sq_ind - 7);
-    }
-    if from_bit & RANK_2 != 0 {
-        black.push(from_sq_ind - 8);
+    if from_bit & NOT_1_RANK & NOT_8_RANK != 0 {
+        if from_bit & NOT_A_FILE != 0 {
+            white.push(from_sq_ind + 7);
+        }
+        if from_bit & NOT_H_FILE != 0 {
+            white.push(from_sq_ind + 9);
+        }
+        if from_bit & RANK_7 != 0 {
+            white.push(from_sq_ind + 8);
+        }
+        if from_bit & NOT_A_FILE != 0 {
+            black.push(from_sq_ind - 9);
+        }
+        if from_bit & NOT_H_FILE != 0 {
+            black.push(from_sq_ind - 7);
+        }
+        if from_bit & RANK_2 != 0 {
+            black.push(from_sq_ind - 8);
+        }
     }
     (white, black)
 }
@@ -140,16 +139,18 @@ fn init_pawn_moves(from_sq_ind: usize) -> (Vec<usize>, Vec<usize>) {
     // Initialize the pawn moves for a given square.
     // Separate for white and black.
     let from_bit: u64 = sq_ind_to_bit(from_sq_ind);
-    let mut black: Vec<usize> = Vec::new();
-    if from_bit & RANK_2 != 0 {
-        black.push(from_sq_ind + 16);
-    }
-    black.push(from_sq_ind + 8);
     let mut white: Vec<usize> = Vec::new();
-    if from_bit & RANK_7 != 0 {
-        white.push(from_sq_ind - 16);
+    let mut black: Vec<usize> = Vec::new();
+    if from_bit & NOT_1_RANK & NOT_8_RANK != 0 {
+        if from_bit & RANK_2 != 0 {
+            white.push(from_sq_ind + 16);
+        }
+        white.push(from_sq_ind + 8);
+        if from_bit & RANK_7 != 0 {
+            black.push(from_sq_ind - 16);
+        }
+        black.push(from_sq_ind - 8);
     }
-    white.push(from_sq_ind - 8);
     (white, black)
 }
 
@@ -188,8 +189,11 @@ impl MoveGen {
         }
     }
 
+    pub fn gen_moves(&self, board: &Bitboard) -> (Vec<(usize, usize, Option<usize>)>, Vec<(usize, usize, Option<usize>)>) {
+        self.gen_knight_moves(board)
+    }
 
-    pub fn gen_knight_moves(&self, board: &Bitboard) -> (Vec<(usize, usize, Option<usize>)>, Vec<(usize, usize, Option<usize>)>) {
+    fn gen_knight_moves(&self, board: &Bitboard) -> (Vec<(usize, usize, Option<usize>)>, Vec<(usize, usize, Option<usize>)>) {
         // Generate all possible knight moves for the current position.
         // Returns a vector of captures and a vector of non-captures, both in the form tuples (from_sq_ind, to_sq_ind, None).
         let mut moves: Vec<(usize, usize, Option<usize>)> = Vec::new();
@@ -220,7 +224,7 @@ impl MoveGen {
         (captures, moves)
     }
 
-    pub fn gen_king_moves(&self, board: &Bitboard) -> (Vec<(usize, usize, Option<usize>)>, Vec<(usize, usize, Option<usize>)>) {
+    fn gen_king_moves(&self, board: &Bitboard) -> (Vec<(usize, usize, Option<usize>)>, Vec<(usize, usize, Option<usize>)>) {
         // Generate all possible king moves for the current position.
         // Returns a vector of captures and a vector of non-captures, both in the form tuples (from_sq_ind, to_sq_ind, None).
         let mut moves: Vec<(usize, usize, Option<usize>)> = Vec::new();
@@ -250,4 +254,6 @@ impl MoveGen {
         }
         (captures, moves)
     }
+
+
 }

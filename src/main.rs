@@ -4,6 +4,8 @@ mod eval;
 use eval::PestoEval;
 mod make_move;
 mod gen_moves;
+use gen_moves::MoveGen;
+use crate::bitboard::sq_ind_to_algebraic;
 
 fn main() {
     for i in 0..64 {
@@ -44,5 +46,14 @@ fn main() {
     println!("{}", pesto.eval(&board));
     assert_eq!(pesto.eval(&board), 52);
     board.print();
-
+    let move_gen = MoveGen::new();
+    let (captures, moves) = move_gen.gen_moves(&board);
+    println!("Captures:");
+    for c in captures {
+        println!("{} {}", sq_ind_to_algebraic(c.0), sq_ind_to_algebraic(c.1));
+    }
+    println!("Moves:");
+    for m in moves {
+        println!("{} {}", sq_ind_to_algebraic(m.0), sq_ind_to_algebraic(m.1));
+    }
 }
