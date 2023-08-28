@@ -1,9 +1,10 @@
-// Generate moves
+// Make moves
 use crate::bitboard::{Bitboard, sq_ind_to_bit, WP, BP, WR, BR, WK, BK};
 
 impl Bitboard {
     pub fn make_move(&self, from_sq_ind: usize, to_sq_ind: usize, promotion: Option<usize>) -> Bitboard {
         // Make a move, returning a new board.
+        // Assumes the move is legal.
 
         let mut new_board: Bitboard = self.clone();
         new_board.halfmove_clock += 1;
@@ -19,7 +20,7 @@ impl Bitboard {
         let to_piece = self.get_piece(to_sq_ind);
         if to_piece != None {
             // Capture: Remove the captured piece before moving.
-            new_board.pieces[to_piece.unwrap() as usize] ^= to_bit;
+            new_board.pieces[to_piece.unwrap()] ^= to_bit;
             new_board.halfmove_clock = 0;
         }
 
@@ -98,6 +99,7 @@ impl Bitboard {
         }
 
         new_board.w_to_move = !new_board.w_to_move;
+        new_board.pieces[12] = new_board.pieces[0] | new_board.pieces[1] | new_board.pieces[2] | new_board.pieces[3] | new_board.pieces[4] | new_board.pieces[5] | new_board.pieces[6] | new_board.pieces[7] | new_board.pieces[8] | new_board.pieces[9] | new_board.pieces[10] | new_board.pieces[11];
         return new_board;
     }
 }
