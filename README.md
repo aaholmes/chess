@@ -8,28 +8,23 @@ The goal is to make a reasonably good chess engine inspired by
 
 ## Goals for first version
 1. Bitboards
-2. Move generation
-3. Alpha-beta pruning
-4. Iterative deepening
-5. Pesto evaluation function
- 
-## Eventual other goals
-1. Bitboard representation of the board
-2. Magic bitboards for sliding pieces
-3. Depth-first alpha-beta pruning
-4. MVV-LVA move ordering
-5. Negamax
-6. Quiescence search
-7. Transposition table
-8. Iterative deepening
+2. Move generation including magic bitboards
+3. Negamax search
+4. Alpha-beta pruning
+5. Iterative deepening
+6. Pesto evaluation function (tapered)
+7. Move ordering:
+   1. Mate killer heuristic
+   2. MVV-LVA
+   3. Knight forks
+   4. Non-captures ordered according to Pesto eval
+8. Quiescence search
 9. Aspiration windows
-10. Tapered evaluation
-11. Material, piece-square, and mobility evaluation
-12. Pawn structure evaluation (doubled, isolated, backward, passed, duo, defended) (optional)
-13. Tune evaluation function with linear regression (optional)
-14. Minor move ordering (optional)
-15. Null move pruning (optional)
-
+10. Transposition table
+11. Null move pruning
+12. Mate killer heuristic
+13. UCI protocol
+ 
 ## Programming language
 We will use Rust for the first version. In the long term we may want to use Rust for the search, Python for the neural network, and Julia as a driver.
 

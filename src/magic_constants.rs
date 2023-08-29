@@ -1,6 +1,29 @@
 // Found using a modified C++ program from https://www.chessprogramming.org/Magic_Bitboards
 // The magic numbers contain 4-8 bits for rooks and 5-9 bits for bishops.
 
+// Number of bits in the blockers for each square
+pub const R_BITS: [i32; 64] = [
+  12, 11, 11, 11, 11, 11, 11, 12,
+  11, 10, 10, 10, 10, 10, 10, 11,
+  11, 10, 10, 10, 10, 10, 10, 11,
+  11, 10, 10, 10, 10, 10, 10, 11,
+  11, 10, 10, 10, 10, 10, 10, 11,
+  11, 10, 10, 10, 10, 10, 10, 11,
+  11, 10, 10, 10, 10, 10, 10, 11,
+  12, 11, 11, 11, 11, 11, 11, 12
+];
+
+pub const B_BITS: [i32; 64] = [
+  6, 5, 5, 5, 5, 5, 5, 6,
+  5, 5, 5, 5, 5, 5, 5, 5,
+  5, 5, 7, 7, 7, 7, 5, 5,
+  5, 5, 7, 9, 9, 7, 5, 5,
+  5, 5, 7, 9, 9, 7, 5, 5,
+  5, 5, 7, 7, 7, 7, 5, 5,
+  5, 5, 5, 5, 5, 5, 5, 5,
+  6, 5, 5, 5, 5, 5, 5, 6
+];
+
 pub const R_MAGIC: [u64; 64] = [
   0x80002000801040,
   0x40200000400010,
