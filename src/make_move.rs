@@ -1,5 +1,5 @@
 // Make moves
-use crate::bitboard::{Bitboard, sq_ind_to_bit, WP, BP, WR, BR, WK, BK};
+use crate::bitboard::{Bitboard, sq_ind_to_bit, WP, BP, WN, BN, WB, BB, WR, BR, WQ, BQ, WK, BK, WOCC, BOCC, OCC};
 
 impl Bitboard {
     pub fn make_move(&self, from_sq_ind: usize, to_sq_ind: usize, promotion: Option<usize>) -> Bitboard {
@@ -99,7 +99,9 @@ impl Bitboard {
         }
 
         new_board.w_to_move = !new_board.w_to_move;
-        new_board.pieces[12] = new_board.pieces[0] | new_board.pieces[1] | new_board.pieces[2] | new_board.pieces[3] | new_board.pieces[4] | new_board.pieces[5] | new_board.pieces[6] | new_board.pieces[7] | new_board.pieces[8] | new_board.pieces[9] | new_board.pieces[10] | new_board.pieces[11];
+        new_board.pieces[WOCC] = new_board.pieces[WP] | new_board.pieces[WN] | new_board.pieces[WB] | new_board.pieces[WR] | new_board.pieces[WQ] | new_board.pieces[WK];
+        new_board.pieces[BOCC] = new_board.pieces[BP] | new_board.pieces[BN] | new_board.pieces[BB] | new_board.pieces[BR] | new_board.pieces[BQ] | new_board.pieces[BK];
+        new_board.pieces[OCC] = new_board.pieces[WOCC] | new_board.pieces[BOCC];
         return new_board;
     }
 }

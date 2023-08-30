@@ -1,11 +1,15 @@
 mod bitboard;
 mod bits;
 mod eval;
+
+use std::arch::x86_64::_popcnt64;
 use eval::PestoEval;
 mod make_move;
 mod gen_moves;
 use gen_moves::MoveGen;
 use crate::bitboard::sq_ind_to_algebraic;
+mod magic_constants;
+use magic_constants::{R_MAGIC, B_MAGIC};
 
 fn main() {
     for i in 0..64 {
@@ -56,4 +60,25 @@ fn main() {
     for m in moves {
         println!("{} {}", sq_ind_to_algebraic(m.0), sq_ind_to_algebraic(m.1));
     }
+    let mut rbits: Vec<i32> = vec![];
+    let mut bbits: Vec<i32> = vec![];
+    for i in 0 .. 64 {
+        unsafe { rbits.push(_popcnt64(R_MAGIC[i] as i64)); }
+        unsafe { println!("{} {}", i, _popcnt64(R_MAGIC[i] as i64)); }
+    }
+    println!("___");
+    for i in 0 .. 64 {
+        unsafe { bbits.push(_popcnt64(B_MAGIC[i] as i64)); }
+        unsafe { println!("{} {}", i, _popcnt64(B_MAGIC[i] as i64)); }
+    }
+    println!("___");
+    println!("Min, max={} {}", rbits.iter().min().unwrap(), rbits.iter().max().unwrap());
+    println!("Min, max={} {}", bbits.iter().min().unwrap(), bbits.iter().max().unwrap());
+//    for i in 0 .. 64 {
+//        unsafe { println!("{} {} {} {}", i, _popcnt64(R_MAGIC[i] as i64), _popcnt64(R_MAGIC2[i] as i64), _popcnt64(R_MAGIC3[i] as i64)); }
+//    }
+//    println!("___");
+//    for i in 0 .. 64 {
+//        unsafe { println!("{} {} {} {}", i, _popcnt64(B_MAGIC[i] as i64), _popcnt64(B_MAGIC2[i] as i64), _popcnt64(B_MAGIC3[i] as i64)); }
+//    }
 }

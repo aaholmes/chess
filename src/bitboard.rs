@@ -11,7 +11,9 @@ pub(crate) const WQ: usize = 8;
 pub(crate) const BQ: usize = 9;
 pub(crate) const WK: usize = 10;
 pub(crate) const BK: usize = 11;
-pub(crate) const OCC: usize = 12; // Occupied squares
+pub(crate) const WOCC: usize = 12; // White occupied squares
+pub(crate) const BOCC: usize = 13; // Black occupied squares
+pub(crate) const OCC: usize = 14; // All occupied squares
 
 
 // Define the bitboard data type.
@@ -111,6 +113,8 @@ impl Bitboard {
                 0x0800000000000000,
                 0x0000000000000010,
                 0x1000000000000000,
+                0x000000000000FFFF,
+                0xFFFF000000000000,
                 0xFFFF00000000FFFF
             ].try_into().unwrap()
         }

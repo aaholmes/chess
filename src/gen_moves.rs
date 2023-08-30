@@ -8,10 +8,15 @@
 // We can also use quiescence search to only generate captures and promotions.
 // For capture move orders, we should use 10*victim_value - attacker_value, where PNBRQK = 123456 e.g., PxQ = 10*5 - 1 = 49, KxN = 10*3 - 6 = 24, etc.
 // For promotions, we should use 10*promoted_piece_value - attacker_value, so Q promotion = 10*5 - 1 = 49, etc.
+// We want to use two heaps, one for captures and one for non-captures, with each element of the heap being a vector of sorted moves.
+// Note that non-captures can be pre-sorted, but captures require the piece value of the captured piece and so they have to be internally sorted, which may be just as fast as sorting the entire vector.
+// Note also that the pesto eval has 25 game modes, ranging from opening to endgame, so our non-capture move ordering should be different for each game mode.
+// Note also that once we implement all of this, as well as quiescence search, we can profile the code to see where the bottlenecks are.
 
 
-use crate::bitboard::{sq_ind_to_bit, WP, BP, WN, BN, WB, BB, WR, BR, WQ, BQ, WK, BK, Bitboard};
+use crate::bitboard::{Bitboard, sq_ind_to_bit, WP, BP, WN, BN, WB, BB, WR, BR, WQ, BQ, WK, BK, WOCC, BOCC, OCC};
 use crate::bits::bits;
+use crate::magic_constants::{R_MAGICS, B_MAGICS, R_BITS, B_BITS, R_MASKS, B_MASKS};
 
 const NOT_A_FILE: u64 = 0xfefefefefefefefe;
 const NOT_H_FILE: u64 = 0x7f7f7f7f7f7f7f7f;
@@ -218,7 +223,7 @@ impl MoveGen {
             // White to move
             for from_sq_ind in bits(&board.pieces[WP]) {
                 for to_sq_ind in &self.wp_captures_promotions[from_sq_ind] {
-                    if board.get_piece(*to_sq_ind) != None || board.en_passant == Some(*to_sq_ind) {
+                    if board.pieces[BOCC] & (1 << to_sq_ind) != 0 || board.en_passant == Some(*to_sq_ind) {
                         if from_sq_ind > 47 && from_sq_ind < 56 {
                             append_promotions(&mut captures, from_sq_ind, to_sq_ind, board.w_to_move);
                         } else {
@@ -246,7 +251,7 @@ impl MoveGen {
             // Black to move
             for from_sq_ind in bits(&board.pieces[BP]) {
                 for to_sq_ind in &self.bp_captures_promotions[from_sq_ind] {
-                    if board.get_piece(*to_sq_ind) != None || board.en_passant == Some(*to_sq_ind) {
+                    if board.pieces[WOCC] & (1 << to_sq_ind) != 0 || board.en_passant == Some(*to_sq_ind) {
                         if from_sq_ind > 7 && from_sq_ind < 16 {
                             append_promotions(&mut captures, from_sq_ind, to_sq_ind, board.w_to_move);
                         } else {
@@ -283,10 +288,10 @@ impl MoveGen {
             // White to move
             for from_sq_ind in bits(&board.pieces[WN]) {
                 for to_sq_ind in &self.n_moves[from_sq_ind] {
-                    if board.get_piece(*to_sq_ind) == None {
-                        moves.push((from_sq_ind, *to_sq_ind, None));
-                    } else {
+                    if board.pieces[BOCC] & (1 << to_sq_ind) != 0 {
                         captures.push((from_sq_ind, *to_sq_ind, None));
+                    } else if {board.pieces[WOCC] & (1 << to_sq_ind) == 0} {
+                        moves.push((from_sq_ind, *to_sq_ind, None));
                     }
                 }
             }
@@ -294,10 +299,10 @@ impl MoveGen {
             // Black to move
             for from_sq_ind in bits(&board.pieces[BN]) {
                 for to_sq_ind in &self.n_moves[from_sq_ind] {
-                    if board.get_piece(*to_sq_ind) == None {
-                        moves.push((from_sq_ind, *to_sq_ind, None));
-                    } else {
+                    if board.pieces[WOCC] & (1 << to_sq_ind) != 0 {
                         captures.push((from_sq_ind, *to_sq_ind, None));
+                    } else if {board.pieces[BOCC] & (1 << to_sq_ind) == 0} {
+                        moves.push((from_sq_ind, *to_sq_ind, None));
                     }
                 }
             }
@@ -314,10 +319,10 @@ impl MoveGen {
             // White to move
             for from_sq_ind in bits(&board.pieces[WK]) {
                 for to_sq_ind in &self.n_moves[from_sq_ind] {
-                    if board.get_piece(*to_sq_ind) == None {
-                        moves.push((from_sq_ind, *to_sq_ind, None));
-                    } else {
+                    if board.pieces[BOCC] & (1 << to_sq_ind) != 0 {
                         captures.push((from_sq_ind, *to_sq_ind, None));
+                    } else if {board.pieces[WOCC] & (1 << to_sq_ind) == 0} {
+                        moves.push((from_sq_ind, *to_sq_ind, None));
                     }
                 }
             }
@@ -325,11 +330,213 @@ impl MoveGen {
             // Black to move
             for from_sq_ind in bits(&board.pieces[BK]) {
                 for to_sq_ind in &self.n_moves[from_sq_ind] {
-                    if board.get_piece(*to_sq_ind) == None {
-                        moves.push((from_sq_ind, *to_sq_ind, None));
-                    } else {
+                    if board.pieces[WOCC] & (1 << to_sq_ind) != 0 {
                         captures.push((from_sq_ind, *to_sq_ind, None));
+                    } else if {board.pieces[BOCC] & (1 << to_sq_ind) == 0} {
+                        moves.push((from_sq_ind, *to_sq_ind, None));
                     }
+                }
+            }
+        }
+        (captures, moves)
+    }
+
+    fn gen_rook_moves(&self, board: &Bitboard) -> (Vec<(usize, usize, Option<usize>)>, Vec<(usize, usize, Option<usize>)>) {
+        // Generate all possible rook moves for the current position.
+        // Returns a vector of captures and a vector of non-captures, both in the form tuples (from_sq_ind, to_sq_ind, None).
+        // Uses magic bitboards.
+        let mut moves: Vec<(usize, usize, Option<usize>)> = Vec::new();
+        let mut captures: Vec<(usize, usize, Option<usize>)> = Vec::new();
+        let mut m: Vec<(usize, usize, Option<usize>)> = Vec::new();
+        let mut c: Vec<(usize, usize, Option<usize>)> = Vec::new();
+        let mut blockers: u64;
+        let mut key: usize;
+        if board.w_to_move {
+            // White to move
+            for from_sq_ind in bits(&board.pieces[WR]) {
+                // Mask blockers
+                blockers = board.pieces(OCC) & R_MASKS[from_sq_ind];
+
+                // Generate the key using a multiplication and right shift
+                key = ((blockers * R_MAGICS[from_sq_ind]) >> (64 - R_BITS[from_sq_ind])) as usize;
+
+                // Return the preinitialized attack set bitboard from the table
+                // TODO: make this table contain both captures and noncaptures as separate vectors
+                (c, m) = R_TABLE[from_sq_ind][key];
+                for (from, to, _) in c {
+                    if board.pieces[BOCC] & (1 << to) != 0 {
+                        captures.push((from, to, None));
+                    }
+                }
+                for (from, to, _) in m {
+                    moves.push((from, to, None));
+                }
+            }
+        } else {
+            // Black to move
+            for from_sq_ind in bits(&board.pieces[BR]) {
+                // Mask blockers
+                blockers = board.pieces(OCC) & R_MASKS[from_sq_ind];
+
+                // Generate the key using a multiplication and right shift
+                key = ((blockers * R_MAGICS[from_sq_ind]) >> (64 - R_BITS[from_sq_ind])) as usize;
+
+                // Return the preinitialized attack set bitboard from the table
+                // TODO: make this table contain both captures and noncaptures as separate vectors
+                (c, m) = R_TABLE[from_sq_ind][key];
+                for (from, to, _) in c {
+                    if board.pieces[WOCC] & (1 << to) != 0 {
+                        captures.push((from, to, None));
+                    }
+                }
+                for (from, to, _) in m {
+                    moves.push((from, to, None));
+                }
+            }
+        }
+        (captures, moves)
+    }
+
+    fn gen_bishop_moves(&self, board: &Bitboard) -> (Vec<(usize, usize, Option<usize>)>, Vec<(usize, usize, Option<usize>)>) {
+        // Generate all possible bishop moves for the current position.
+        // Returns a vector of captures and a vector of non-captures, both in the form tuples (from_sq_ind, to_sq_ind, None).
+        // Uses magic bitboards.
+        let mut moves: Vec<(usize, usize, Option<usize>)> = Vec::new();
+        let mut captures: Vec<(usize, usize, Option<usize>)> = Vec::new();
+        let mut m: Vec<(usize, usize, Option<usize>)> = Vec::new();
+        let mut c: Vec<(usize, usize, Option<usize>)> = Vec::new();
+        let mut blockers: u64;
+        let mut key: usize;
+        if board.w_to_move {
+            // White to move
+            for from_sq_ind in bits(&board.pieces[WB]) {
+                // Mask blockers
+                blockers = board.pieces(OCC) & B_MASKS[from_sq_ind];
+
+                // Generate the key using a multiplication and right shift
+                key = ((blockers * B_MAGICS[from_sq_ind]) >> (64 - B_BITS[from_sq_ind])) as usize;
+
+                // Return the preinitialized attack set bitboard from the table
+                // TODO: make this table contain both captures and noncaptures as separate vectors
+                (c, m) = B_TABLE[from_sq_ind][key];
+                for (from, to, _) in c {
+                    if board.pieces[BOCC] & (1 << to) != 0 {
+                        captures.push((from, to, None));
+                    }
+                }
+                for (from, to, _) in m {
+                    moves.push((from, to, None));
+                }
+            }
+        } else {
+            // Black to move
+            for from_sq_ind in bits(&board.pieces[BB]) {
+                // Mask blockers
+                blockers = board.pieces(OCC) & B_MASKS[from_sq_ind];
+
+                // Generate the key using a multiplication and right shift
+                key = ((blockers * B_MAGICS[from_sq_ind]) >> (64 - B_BITS[from_sq_ind])) as usize;
+
+                // Return the preinitialized attack set bitboard from the table
+                // TODO: make this table contain both captures and noncaptures as separate vectors
+                (c, m) = B_TABLE[from_sq_ind][key];
+                for (from, to, _) in c {
+                    if board.pieces[WOCC] & (1 << to) != 0 {
+                        captures.push((from, to, None));
+                    }
+                }
+                for (from, to, _) in m {
+                    moves.push((from, to, None));
+                }
+            }
+        }
+        (captures, moves)
+    }
+
+    fn gen_queen_moves(&self, board: &Bitboard) -> (Vec<(usize, usize, Option<usize>)>, Vec<(usize, usize, Option<usize>)>) {
+        // Generate all possible queen moves for the current position.
+        // Returns a vector of captures and a vector of non-captures, both in the form tuples (from_sq_ind, to_sq_ind, None).
+        // Uses magic bitboards.
+        let mut moves: Vec<(usize, usize, Option<usize>)> = Vec::new();
+        let mut captures: Vec<(usize, usize, Option<usize>)> = Vec::new();
+        let mut m: Vec<(usize, usize, Option<usize>)> = Vec::new();
+        let mut c: Vec<(usize, usize, Option<usize>)> = Vec::new();
+        let mut blockers: u64;
+        let mut key: usize;
+        if board.w_to_move {
+            // White to move
+            for from_sq_ind in bits(&board.pieces[WQ]) {
+                // Mask blockers
+                blockers = board.pieces(OCC) & R_MASKS[from_sq_ind];
+
+                // Generate the key using a multiplication and right shift
+                key = ((blockers * R_MAGICS[from_sq_ind]) >> (64 - R_BITS[from_sq_ind])) as usize;
+
+                // Return the preinitialized attack set bitboard from the table
+                // TODO: make this table contain both captures and noncaptures as separate vectors
+                (c, m) = R_TABLE[from_sq_ind][key];
+                for (from, to, _) in c {
+                    if board.pieces[BOCC] & (1 << to) != 0 {
+                        captures.push((from, to, None));
+                    }
+                }
+                for (from, to, _) in m {
+                    moves.push((from, to, None));
+                }
+                // Mask blockers
+                blockers = board.pieces(OCC) & B_MASKS[from_sq_ind];
+
+                // Generate the key using a multiplication and right shift
+                key = ((blockers * B_MAGICS[from_sq_ind]) >> (64 - B_BITS[from_sq_ind])) as usize;
+
+                // Return the preinitialized attack set bitboard from the table
+                // TODO: make this table contain both captures and noncaptures as separate vectors
+                (c, m) = B_TABLE[from_sq_ind][key];
+                for (from, to, _) in c {
+                    if board.pieces[BOCC] & (1 << to) != 0 {
+                        captures.push((from, to, None));
+                    }
+                }
+                for (from, to, _) in m {
+                    moves.push((from, to, None));
+                }
+            }
+        } else {
+            // Black to move
+            for from_sq_ind in bits(&board.pieces[BQ]) {
+                // Mask blockers
+                blockers = board.pieces(OCC) & R_MASKS[from_sq_ind];
+
+                // Generate the key using a multiplication and right shift
+                key = ((blockers * R_MAGICS[from_sq_ind]) >> (64 - R_BITS[from_sq_ind])) as usize;
+
+                // Return the preinitialized attack set bitboard from the table
+                // TODO: make this table contain both captures and noncaptures as separate vectors
+                (c, m) = R_TABLE[from_sq_ind][key];
+                for (from, to, _) in c {
+                    if board.pieces[WOCC] & (1 << to) != 0 {
+                        captures.push((from, to, None));
+                    }
+                }
+                for (from, to, _) in m {
+                    moves.push((from, to, None));
+                }
+                // Mask blockers
+                blockers = board.pieces(OCC) & B_MASKS[from_sq_ind];
+
+                // Generate the key using a multiplication and right shift
+                key = ((blockers * B_MAGICS[from_sq_ind]) >> (64 - B_BITS[from_sq_ind])) as usize;
+
+                // Return the preinitialized attack set bitboard from the table
+                // TODO: make this table contain both captures and noncaptures as separate vectors
+                (c, m) = B_TABLE[from_sq_ind][key];
+                for (from, to, _) in c {
+                    if board.pieces[WOCC] & (1 << to) != 0 {
+                        captures.push((from, to, None));
+                    }
+                }
+                for (from, to, _) in m {
+                    moves.push((from, to, None));
                 }
             }
         }

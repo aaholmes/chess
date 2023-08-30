@@ -22,8 +22,18 @@ The goal is to make a reasonably good chess engine inspired by
 9. Aspiration windows
 10. Transposition table
 11. Null move pruning
-12. Mate killer heuristic
-13. UCI protocol
+12. UCI protocol
+
+I believe that this will already be enough to make a pretty strong engine.
+
+## Goals for second version
+1. Time management
+2. Neural network evaluation function (DenseNet NNUE plus tapered Pesto)
+3. Opening book
+4. Endgame tablebases
+5. Parallel search
+
+If I get this far, the engine should be very strong.
  
 ## Programming language
 We will use Rust for the first version. In the long term we may want to use Rust for the search, Python for the neural network, and Julia as a driver.
