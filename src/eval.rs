@@ -20,6 +20,7 @@ const EG_VALUE: [i32; 6] = [ 94, 281, 297, 512,  936,  0];
 
 // Piece-square tables
 // Values from Rofchade: http://www.talkchess.com/forum3/viewtopic.php?f=2&t=68311&start=19
+// We only modify the middlegame king table, so that the king doesn't want to go forward when all the pieces are on the board
 // Note that these apparently use a different indexing, so we need to flip the board vertically for white
 
 const MG_PAWN_TABLE: [i32; 64] = [
@@ -134,15 +135,25 @@ const EG_QUEEN_TABLE: [i32; 64] = [
 
 // Modify MG_KING_TABLE so at least the king doesn't want to go forward when all the pieces are on the board
 const MG_KING_TABLE: [i32; 64] = [
-    -65, -30, -30, -30, -56, -38, -38, -38,
-    -20, -27, -30, -30, -30, -36, -38, -36,
-    -20, -20, -27, -30, -30, -30, -36, -36,
+    -65, -38, -38, -38, -56, -38, -38, -38,
+    -36, -36, -36, -36, -36, -36, -38, -36,
+    -36, -36, -36, -36, -36, -36, -36, -36,
     -17, -20, -12, -27, -30, -25, -14, -36,
-    -17,  -1, -12, -12, -25, -14, -14, -14,
-     -1,  -1,  -1, -12, -12, -14, -14, -14,
-      1,   7,  -1,  -1, -12, -12,   9,   8,
-      7,  36,  12,  -1,   8,   9,  24,  14,
+    -12,  -1, -12, -12, -12, -12, -12, -12,
+     -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,
+      1,   7,  -1,  -1,  -1,  -1,   9,   8,
+      9,  36,  12,   9,   9,   9,  24,  14,
 ];
+// const MG_KING_TABLE: [i32; 64] = [
+//     -65, -30, -30, -30, -56, -38, -38, -38,
+//     -20, -27, -30, -30, -30, -36, -38, -36,
+//     -20, -20, -27, -30, -30, -30, -36, -36,
+//     -17, -20, -12, -27, -30, -25, -14, -36,
+//     -17,  -1, -12, -12, -25, -14, -14, -14,
+//      -1,  -1,  -1, -12, -12, -14, -14, -14,
+//       1,   7,  -1,  -1, -12, -12,   9,   8,
+//       7,  36,  12,  -1,   8,   9,  24,  14,
+// ];
 // const MG_KING_TABLE: [i32; 64] = [
 //     -65, 23, 16, -15, -56, -34, 2, 13,
 //     29, -1, -20, -7, -8, -4, -38, -29,
