@@ -9,7 +9,7 @@ mod gen_moves;
 use gen_moves::MoveGen;
 use crate::bitboard::sq_ind_to_algebraic;
 mod magic_constants;
-use magic_constants::{R_MAGIC, B_MAGIC};
+use magic_constants::{R_MAGICS, B_MAGICS};
 
 fn main() {
     for i in 0..64 {
@@ -17,7 +17,7 @@ fn main() {
         assert_eq!(i, bitboard::algebraic_to_sq_ind(&bitboard::sq_ind_to_algebraic(i)));
     }
     let mut board = bitboard::Bitboard::new();
-    assert_eq!(board.pieces[12], board.pieces[0] | board.pieces[1] | board.pieces[2] | board.pieces[3] | board.pieces[4] | board.pieces[5] | board.pieces[6] | board.pieces[7] | board.pieces[8] | board.pieces[9] | board.pieces[10] | board.pieces[11]);
+    assert_eq!(board.pieces[14], board.pieces[0] | board.pieces[1] | board.pieces[2] | board.pieces[3] | board.pieces[4] | board.pieces[5] | board.pieces[6] | board.pieces[7] | board.pieces[8] | board.pieces[9] | board.pieces[10] | board.pieces[11]);
     board.print();
     // for i in 0..64 {
     //     let bit = bitboard::sq_ind_to_bit(i);
@@ -63,13 +63,13 @@ fn main() {
     let mut rbits: Vec<i32> = vec![];
     let mut bbits: Vec<i32> = vec![];
     for i in 0 .. 64 {
-        unsafe { rbits.push(_popcnt64(R_MAGIC[i] as i64)); }
-        unsafe { println!("{} {}", i, _popcnt64(R_MAGIC[i] as i64)); }
+        unsafe { rbits.push(_popcnt64(R_MAGICS[i] as i64)); }
+        unsafe { println!("{} {}", i, _popcnt64(R_MAGICS[i] as i64)); }
     }
     println!("___");
     for i in 0 .. 64 {
-        unsafe { bbits.push(_popcnt64(B_MAGIC[i] as i64)); }
-        unsafe { println!("{} {}", i, _popcnt64(B_MAGIC[i] as i64)); }
+        unsafe { bbits.push(_popcnt64(B_MAGICS[i] as i64)); }
+        unsafe { println!("{} {}", i, _popcnt64(B_MAGICS[i] as i64)); }
     }
     println!("___");
     println!("Min, max={} {}", rbits.iter().min().unwrap(), rbits.iter().max().unwrap());

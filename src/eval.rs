@@ -1,6 +1,7 @@
 // Pesto evaluation function
 // From CPW: Tapered eval to interpolate by current game stage between piece-square tables for
 // opening and endgame, optimized by Texel tuning.
+// TODO: Add pawn structure and king safety, possibly using a simple NN with a conv layer for pawns (e.g. 3 3x3 filters, yielding a 3x4x6 layer) and 2 dense layers combining its output with king position
 
 use std::cmp::min;
 use crate::bitboard::{Bitboard, flip_sq_ind_vertically};
