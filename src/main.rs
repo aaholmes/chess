@@ -18,18 +18,18 @@ fn main() {
     }
     let mut board = bitboard::Bitboard::new();
     assert_eq!(board.pieces[14], board.pieces[0] | board.pieces[1] | board.pieces[2] | board.pieces[3] | board.pieces[4] | board.pieces[5] | board.pieces[6] | board.pieces[7] | board.pieces[8] | board.pieces[9] | board.pieces[10] | board.pieces[11]);
-    board.print();
+    // board.print();
+    // // for i in 0..64 {
+    // //     let bit = bitboard::sq_ind_to_bit(i);
+    // //     let algebraic = bitboard::sq_ind_to_algebraic(i);
+    // //     let flipped_bit = bitboard::flip_vertically(bit);
+    // //     let flipped_algebraic = bitboard::sq_ind_to_algebraic(bitboard::bit_to_sq_ind(flipped_bit));
+    // //     println!("{} {} {} {}", bit_to_sq_ind(bit), algebraic, bit_to_sq_ind(flipped_bit), flipped_algebraic);
+    // // }
+    // board.flip_vertically().print();
     // for i in 0..64 {
-    //     let bit = bitboard::sq_ind_to_bit(i);
-    //     let algebraic = bitboard::sq_ind_to_algebraic(i);
-    //     let flipped_bit = bitboard::flip_vertically(bit);
-    //     let flipped_algebraic = bitboard::sq_ind_to_algebraic(bitboard::bit_to_sq_ind(flipped_bit));
-    //     println!("{} {} {} {}", bit_to_sq_ind(bit), algebraic, bit_to_sq_ind(flipped_bit), flipped_algebraic);
+    //     println!("{} {}", i, bitboard::flip_sq_ind_vertically(i));
     // }
-    board.flip_vertically().print();
-    for i in 0..64 {
-        println!("{} {}", i, bitboard::flip_sq_ind_vertically(i));
-    }
     let pesto: PestoEval = PestoEval::new();
     // board.print();
     // // Move e2e4, e7e5, Ng1f3, Nb8c6, Bf1c4, Bc8c5, O-O
@@ -60,20 +60,20 @@ fn main() {
     for m in moves {
         println!("{} {}", sq_ind_to_algebraic(m.0), sq_ind_to_algebraic(m.1));
     }
-    let mut rbits: Vec<i32> = vec![];
-    let mut bbits: Vec<i32> = vec![];
-    for i in 0 .. 64 {
-        unsafe { rbits.push(_popcnt64(R_MAGICS[i] as i64)); }
-        unsafe { println!("{} {}", i, _popcnt64(R_MAGICS[i] as i64)); }
-    }
-    println!("___");
-    for i in 0 .. 64 {
-        unsafe { bbits.push(_popcnt64(B_MAGICS[i] as i64)); }
-        unsafe { println!("{} {}", i, _popcnt64(B_MAGICS[i] as i64)); }
-    }
-    println!("___");
-    println!("Min, max={} {}", rbits.iter().min().unwrap(), rbits.iter().max().unwrap());
-    println!("Min, max={} {}", bbits.iter().min().unwrap(), bbits.iter().max().unwrap());
+    // let mut rbits: Vec<i32> = vec![];
+    // let mut bbits: Vec<i32> = vec![];
+    // for i in 0 .. 64 {
+    //     unsafe { rbits.push(_popcnt64(R_MAGICS[i] as i64)); }
+    //     unsafe { println!("{} {}", i, _popcnt64(R_MAGICS[i] as i64)); }
+    // }
+    // println!("___");
+    // for i in 0 .. 64 {
+    //     unsafe { bbits.push(_popcnt64(B_MAGICS[i] as i64)); }
+    //     unsafe { println!("{} {}", i, _popcnt64(B_MAGICS[i] as i64)); }
+    // }
+    // println!("___");
+    // println!("Min, max={} {}", rbits.iter().min().unwrap(), rbits.iter().max().unwrap());
+    // println!("Min, max={} {}", bbits.iter().min().unwrap(), bbits.iter().max().unwrap());
 //    for i in 0 .. 64 {
 //        unsafe { println!("{} {} {} {}", i, _popcnt64(R_MAGIC[i] as i64), _popcnt64(R_MAGIC2[i] as i64), _popcnt64(R_MAGIC3[i] as i64)); }
 //    }
