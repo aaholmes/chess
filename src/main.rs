@@ -11,6 +11,8 @@ use crate::bitboard::sq_ind_to_algebraic;
 mod magic_constants;
 use magic_constants::{R_MAGICS, B_MAGICS};
 
+mod utils;
+
 fn main() {
     for i in 0..64 {
         // println!("{} {}", i, bitboards::sq_ind_to_algebraic(i));
@@ -30,21 +32,21 @@ fn main() {
     // for i in 0..64 {
     //     println!("{} {}", i, bitboard::flip_sq_ind_vertically(i));
     // }
-    let pesto: PestoEval = PestoEval::new();
+    // let pesto: PestoEval = PestoEval::new();
     // board.print();
     // // Move e2e4, e7e5, Ng1f3, Nb8c6, Bf1c4, Bc8c5, O-O
     // println!("{}", pesto.eval(&board));
-    // board = board.make_move(bitboard::algebraic_to_sq_ind("e2"), bitboard::algebraic_to_sq_ind("e4"), None);
+    board = board.make_move(bitboard::algebraic_to_sq_ind("e2"), bitboard::algebraic_to_sq_ind("e4"), None);
     // println!("{}", pesto.eval(&board));
-    // board = board.make_move(bitboard::algebraic_to_sq_ind("e7"), bitboard::algebraic_to_sq_ind("e5"), None);
+    board = board.make_move(bitboard::algebraic_to_sq_ind("e7"), bitboard::algebraic_to_sq_ind("e5"), None);
     // println!("{}", pesto.eval(&board));
-    // board = board.make_move(bitboard::algebraic_to_sq_ind("g1"), bitboard::algebraic_to_sq_ind("f3"), None);
+    board = board.make_move(bitboard::algebraic_to_sq_ind("g1"), bitboard::algebraic_to_sq_ind("f3"), None);
     // println!("{}", pesto.eval(&board));
-    // board = board.make_move(bitboard::algebraic_to_sq_ind("b8"), bitboard::algebraic_to_sq_ind("c6"), None);
+    board = board.make_move(bitboard::algebraic_to_sq_ind("b8"), bitboard::algebraic_to_sq_ind("c6"), None);
     // println!("{}", pesto.eval(&board));
-    // board = board.make_move(bitboard::algebraic_to_sq_ind("f1"), bitboard::algebraic_to_sq_ind("c4"), None);
+    board = board.make_move(bitboard::algebraic_to_sq_ind("f1"), bitboard::algebraic_to_sq_ind("c4"), None);
     // println!("{}", pesto.eval(&board));
-    // board = board.make_move(bitboard::algebraic_to_sq_ind("f8"), bitboard::algebraic_to_sq_ind("c5"), None);
+    board = board.make_move(bitboard::algebraic_to_sq_ind("f8"), bitboard::algebraic_to_sq_ind("c5"), None);
     // println!("{}", pesto.eval(&board));
     // board = board.make_move(bitboard::algebraic_to_sq_ind("e1"), bitboard::algebraic_to_sq_ind("g1"), None);
     // println!("{}", pesto.eval(&board));

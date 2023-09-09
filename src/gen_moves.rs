@@ -18,6 +18,8 @@
 use crate::bitboard::{Bitboard, sq_ind_to_bit, WP, BP, WN, BN, WB, BB, WR, BR, WQ, BQ, WK, BK, WOCC, BOCC, OCC};
 use crate::bits::bits;
 use crate::magic_constants::{R_MAGICS, B_MAGICS, R_BITS, B_BITS, R_MASKS, B_MASKS};
+use crate::utils::print_bits;
+use rand;
 
 const NOT_A_FILE: u64 = 0xfefefefefefefefe;
 const NOT_H_FILE: u64 = 0x7f7f7f7f7f7f7f7f;
@@ -41,6 +43,72 @@ pub(crate) struct MoveGen {
     bp_moves: Vec<Vec<usize>>,
     r_moves: Vec<Vec<(Vec<usize>, Vec<usize>)>>,
     b_moves: Vec<Vec<(Vec<usize>, Vec<usize>)>>
+}
+
+fn find_magic_numbers() {
+    // Find magic numbers for magic bitboards.
+    // (blockers * magic) >> (64 - n_bits) should give a unique key for each blocker combination.
+
+    let mut blockers: u64;
+    let mut blocker_squares: Vec<usize> = Vec::new();
+    let mut key: usize;
+    let mut keys: Vec<usize> = Vec::new();
+    let mut magic: u64;
+    for is_bishop in [true, false].iter() {
+        for from_sq_ind in 0..64 {
+            // Mask blockers
+            if *is_bishop {
+                blockers = B_MASKS[from_sq_ind];
+            } else {
+                blockers = R_MASKS[from_sq_ind];
+            }
+            blocker_squares.clear();
+            for i in bits(&blockers) {
+                blocker_squares.push(i);
+            }
+            for _i_magic in 0..1000000 {
+                magic = rand::random::<u64>() & rand::random::<u64>() & rand::random::<u64>();
+                // Iterate over all possible blocker combinations
+                // Require that they are all unique
+                keys.clear();
+                for blocker_ind in 0..(1 << blocker_squares.len()) {
+                    if *is_bishop {
+                        blockers = B_MASKS[from_sq_ind];
+                    } else {
+                        blockers = R_MASKS[from_sq_ind];
+                    }
+                    for i in 0..blocker_squares.len() {
+                        if (blocker_ind & (1 << i)) != 0 {
+                            blockers &= !sq_ind_to_bit(blocker_squares[i]);
+                        }
+                    }
+                    if *is_bishop {
+                        key = ((blockers * magic) >> (64 - B_BITS[from_sq_ind])) as usize;
+                    } else {
+                        key = ((blockers * magic) >> (64 - R_BITS[from_sq_ind])) as usize;
+                    }
+                    if keys.contains(&key) {
+                        break;
+                    } else {
+                        keys.push(key);
+                    }
+                }
+                if *is_bishop {
+                    if keys.len() == (1 << B_BITS[from_sq_ind]) {
+                        println!("Found bishop magic number for square {} with {} bits: {}", from_sq_ind, B_BITS[from_sq_ind], magic);
+                        B_MAGICS[from_sq_ind] = magic;
+                        break;
+                    }
+                } else {
+                    if keys.len() == (1 << R_BITS[from_sq_ind]) {
+                        println!("Found rook magic number for square {} with {} bits: {}", from_sq_ind, R_BITS[from_sq_ind], magic);
+                        R_MAGICS[from_sq_ind] = magic;
+                        break;
+                    }
+                }
+            }
+        }
+    }
 }
 
 fn init_king_moves(from_sq_ind: usize) -> Vec<usize> {
@@ -195,20 +263,39 @@ fn init_bishop_moves() -> Vec<Vec<(Vec<usize>, Vec<usize>)>> {
     let mut out: Vec<Vec<(Vec<usize>, Vec<usize>)>> = Vec::new();
     let mut blockers: u64;
     let mut key: usize;
+    let mut blocker_squares: Vec<usize> = Vec::new();
     for from_sq_ind in 0..64 {
         out.push(vec![(vec![], vec![]); 4096]);
-        for blocker_ind in 0..4096 {
-            blockers = sq_ind_to_bit(blocker_ind);
-            // Mask blockers
+        // Mask blockers
+        blockers = B_MASKS[from_sq_ind];
+        blocker_squares.clear();
+        for i in bits(&blockers) {
+            blocker_squares.push(i);
+        }
+        if (from_sq_ind == 2) || (from_sq_ind == 26) {
+            println!("blocker squares={:?}", blocker_squares);
+        }
+        // Iterate over all possible blocker combinations
+        for blocker_ind in 0..(1 << blocker_squares.len()) {
             blockers = B_MASKS[from_sq_ind];
-            for i in 0..12 {
+            for i in 0..blocker_squares.len() {
                 if (blocker_ind & (1 << i)) != 0 {
-                    blockers &= !sq_ind_to_bit(i);
+                    blockers &= !sq_ind_to_bit(blocker_squares[i]);
                 }
+            }
+            if from_sq_ind == 2 || from_sq_ind == 26 {
+                // println!("blocker_ind in binary = {:b}", blocker_ind);
+                // println!("blocker set:");
+                // print_bits(blockers);
             }
 
             // Generate the key using a multiplication and right shift
             key = ((blockers * B_MAGICS[from_sq_ind]) >> (64 - B_BITS[from_sq_ind])) as usize;
+            if (from_sq_ind == 2 && key == 15) || (from_sq_ind == 26 && key == 64) {
+                println!("from square {}, key = {:b}", from_sq_ind, key);
+                println!("blockers =");
+                print_bits(blockers);
+            }
 
             // Assign the captures and moves for this blocker combination
             out[from_sq_ind][key] = bishop_attacks(from_sq_ind, blockers);
@@ -384,6 +471,8 @@ fn append_promotions(captures: &mut Vec<(usize, usize, Option<usize>)>, from_sq_
 
 impl MoveGen {
     pub fn new() -> MoveGen {
+        // Generate magic numbers for sliding pieces
+        find_magic_numbers();
         // Initialize the move generator by creating the iterators for Pawn, Knight, and King moves.
         let mut wp_captures_promotions: Vec<Vec<usize>> = Vec::new();
         let mut bp_captures_promotions: Vec<Vec<usize>> = Vec::new();
@@ -634,11 +723,17 @@ impl MoveGen {
         if board.w_to_move {
             // White to move
             for from_sq_ind in bits(&board.pieces[WB]) {
+                println!("Getting bishop move from square {}", from_sq_ind);
                 // Mask blockers
+                println!("Mask:");
+                print_bits(B_MASKS[from_sq_ind]);
                 blockers = board.pieces[OCC] & B_MASKS[from_sq_ind];
+                println!("Blockers:");
+                print_bits(blockers);
 
                 // Generate the key using a multiplication and right shift
                 key = ((blockers * B_MAGICS[from_sq_ind]) >> (64 - B_BITS[from_sq_ind])) as usize;
+                println!("Key: {}", key);
 
                 // Return the preinitialized attack set bitboard from the table
                 println!("{:?}", self.b_moves[from_sq_ind][key].0);
