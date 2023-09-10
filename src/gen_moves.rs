@@ -523,8 +523,6 @@ impl MoveGen {
         let (mut captures_rooks, mut moves_rooks) = self.gen_rook_moves(board);
         let (mut captures_bishops, mut moves_bishops) = self.gen_bishop_moves(board);
         let (mut captures_queens, mut moves_queens) = self.gen_queen_moves(board);
-        println!("{} {} {} {} {} {}", captures.len(), captures_knights.len(), captures_kings.len(), captures_rooks.len(), captures_bishops.len(), captures_queens.len());
-        println!("{} {} {} {} {} {}", moves.len(), moves_knights.len(), moves_kings.len(), moves_rooks.len(), moves_bishops.len(), moves_queens.len());
         captures.append(&mut captures_knights);
         captures.append(&mut captures_bishops);
         captures.append(&mut captures_rooks);
@@ -847,50 +845,3 @@ impl MoveGen {
         (captures, moves)
     }
 }
-
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
-//
-//     #[test]
-//     fn test_init_bishop_moves() {
-//         let bishop_moves = init_bishop_moves();
-//         assert_eq!(bishop_moves[0][0].0, vec![]);
-//         assert_eq!(bishop_moves[0][0].1, vec![]);
-//         assert_eq!(bishop_moves[0][4095].0, vec![]);
-//         assert_eq!(bishop_moves[0][4095].1, vec![]);
-//         assert_eq!(bishop_moves[0][1].0, vec![9, 18, 27, 36, 45, 54, 63]);
-//         assert_eq!(bishop_moves[0][1].1, vec![9, 18, 27, 36, 45, 54, 63]);
-//         assert_eq!(bishop_moves[0][4094].0, vec![7, 14, 21, 28, 35, 42, 49, 56]);
-//         assert_eq!(bishop_moves[0][4094].1, vec![7, 14, 21, 28, 35, 42, 49, 56]);
-//         assert_eq!(bishop_moves[0][2].0, vec![17, 34, 51]);
-//         assert_eq!(bishop_moves[0][2].1, vec![17, 34, 51]);
-//         assert_eq!(bishop_moves[0][4093].0, vec![6, 13, 20, 27, 34, 41, 48, 55]);
-//         assert_eq!(bishop_moves[0][4093].1, vec![6, 13, 20, 27, 34, 41, 48, 55]);
-//         assert_eq!(bishop_moves[0][3].0, vec![25, 50]);
-//         assert_eq!(bishop_moves[0][3].1, vec![25, 50]);
-//         assert_eq!(bishop_moves[0][4092].0, vec![5, 12, 19, 26, 33, 40, 47, 54]);
-//         assert_eq!(bishop_moves[0][4092].1, vec![5, 12, 19, 26, 33, 40, 47, 54]);
-//     }
-//
-//     #[test]
-//     fn test_init_rook_moves() {
-//         let rook_moves = init_rook_moves();
-//         assert_eq!(rook_moves[0][0].0, vec![]);
-//         assert_eq!(rook_moves[0][0].1, vec![]);
-//         assert_eq!(rook_moves[0][4095].0, vec![]);
-//         assert_eq!(rook_moves[0][4095].1, vec![]);
-//         assert_eq!(rook_moves[0][1].0, vec![1, 2, 3, 4, 5, 6, 7]);
-//         assert_eq!(rook_moves[0][1].1, vec![1, 2, 3, 4, 5, 6, 7]);
-//         assert_eq!(rook_moves[0][4094].0, vec![0, 8, 16, 24, 32, 40, 48, 56]);
-//         assert_eq!(rook_moves[0][4094].1, vec![0, 8, 16, 24, 32, 40, 48, 56]);
-//         assert_eq!(rook_moves[0][2].0, vec![2, 4, 6]);
-//         assert_eq!(rook_moves[0][2].1, vec![2, 4, 6]);
-//         assert_eq!(rook_moves[0][4093].0, vec![0, 8, 16, 24, 32, 40, 48, 56]);
-//         assert_eq!(rook_moves[0][4093].1, vec![0, 8, 16, 24, 32, 40, 48, 56]);
-//         assert_eq!(rook_moves[0][3].0, vec![1, 3, 5]);
-//         assert_eq!(rook_moves[0][3].1, vec![1, 3, 5]);
-//         assert_eq!(rook_moves[0][4092].0, vec![0, 8, 16, 24, 32, 40, 48, 56]);
-//         assert_eq!(rook_moves[0][4092].1, vec![0, 8, 16, 24, 32, 40, 48, 56]);
-//     }
-// }
