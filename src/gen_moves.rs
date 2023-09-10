@@ -505,9 +505,9 @@ impl MoveGen {
             r_magics: [0; 64],
         };
         // Generate magic numbers for sliding pieces
-        let (b_magics, r_magics) = find_magic_numbers();
-        move_gen.b_magics = b_magics;
-        move_gen.r_magics = r_magics;
+        // let (b_magics, r_magics) = find_magic_numbers();
+        move_gen.b_magics = B_MAGICS;
+        move_gen.r_magics = R_MAGICS;
         move_gen.r_moves = init_rook_moves(move_gen.r_magics);
         move_gen.b_moves = init_bishop_moves(move_gen.b_magics);
         move_gen
