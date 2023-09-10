@@ -116,18 +116,9 @@ fn find_magic_numbers() -> ([u64; 64], [u64; 64]) {
 }
 
 fn init_king_moves(from_sq_ind: usize) -> Vec<usize> {
-    // Initialize the king moves for a given square.
+    // Initialize the king moves for a given square, ignoring castling
     let from_bit: u64 = sq_ind_to_bit(from_sq_ind);
     let mut out: Vec<usize> = Vec::new();
-    // Castling
-    if from_sq_ind == 4 {
-        out.push(6);
-        out.push(2);
-    } else if from_sq_ind == 60 {
-        out.push(62);
-        out.push(58);
-    }
-    // Regular king moves
     if from_bit & NOT_A_FILE != 0 {
         out.push(from_sq_ind - 1);
     }
@@ -641,6 +632,16 @@ impl MoveGen {
         let mut captures: Vec<(usize, usize, Option<usize>)> = Vec::new();
         if board.w_to_move {
             // White to move
+            if board.w_castle_k {
+                if board.pieces[OCC] & ((1 << 5) | (1 << 6)) == 0 {
+                    moves.push((4, 6, None));
+                }
+            }
+            if board.w_castle_q {
+                if board.pieces[OCC] & ((1 << 1) | (1 << 2) | (1 << 3)) == 0 {
+                    moves.push((4, 2, None));
+                }
+            }
             for from_sq_ind in bits(&board.pieces[WK]) {
                 for to_sq_ind in &self.k_moves[from_sq_ind] {
                     if board.pieces[BOCC] & (1 << to_sq_ind) != 0 {
@@ -652,6 +653,16 @@ impl MoveGen {
             }
         } else {
             // Black to move
+            if board.b_castle_k {
+                if board.pieces[OCC] & ((1 << 61) | (1 << 62)) == 0 {
+                    moves.push((60, 62, None));
+                }
+            }
+            if board.b_castle_q {
+                if board.pieces[OCC] & ((1 << 57) | (1 << 58) | (1 << 59)) == 0 {
+                    moves.push((60, 58, None));
+                }
+            }
             for from_sq_ind in bits(&board.pieces[BK]) {
                 for to_sq_ind in &self.k_moves[from_sq_ind] {
                     if board.pieces[WOCC] & (1 << to_sq_ind) != 0 {

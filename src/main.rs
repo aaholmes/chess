@@ -89,6 +89,15 @@ fn main() {
     println!("___");
     println!("perft");
     for i in 1..4 {
-        println!("{} {}", i, utils::perft(board.clone(), &move_gen, i));
+        println!("{} {}", i, utils::perft(board.clone(), &move_gen, i, false));
+    }
+    let (captures, moves) = move_gen.gen_moves(&board);
+    for m in moves {
+        let mut board = Bitboard::new();
+        board = board.make_move(m.0, m.1, m.2);
+        // if utils::print_move(&m) == "e2e4" {
+        //     utils::perft(board.clone(), &move_gen, 2, true);
+        // }
+        println!("{} {}", utils::print_move(&m), utils::perft(board, &move_gen, 2, false));
     }
 }
