@@ -35,12 +35,14 @@ impl Bitboard {
                 new_board.en_passant = Some((from_sq_ind + to_sq_ind) / 2);
             }
             // En passant
-            if to_sq_ind == new_board.en_passant.unwrap() {
-                // Capture the pawn.
-                if new_board.w_to_move {
-                    new_board.pieces[WP] ^= sq_ind_to_bit(to_sq_ind - 8);
-                } else {
-                    new_board.pieces[BP] ^= sq_ind_to_bit(to_sq_ind + 8);
+            if new_board.en_passant != None {
+                if to_sq_ind == new_board.en_passant.unwrap() {
+                    // Capture the pawn.
+                    if new_board.w_to_move {
+                        new_board.pieces[WP] ^= sq_ind_to_bit(to_sq_ind - 8);
+                    } else {
+                        new_board.pieces[BP] ^= sq_ind_to_bit(to_sq_ind + 8);
+                    }
                 }
             }
         }

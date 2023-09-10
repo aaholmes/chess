@@ -703,7 +703,7 @@ impl MoveGen {
 
                 // Return the preinitialized attack set bitboard from the table
                 for to_sq_ind in &self.r_moves[from_sq_ind][key].0 {
-                    if board.pieces[BOCC] & (1 << to_sq_ind) != 0 {
+                    if board.pieces[WOCC] & (1 << to_sq_ind) != 0 {
                         captures.push((from_sq_ind, *to_sq_ind, None));
                     }
                 }
@@ -753,7 +753,7 @@ impl MoveGen {
 
                 // Return the preinitialized attack set bitboard from the table
                 for to_sq_ind in &self.b_moves[from_sq_ind][key].0 {
-                    if board.pieces[BOCC] & (1 << to_sq_ind) != 0 {
+                    if board.pieces[WOCC] & (1 << to_sq_ind) != 0 {
                         captures.push((from_sq_ind, *to_sq_ind, None));
                     }
                 }
@@ -818,7 +818,7 @@ impl MoveGen {
 
                 // Return the preinitialized attack set bitboard from the table
                 for to_sq_ind in &self.r_moves[from_sq_ind][key].0 {
-                    if board.pieces[BOCC] & (1 << to_sq_ind) != 0 {
+                    if board.pieces[WOCC] & (1 << to_sq_ind) != 0 {
                         captures.push((from_sq_ind, *to_sq_ind, None));
                     }
                 }
@@ -833,7 +833,7 @@ impl MoveGen {
 
                 // Return the preinitialized attack set bitboard from the table
                 for to_sq_ind in &self.b_moves[from_sq_ind][key].0 {
-                    if board.pieces[BOCC] & (1 << to_sq_ind) != 0 {
+                    if board.pieces[WOCC] & (1 << to_sq_ind) != 0 {
                         captures.push((from_sq_ind, *to_sq_ind, None));
                     }
                 }

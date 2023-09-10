@@ -7,7 +7,7 @@ use eval::PestoEval;
 mod make_move;
 mod gen_moves;
 use gen_moves::MoveGen;
-use crate::bitboard::sq_ind_to_algebraic;
+use crate::bitboard::{Bitboard, sq_ind_to_algebraic};
 mod magic_constants;
 use magic_constants::{R_MAGICS, B_MAGICS};
 
@@ -85,4 +85,10 @@ fn main() {
 //    for i in 0 .. 64 {
 //        unsafe { println!("{} {} {} {}", i, _popcnt64(B_MAGIC[i] as i64), _popcnt64(B_MAGIC2[i] as i64), _popcnt64(B_MAGIC3[i] as i64)); }
 //    }
+    let board = Bitboard::new();
+    println!("___");
+    println!("perft");
+    for i in 1..4 {
+        println!("{} {}", i, utils::perft(board.clone(), &move_gen, i));
+    }
 }
