@@ -39,6 +39,8 @@ fn main() {
     board = board.make_move(bitboard::algebraic_to_sq_ind("e2"), bitboard::algebraic_to_sq_ind("e4"), None);
     // println!("{}", pesto.eval(&board));
     board = board.make_move(bitboard::algebraic_to_sq_ind("e7"), bitboard::algebraic_to_sq_ind("e5"), None);
+    board = board.make_move(bitboard::algebraic_to_sq_ind("d1"), bitboard::algebraic_to_sq_ind("h5"), None);
+    board = board.make_move(bitboard::algebraic_to_sq_ind("d7"), bitboard::algebraic_to_sq_ind("d5"), None);
     // println!("{}", pesto.eval(&board));
     board = board.make_move(bitboard::algebraic_to_sq_ind("g1"), bitboard::algebraic_to_sq_ind("f3"), None);
     // println!("{}", pesto.eval(&board));
