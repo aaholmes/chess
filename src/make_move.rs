@@ -101,6 +101,9 @@ impl Bitboard {
         }
 
         new_board.w_to_move = !new_board.w_to_move;
+        if new_board.w_to_move {
+            new_board.fullmove_clock += 1;
+        }
         new_board.pieces[WOCC] = new_board.pieces[WP] | new_board.pieces[WN] | new_board.pieces[WB] | new_board.pieces[WR] | new_board.pieces[WQ] | new_board.pieces[WK];
         new_board.pieces[BOCC] = new_board.pieces[BP] | new_board.pieces[BN] | new_board.pieces[BB] | new_board.pieces[BR] | new_board.pieces[BQ] | new_board.pieces[BK];
         new_board.pieces[OCC] = new_board.pieces[WOCC] | new_board.pieces[BOCC];

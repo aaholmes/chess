@@ -198,6 +198,9 @@ impl Bitboard {
                 board.fullmove_clock = parts[5].parse::<u8>().unwrap();
             }
         }
+        board.pieces[WOCC] = board.pieces[WP] | board.pieces[WN] | board.pieces[WB] | board.pieces[WR] | board.pieces[WQ] | board.pieces[WK];
+        board.pieces[BOCC] = board.pieces[BP] | board.pieces[BN] | board.pieces[BB] | board.pieces[BR] | board.pieces[BQ] | board.pieces[BK];
+        board.pieces[OCC] = board.pieces[WOCC] | board.pieces[BOCC];
         board
     }
 
