@@ -55,7 +55,7 @@ fn main() {
     // assert_eq!(pesto.eval(&board), 52);
     board.print();
     let move_gen = MoveGen::new();
-    let (captures, moves) = move_gen.gen_moves(&board);
+    let (captures, moves) = move_gen.gen_pseudo_legal_moves(&board);
     println!("Captures:");
     for c in captures {
         println!("{} {}", sq_ind_to_algebraic(c.0), sq_ind_to_algebraic(c.1));
@@ -88,16 +88,16 @@ fn main() {
     let board = Bitboard::new();
     println!("___");
     println!("perft");
-    for i in 1..4 {
+    for i in 1..5 {
         println!("{} {}", i, utils::perft(board.clone(), &move_gen, i, false));
     }
-    let (captures, moves) = move_gen.gen_moves(&board);
-    for m in moves {
-        let mut board = Bitboard::new();
-        board = board.make_move(m.0, m.1, m.2);
-        // if utils::print_move(&m) == "e2e4" {
-        //     utils::perft(board.clone(), &move_gen, 2, true);
-        // }
-        println!("{} {}", utils::print_move(&m), utils::perft(board, &move_gen, 2, false));
-    }
+    // let (captures, moves) = move_gen.gen_pseudo_legal_moves(&board);
+    // for m in moves {
+    //     let mut board = Bitboard::new();
+    //     board = board.make_move(m.0, m.1, m.2);
+    //     // if utils::print_move(&m) == "e2e4" {
+    //     //     utils::perft(board.clone(), &move_gen, 2, true);
+    //     // }
+    //     println!("{} {}", utils::print_move(&m), utils::perft(board, &move_gen, 2, false));
+    // }
 }

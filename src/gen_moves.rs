@@ -34,14 +34,22 @@ const RANK_7: u64 = 0x00ff000000000000;
 pub(crate) struct MoveGen {
     // Generate all possible moves for a given position.
     // For now, only non-sliding moves.
-    wp_captures_promotions: Vec<Vec<usize>>,
-    bp_captures_promotions: Vec<Vec<usize>>,
-    n_moves: Vec<Vec<usize>>,
-    k_moves: Vec<Vec<usize>>,
+    pub wp_captures: Vec<Vec<usize>>,
+    pub bp_captures: Vec<Vec<usize>>,
+    pub wp_capture_bitboard: [u64; 64],
+    pub bp_capture_bitboard: [u64; 64],
+    wp_promotions: Vec<Vec<usize>>,
+    bp_promotions: Vec<Vec<usize>>,
+    pub n_moves: Vec<Vec<usize>>,
+    pub k_moves: Vec<Vec<usize>>,
+    pub n_move_bitboard: [u64; 64],
+    pub k_move_bitboard: [u64; 64],
     wp_moves: Vec<Vec<usize>>,
     bp_moves: Vec<Vec<usize>>,
     r_moves: Vec<Vec<(Vec<usize>, Vec<usize>)>>,
     b_moves: Vec<Vec<(Vec<usize>, Vec<usize>)>>,
+    r_move_bitboard: Vec<Vec<u64>>,
+    b_move_bitboard: Vec<Vec<u64>>,
     b_magics: [u64; 64],
     r_magics: [u64; 64],
 }
@@ -177,33 +185,35 @@ fn init_knight_moves(from_sq_ind: usize) -> Vec<usize> {
     out
 }
 
-fn init_pawn_captures_promotions(from_sq_ind: usize) -> (Vec<usize>, Vec<usize>) {
+fn init_pawn_captures_promotions(from_sq_ind: usize) -> (Vec<usize>, Vec<usize>, Vec<usize>, Vec<usize>) {
     // Initialize the pawn captures and promotions for a given square.
     // Separate for white and black.
     let from_bit: u64 = sq_ind_to_bit(from_sq_ind);
-    let mut white: Vec<usize> = Vec::new();
-    let mut black: Vec<usize> = Vec::new();
+    let mut w_cap: Vec<usize> = Vec::new();
+    let mut b_cap: Vec<usize> = Vec::new();
+    let mut w_prom: Vec<usize> = Vec::new();
+    let mut b_prom: Vec<usize> = Vec::new();
     if from_bit & NOT_1_RANK & NOT_8_RANK != 0 {
         if from_bit & NOT_A_FILE != 0 {
-            white.push(from_sq_ind + 7);
+            w_cap.push(from_sq_ind + 7);
         }
         if from_bit & NOT_H_FILE != 0 {
-            white.push(from_sq_ind + 9);
+            w_cap.push(from_sq_ind + 9);
         }
         if from_bit & RANK_7 != 0 {
-            white.push(from_sq_ind + 8);
+            w_prom.push(from_sq_ind + 8);
         }
         if from_bit & NOT_A_FILE != 0 {
-            black.push(from_sq_ind - 9);
+            b_cap.push(from_sq_ind - 9);
         }
         if from_bit & NOT_H_FILE != 0 {
-            black.push(from_sq_ind - 7);
+            b_cap.push(from_sq_ind - 7);
         }
         if from_bit & RANK_2 != 0 {
-            black.push(from_sq_ind - 8);
+            b_prom.push(from_sq_ind - 8);
         }
     }
-    (white, black)
+    (w_cap, w_prom, b_cap, b_prom)
 }
 
 fn init_pawn_moves(from_sq_ind: usize) -> (Vec<usize>, Vec<usize>) {
@@ -225,50 +235,18 @@ fn init_pawn_moves(from_sq_ind: usize) -> (Vec<usize>, Vec<usize>) {
     (white, black)
 }
 
-fn init_rook_moves(r_magics: [u64; 64]) -> Vec<Vec<(Vec<usize>, Vec<usize>)>> {
-    // Initialize the rook moves for each square and blocker combination.
-    // Uses magic bitboards.
-    let mut out: Vec<Vec<(Vec<usize>, Vec<usize>)>> = Vec::new();
-    let mut blockers: u64;
-    let mut key: usize;
-    let mut blocker_squares: Vec<usize> = Vec::new();
-    for from_sq_ind in 0..64 {
-        out.push(vec![(vec![], vec![]); 4096]);
-        // Mask blockers
-        blockers = R_MASKS[from_sq_ind];
-        blocker_squares.clear();
-        for i in bits(&blockers) {
-            blocker_squares.push(i);
-        }
-
-        // Iterate over all possible blocker combinations
-        for blocker_ind in 0..(1 << blocker_squares.len()) {
-            blockers = R_MASKS[from_sq_ind];
-            for i in 0..blocker_squares.len() {
-                if (blocker_ind & (1 << i)) != 0 {
-                    blockers &= !sq_ind_to_bit(blocker_squares[i]);
-                }
-            }
-
-            // Generate the key using a multiplication and right shift
-            key = ((blockers * r_magics[from_sq_ind]) >> (64 - R_BITS[from_sq_ind])) as usize;
-
-            // Assign the captures and moves for this blocker combination
-            out[from_sq_ind][key] = rook_attacks(from_sq_ind, blockers);
-        }
-    }
-    out
-}
-
-fn init_bishop_moves(b_magics: [u64; 64]) -> Vec<Vec<(Vec<usize>, Vec<usize>)>> {
+fn init_bishop_moves(b_magics: [u64; 64]) -> (Vec<Vec<(Vec<usize>, Vec<usize>)>>, Vec<Vec<u64>>) {
     // Initialize the bishop moves for each square and blocker combination.
     // Uses magic bitboards.
-    let mut out: Vec<Vec<(Vec<usize>, Vec<usize>)>> = Vec::new();
+    // Returns, for each square and key, both vectors of captures and moves, as well as a bitboard of potential captures (for detecting check).
+    let mut out1: Vec<Vec<(Vec<usize>, Vec<usize>)>> = Vec::new();
+    let mut out2: Vec<Vec<u64>> = Vec::new();
     let mut blockers: u64;
     let mut key: usize;
     let mut blocker_squares: Vec<usize> = Vec::new();
     for from_sq_ind in 0..64 {
-        out.push(vec![(vec![], vec![]); 4096]);
+        out1.push(vec![(vec![], vec![]); 4096]);
+        out2.push(vec![0; 4096]);
         // Mask blockers
         blockers = B_MASKS[from_sq_ind];
         blocker_squares.clear();
@@ -289,10 +267,54 @@ fn init_bishop_moves(b_magics: [u64; 64]) -> Vec<Vec<(Vec<usize>, Vec<usize>)>> 
             key = ((blockers * b_magics[from_sq_ind]) >> (64 - B_BITS[from_sq_ind])) as usize;
 
             // Assign the captures and moves for this blocker combination
-            out[from_sq_ind][key] = bishop_attacks(from_sq_ind, blockers);
+            out1[from_sq_ind][key] = bishop_attacks(from_sq_ind, blockers);
+            for i in out1[from_sq_ind][key].0.iter_mut() {
+                out2[from_sq_ind][key] |= sq_ind_to_bit(*i);
+            }
         }
     }
-    out
+    (out1, out2)
+}
+
+fn init_rook_moves(r_magics: [u64; 64]) -> (Vec<Vec<(Vec<usize>, Vec<usize>)>>, Vec<Vec<u64>>) {
+    // Initialize the rook moves for each square and blocker combination.
+    // Uses magic bitboards.
+    // Returns, for each square and key, both vectors of captures and moves, as well as a bitboard of potential captures (for detecting check).
+    let mut out1: Vec<Vec<(Vec<usize>, Vec<usize>)>> = Vec::new();
+    let mut out2: Vec<Vec<u64>> = Vec::new();
+    let mut blockers: u64;
+    let mut key: usize;
+    let mut blocker_squares: Vec<usize> = Vec::new();
+    for from_sq_ind in 0..64 {
+        out1.push(vec![(vec![], vec![]); 4096]);
+        out2.push(vec![0; 4096]);
+        // Mask blockers
+        blockers = R_MASKS[from_sq_ind];
+        blocker_squares.clear();
+        for i in bits(&blockers) {
+            blocker_squares.push(i);
+        }
+
+        // Iterate over all possible blocker combinations
+        for blocker_ind in 0..(1 << blocker_squares.len()) {
+            blockers = R_MASKS[from_sq_ind];
+            for i in 0..blocker_squares.len() {
+                if (blocker_ind & (1 << i)) != 0 {
+                    blockers &= !sq_ind_to_bit(blocker_squares[i]);
+                }
+            }
+
+            // Generate the key using a multiplication and right shift
+            key = ((blockers * r_magics[from_sq_ind]) >> (64 - R_BITS[from_sq_ind])) as usize;
+
+            // Assign the captures and moves for this blocker combination
+            out1[from_sq_ind][key] = rook_attacks(from_sq_ind, blockers);
+            for i in out1[from_sq_ind][key].0.iter_mut() {
+                out2[from_sq_ind][key] |= sq_ind_to_bit(*i);
+            }
+        }
+    }
+    (out1, out2)
 }
 
 fn rook_attacks(sq: usize, block: u64) -> (Vec<usize>, Vec<usize>) {
@@ -444,39 +466,65 @@ fn bishop_attacks(sq: usize, block: u64) -> (Vec<usize>, Vec<usize>) {
     (captures, moves)
 }
 
-fn append_promotions(captures: &mut Vec<(usize, usize, Option<usize>)>, from_sq_ind: usize, to_sq_ind: &usize, w_to_move: bool) {
+fn append_promotions(promotions: &mut Vec<(usize, usize, Option<usize>)>, from_sq_ind: usize, to_sq_ind: &usize, w_to_move: bool) {
     if w_to_move {
-        captures.push((from_sq_ind, *to_sq_ind, Some(WQ)));
-        captures.push((from_sq_ind, *to_sq_ind, Some(WR)));
-        captures.push((from_sq_ind, *to_sq_ind, Some(WN)));
-        captures.push((from_sq_ind, *to_sq_ind, Some(WB)));
+        promotions.push((from_sq_ind, *to_sq_ind, Some(WQ)));
+        promotions.push((from_sq_ind, *to_sq_ind, Some(WR)));
+        promotions.push((from_sq_ind, *to_sq_ind, Some(WN)));
+        promotions.push((from_sq_ind, *to_sq_ind, Some(WB)));
     } else {
-        captures.push((from_sq_ind, *to_sq_ind, Some(BQ)));
-        captures.push((from_sq_ind, *to_sq_ind, Some(BR)));
-        captures.push((from_sq_ind, *to_sq_ind, Some(BN)));
-        captures.push((from_sq_ind, *to_sq_ind, Some(BB)));
+        promotions.push((from_sq_ind, *to_sq_ind, Some(BQ)));
+        promotions.push((from_sq_ind, *to_sq_ind, Some(BR)));
+        promotions.push((from_sq_ind, *to_sq_ind, Some(BN)));
+        promotions.push((from_sq_ind, *to_sq_ind, Some(BB)));
     }
 }
 
 impl MoveGen {
     pub fn new() -> MoveGen {
         // Initialize the move generator by creating the iterators for Pawn, Knight, and King moves.
-        let mut wp_captures_promotions: Vec<Vec<usize>> = Vec::new();
-        let mut bp_captures_promotions: Vec<Vec<usize>> = Vec::new();
+        let mut wp_captures: Vec<Vec<usize>> = Vec::new();
+        let mut bp_captures: Vec<Vec<usize>> = Vec::new();
+        let mut wp_capture_bitboard: [u64; 64] = [0; 64];
+        let mut bp_capture_bitboard: [u64; 64] = [0; 64];
+        let mut wp_promotions: Vec<Vec<usize>> = Vec::new();
+        let mut bp_promotions: Vec<Vec<usize>> = Vec::new();
         let mut n_moves: Vec<Vec<usize>> = Vec::new();
         let mut k_moves: Vec<Vec<usize>> = Vec::new();
+        let mut n_move_bitboard: [u64; 64] = [0; 64];
+        let mut k_move_bitboard: [u64; 64] = [0; 64];
         let mut wp_moves: Vec<Vec<usize>> = Vec::new();
         let mut bp_moves: Vec<Vec<usize>> = Vec::new();
         let mut wp: Vec<usize>;
         let mut bp: Vec<usize>;
+        let mut wp_cap: Vec<usize>;
+        let mut bp_cap: Vec<usize>;
+        let mut wp_prom: Vec<usize>;
+        let mut bp_prom: Vec<usize>;
         for from_sq_ind in 0..64 {
-            wp = vec![];
-            bp = vec![];
-            (wp, bp) = init_pawn_captures_promotions(from_sq_ind);
-            wp_captures_promotions.push(wp.clone());
-            bp_captures_promotions.push(bp.clone());
+            wp_cap = vec![];
+            bp_cap = vec![];
+            wp_prom = vec![];
+            bp_prom = vec![];
+            (wp_cap, wp_prom, bp_cap, bp_prom) = init_pawn_captures_promotions(from_sq_ind);
+            wp_captures.push(wp_cap.clone());
+            bp_captures.push(bp_cap.clone());
+            for i in &wp_captures[from_sq_ind] {
+                wp_capture_bitboard[from_sq_ind] |= sq_ind_to_bit(*i);
+            }
+            for i in &bp_captures[from_sq_ind] {
+                bp_capture_bitboard[from_sq_ind] |= sq_ind_to_bit(*i);
+            }
+            wp_promotions.push(wp_prom.clone());
+            bp_promotions.push(bp_prom.clone());
             n_moves.push(init_knight_moves(from_sq_ind));
             k_moves.push(init_king_moves(from_sq_ind));
+            for i in &n_moves[from_sq_ind] {
+                n_move_bitboard[from_sq_ind] |= sq_ind_to_bit(*i);
+            }
+            for i in &k_moves[from_sq_ind] {
+                k_move_bitboard[from_sq_ind] |= sq_ind_to_bit(*i);
+            }
             wp = vec![];
             bp = vec![];
             (wp, bp) = init_pawn_moves(from_sq_ind);
@@ -484,14 +532,22 @@ impl MoveGen {
             bp_moves.push(bp.clone());
         }
         let mut move_gen: MoveGen = MoveGen {
-            wp_captures_promotions,
-            bp_captures_promotions,
+            wp_captures,
+            bp_captures,
+            wp_capture_bitboard,
+            bp_capture_bitboard,
+            wp_promotions,
+            bp_promotions,
             n_moves,
             k_moves,
+            n_move_bitboard,
+            k_move_bitboard,
             wp_moves,
             bp_moves,
             r_moves: vec![],
             b_moves: vec![],
+            r_move_bitboard: vec![],
+            b_move_bitboard: vec![],
             b_magics: [0; 64],
             r_magics: [0; 64],
         };
@@ -499,16 +555,21 @@ impl MoveGen {
         // let (b_magics, r_magics) = find_magic_numbers();
         move_gen.b_magics = B_MAGICS;
         move_gen.r_magics = R_MAGICS;
-        move_gen.r_moves = init_rook_moves(move_gen.r_magics);
-        move_gen.b_moves = init_bishop_moves(move_gen.b_magics);
+        let (b_moves, b_move_bitboard) = init_bishop_moves(move_gen.b_magics);
+        move_gen.b_moves = b_moves;
+        move_gen.b_move_bitboard = b_move_bitboard;
+        let (r_moves, r_move_bitboard) = init_rook_moves(move_gen.r_magics);
+        move_gen.r_moves = r_moves;
+        move_gen.r_move_bitboard = r_move_bitboard;
         move_gen
     }
 
-    pub fn gen_moves(&self, board: &Bitboard) -> (Vec<(usize, usize, Option<usize>)>, Vec<(usize, usize, Option<usize>)>) {
-        // Generate all possible moves for the current position.
-        // Check for legality and perform move ordering.
+    pub fn gen_pseudo_legal_moves(&self, board: &Bitboard) -> (Vec<(usize, usize, Option<usize>)>, Vec<(usize, usize, Option<usize>)>) {
+        // Generate all pseudo-legal moves for the current position, i.e., these moves may move into check.
+        // Elsewhere we need to check for legality and perform move ordering.
         // Returns a vector of captures and a vector of non-captures, both in the form tuples (from_sq_ind, to_sq_ind, None).
-        let (mut captures, mut moves) = self.gen_pawn_moves(board);
+        // Includes promotions as captures here
+        let (mut captures, mut promotions, mut moves) = self.gen_pawn_moves(board);
         let (mut captures_knights, mut moves_knights) = self.gen_knight_moves(board);
         let (mut captures_kings, mut moves_kings) = self.gen_king_moves(board);
         let (mut captures_rooks, mut moves_rooks) = self.gen_rook_moves(board);
@@ -519,6 +580,7 @@ impl MoveGen {
         captures.append(&mut captures_rooks);
         captures.append(&mut captures_queens);
         captures.append(&mut captures_kings);
+        captures.append(&mut promotions);
         moves.append(&mut moves_knights);
         moves.append(&mut moves_bishops);
         moves.append(&mut moves_rooks);
@@ -527,23 +589,29 @@ impl MoveGen {
         (captures, moves)
     }
 
-    fn gen_pawn_moves(&self, board: &Bitboard) -> (Vec<(usize, usize, Option<usize>)>, Vec<(usize, usize, Option<usize>)>) {
+    fn gen_pawn_moves(&self, board: &Bitboard) -> (Vec<(usize, usize, Option<usize>)>, Vec<(usize, usize, Option<usize>)>, Vec<(usize, usize, Option<usize>)>) {
         // Generate all possible pawn moves for the current position.
         // Returns a vector of captures and a vector of non-captures, both in the form tuples (from_sq_ind, to_sq_ind, None).
         // Treats promotions as captures.
         // Lists promotions in the following order: queen, rook, knight, bishop, since bishop promotions are very rare.
         let mut moves: Vec<(usize, usize, Option<usize>)> = Vec::new();
         let mut captures: Vec<(usize, usize, Option<usize>)> = Vec::new();
+        let mut promotions: Vec<(usize, usize, Option<usize>)> = Vec::new();
         if board.w_to_move {
             // White to move
             for from_sq_ind in bits(&board.pieces[WP]) {
-                for to_sq_ind in &self.wp_captures_promotions[from_sq_ind] {
+                for to_sq_ind in &self.wp_captures[from_sq_ind] {
                     if board.pieces[BOCC] & (1 << to_sq_ind) != 0 || board.en_passant == Some(*to_sq_ind) {
                         if from_sq_ind > 47 && from_sq_ind < 56 {
-                            append_promotions(&mut captures, from_sq_ind, to_sq_ind, board.w_to_move);
+                            append_promotions(&mut promotions, from_sq_ind, to_sq_ind, board.w_to_move);
                         } else {
                             captures.push((from_sq_ind, *to_sq_ind, None));
                         }
+                    }
+                }
+                for to_sq_ind in &self.wp_promotions[from_sq_ind] {
+                    if board.get_piece(*to_sq_ind) == None {
+                        append_promotions(&mut promotions, from_sq_ind, to_sq_ind, board.w_to_move);
                     }
                 }
                 for to_sq_ind in &self.wp_moves[from_sq_ind] {
@@ -565,13 +633,18 @@ impl MoveGen {
         } else {
             // Black to move
             for from_sq_ind in bits(&board.pieces[BP]) {
-                for to_sq_ind in &self.bp_captures_promotions[from_sq_ind] {
+                for to_sq_ind in &self.bp_captures[from_sq_ind] {
                     if board.pieces[WOCC] & (1 << to_sq_ind) != 0 || board.en_passant == Some(*to_sq_ind) {
                         if from_sq_ind > 7 && from_sq_ind < 16 {
-                            append_promotions(&mut captures, from_sq_ind, to_sq_ind, board.w_to_move);
+                            append_promotions(&mut promotions, from_sq_ind, to_sq_ind, board.w_to_move);
                         } else {
                             captures.push((from_sq_ind, *to_sq_ind, None));
                         }
+                    }
+                }
+                for to_sq_ind in &self.bp_promotions[from_sq_ind] {
+                    if board.get_piece(*to_sq_ind) == None {
+                        append_promotions(&mut promotions, from_sq_ind, to_sq_ind, board.w_to_move);
                     }
                 }
                 for to_sq_ind in &self.bp_moves[from_sq_ind] {
@@ -591,7 +664,7 @@ impl MoveGen {
                 }
             }
         }
-        (captures, moves)
+        (captures, promotions, moves)
     }
 
     fn gen_knight_moves(&self, board: &Bitboard) -> (Vec<(usize, usize, Option<usize>)>, Vec<(usize, usize, Option<usize>)>) {
@@ -724,6 +797,36 @@ impl MoveGen {
             }
         }
         (captures, moves)
+    }
+
+    pub fn gen_bishop_potential_captures(&self, board: &Bitboard, from_sq_ind: usize) -> u64 {
+        // Generate potential bishop captures from the given square.
+        // Used to determine whether a king is in check.
+        let mut blockers: u64;
+        let mut key: usize;
+        // Mask blockers
+        blockers = board.pieces[OCC] & B_MASKS[from_sq_ind];
+
+        // Generate the key using a multiplication and right shift
+        key = ((blockers * self.b_magics[from_sq_ind]) >> (64 - B_BITS[from_sq_ind])) as usize;
+
+        // Return the preinitialized capture set bitboard from the table
+        self.b_move_bitboard[from_sq_ind][key]
+    }
+
+    pub fn gen_rook_potential_captures(&self, board: &Bitboard, from_sq_ind: usize) -> u64 {
+        // Generate potential rook captures from the given square.
+        // Used to determine whether a king is in check.
+        let mut blockers: u64;
+        let mut key: usize;
+        // Mask blockers
+        blockers = board.pieces[OCC] & R_MASKS[from_sq_ind];
+
+        // Generate the key using a multiplication and right shift
+        key = ((blockers * self.r_magics[from_sq_ind]) >> (64 - R_BITS[from_sq_ind])) as usize;
+
+        // Return the preinitialized capture set bitboard from the table
+        self.r_move_bitboard[from_sq_ind][key]
     }
 
     fn gen_bishop_moves(&self, board: &Bitboard) -> (Vec<(usize, usize, Option<usize>)>, Vec<(usize, usize, Option<usize>)>) {

@@ -1,3 +1,5 @@
+use crate::gen_moves::MoveGen;
+
 // Piece labels
 pub(crate) const WP: usize = 0;
 pub(crate) const BP: usize = 1;
@@ -269,6 +271,57 @@ impl Bitboard {
             }
         }
         None
+    }
+
+    pub(crate) fn is_legal(&self, move_gen: &MoveGen) -> bool {
+        // Determines whether this position is legal, i.e. the side to move cannot capture the king.
+        if self.w_to_move {
+            let king_sq_ind = bit_to_sq_ind(self.pieces[BK]);
+            // Can the king reach an enemy bishop or queen by a bishop move?
+            if (move_gen.gen_bishop_potential_captures(self, king_sq_ind) & (self.pieces[WB] | self.pieces[WQ])) != 0 {
+                return false;
+            }
+            // Can the king reach an enemy rook or queen by a rook move?
+            if (move_gen.gen_rook_potential_captures(self, king_sq_ind) & (self.pieces[WR] | self.pieces[WQ])) != 0 {
+                return false;
+            }
+            // Can the king reach an enemy knight by a knight move?
+            if (move_gen.n_move_bitboard[king_sq_ind] & self.pieces[WN]) != 0 {
+                return false;
+            }
+            // Can the king reach an enemy pawn by a pawn move?
+            if (move_gen.wp_capture_bitboard[king_sq_ind] & self.pieces[WP]) != 0 {
+                return false;
+            }
+            // Can the king reach an enemy king by a king move?
+            if (move_gen.k_move_bitboard[king_sq_ind] & self.pieces[WK]) != 0 {
+                return false;
+            }
+            true
+        } else {
+            let king_sq_ind = bit_to_sq_ind(self.pieces[WK]);
+            // Can the king reach an enemy bishop or queen by a bishop move?
+            if (move_gen.gen_bishop_potential_captures(self, king_sq_ind) & (self.pieces[BB] | self.pieces[BQ])) != 0 {
+                return false;
+            }
+            // Can the king reach an enemy rook or queen by a rook move?
+            if (move_gen.gen_rook_potential_captures(self, king_sq_ind) & (self.pieces[BR] | self.pieces[BQ])) != 0 {
+                return false;
+            }
+            // Can the king reach an enemy knight by a knight move?
+            if (move_gen.n_move_bitboard[king_sq_ind] & self.pieces[BN]) != 0 {
+                return false;
+            }
+            // Can the king reach an enemy pawn by a pawn move?
+            if (move_gen.bp_capture_bitboard[king_sq_ind] & self.pieces[BP]) != 0 {
+                return false;
+            }
+            // Can the king reach an enemy king by a king move?
+            if (move_gen.k_move_bitboard[king_sq_ind] & self.pieces[BK]) != 0 {
+                return false;
+            }
+            true
+        }
     }
 
 }
