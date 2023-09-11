@@ -27,6 +27,7 @@ pub struct Bitboard {
     pub(crate) b_castle_q: bool,
     pub(crate) en_passant: Option<usize>, // index of square where en passant is possible
     pub(crate) halfmove_clock: u8, // number of halfmoves since last capture or pawn advance
+    pub(crate) fullmove_clock: u8, // number of fullmoves since start of game
     pub(crate) pieces: Vec<u64>
 }
 
@@ -100,6 +101,7 @@ impl Bitboard {
             b_castle_q: true,
             en_passant: None,
             halfmove_clock: 0,
+            fullmove_clock: 1,
             pieces: [
                 0x000000000000FF00,
                 0x00FF000000000000,
@@ -118,6 +120,85 @@ impl Bitboard {
                 0xFFFF00000000FFFF
             ].try_into().unwrap()
         }
+    }
+
+    // FEN reader
+    pub(crate) fn new_from_fen(fen: String) -> Bitboard {
+        let parts = fen.split(" ").collect::<Vec<&str>>();
+        let mut board = Bitboard::new();
+        board.pieces = [0; 15].try_into().unwrap();
+        board.w_castle_k = false;
+        board.w_castle_q = false;
+        board.b_castle_k = false;
+        board.b_castle_q = false;
+        let mut rank = 7;
+        let mut file = 0;
+        for c in parts[0].chars() {
+            if c == '/' {
+                rank -= 1;
+                file = 0;
+            } else if c.is_digit(10) {
+                file += c.to_digit(10).unwrap() as usize;
+            } else {
+                let sq_ind = coords_to_sq_ind(file, rank);
+                let bit = sq_ind_to_bit(sq_ind);
+                match c {
+                    'P' => board.pieces[WP] ^= bit,
+                    'p' => board.pieces[BP] ^= bit,
+                    'N' => board.pieces[WN] ^= bit,
+                    'n' => board.pieces[BN] ^= bit,
+                    'B' => board.pieces[WB] ^= bit,
+                    'b' => board.pieces[BB] ^= bit,
+                    'R' => board.pieces[WR] ^= bit,
+                    'r' => board.pieces[BR] ^= bit,
+                    'Q' => board.pieces[WQ] ^= bit,
+                    'q' => board.pieces[BQ] ^= bit,
+                    'K' => board.pieces[WK] ^= bit,
+                    'k' => board.pieces[BK] ^= bit,
+                    _ => panic!("Invalid FEN")
+                }
+                file += 1;
+            }
+        }
+        match parts[1] {
+            "w" => board.w_to_move = true,
+            "b" => board.w_to_move = false,
+            _ => panic!("Invalid FEN")
+        }
+        match parts[2] {
+            "-" => (),
+            _ => {
+                for c in parts[2].chars() {
+                    match c {
+                        'K' => board.w_castle_k = true,
+                        'Q' => board.w_castle_q = true,
+                        'k' => board.b_castle_k = true,
+                        'q' => board.b_castle_q = true,
+                        _ => panic!("Invalid FEN")
+                    }
+                }
+            }
+        }
+        match parts[3] {
+            "-" => (),
+            _ => {
+                let sq_ind = algebraic_to_sq_ind(parts[3]);
+                board.en_passant = Some(sq_ind);
+            }
+        }
+        match parts[4] {
+            "0" => (),
+            _ => {
+                board.halfmove_clock = parts[4].parse::<u8>().unwrap();
+            }
+        }
+        match parts[5] {
+            "1" => (),
+            _ => {
+                board.fullmove_clock = parts[5].parse::<u8>().unwrap();
+            }
+        }
+        board
     }
 
     pub fn print(&self) {
@@ -171,6 +252,7 @@ impl Bitboard {
             b_castle_q: self.w_castle_q,
             en_passant: { if self.en_passant == None { None } else { Some(flip_sq_ind_vertically(self.en_passant.unwrap())) } },
             halfmove_clock: self.halfmove_clock,
+            fullmove_clock: self.fullmove_clock,
             pieces: self.pieces.iter().map(|&x| flip_vertically(x)).collect()
         }
     }
