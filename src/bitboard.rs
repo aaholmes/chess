@@ -22,6 +22,7 @@ pub(crate) const OCC: usize = 14; // All occupied squares
 // We will use a 64-bit unsigned integer to represent the bitboard for each piece.
 #[derive(Clone)]
 pub struct Bitboard {
+    pub(crate) game_result: Option<i32>, // None = in progress, 1 = white wins, -1 = black wins, 0 = draw
     pub(crate) w_to_move: bool,
     pub(crate) w_castle_k: bool,
     pub(crate) w_castle_q: bool,
@@ -96,6 +97,7 @@ pub fn flip_vertically(bit: u64) -> u64 {
 impl Bitboard {
     pub(crate) fn new() -> Bitboard {
         Bitboard {
+            game_result: None,
             w_to_move: true,
             w_castle_k: true,
             w_castle_q: true,
@@ -125,8 +127,8 @@ impl Bitboard {
     }
 
     // FEN reader
-    pub(crate) fn new_from_fen(fen: String) -> Bitboard {
-        let parts = fen.split(" ").collect::<Vec<&str>>();
+    pub(crate) fn new_from_fen(fen: &str) -> Bitboard {
+        let parts = fen.split(' ').collect::<Vec<&str>>();
         let mut board = Bitboard::new();
         board.pieces = [0; 15].try_into().unwrap();
         board.w_castle_k = false;
@@ -250,6 +252,7 @@ impl Bitboard {
     pub fn flip_vertically(&self) -> Bitboard {
         // Flip the board vertically, returning a new board.
         Bitboard {
+            game_result: self.game_result,
             w_to_move: !self.w_to_move,
             w_castle_k: self.b_castle_k,
             w_castle_q: self.b_castle_q,
@@ -277,6 +280,10 @@ impl Bitboard {
         // Determines whether this position is legal, i.e. the side to move cannot capture the king.
         if self.w_to_move {
             let king_sq_ind = bit_to_sq_ind(self.pieces[BK]);
+            if king_sq_ind == 64 {
+                println!("No black king");
+                self.print();
+            }
             // Can the king reach an enemy bishop or queen by a bishop move?
             if (move_gen.gen_bishop_potential_captures(self, king_sq_ind) & (self.pieces[WB] | self.pieces[WQ])) != 0 {
                 return false;
@@ -290,7 +297,7 @@ impl Bitboard {
                 return false;
             }
             // Can the king reach an enemy pawn by a pawn move?
-            if (move_gen.wp_capture_bitboard[king_sq_ind] & self.pieces[WP]) != 0 {
+            if (move_gen.bp_capture_bitboard[king_sq_ind] & self.pieces[WP]) != 0 {
                 return false;
             }
             // Can the king reach an enemy king by a king move?
@@ -300,6 +307,10 @@ impl Bitboard {
             true
         } else {
             let king_sq_ind = bit_to_sq_ind(self.pieces[WK]);
+            if king_sq_ind == 64 {
+                println!("No white king");
+                self.print();
+            }
             // Can the king reach an enemy bishop or queen by a bishop move?
             if (move_gen.gen_bishop_potential_captures(self, king_sq_ind) & (self.pieces[BB] | self.pieces[BQ])) != 0 {
                 return false;
@@ -313,7 +324,7 @@ impl Bitboard {
                 return false;
             }
             // Can the king reach an enemy pawn by a pawn move?
-            if (move_gen.bp_capture_bitboard[king_sq_ind] & self.pieces[BP]) != 0 {
+            if (move_gen.wp_capture_bitboard[king_sq_ind] & self.pieces[BP]) != 0 {
                 return false;
             }
             // Can the king reach an enemy king by a king move?

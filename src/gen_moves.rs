@@ -567,7 +567,7 @@ impl MoveGen {
     pub fn gen_pseudo_legal_moves(&self, board: &Bitboard) -> (Vec<(usize, usize, Option<usize>)>, Vec<(usize, usize, Option<usize>)>) {
         // Generate all pseudo-legal moves for the current position, i.e., these moves may move into check.
         // Elsewhere we need to check for legality and perform move ordering.
-        // Returns a vector of captures and a vector of non-captures, both in the form tuples (from_sq_ind, to_sq_ind, None).
+        // Returns a vector of captures and a vector of non-captures, both in the form tuples (from_sq_ind, to_sq_ind, promotion).
         // Includes promotions as captures here
         let (mut captures, mut promotions, mut moves) = self.gen_pawn_moves(board);
         let (mut captures_knights, mut moves_knights) = self.gen_knight_moves(board);
@@ -773,7 +773,10 @@ impl MoveGen {
                     }
                 }
                 for to_sq_ind in &self.r_moves[from_sq_ind][key].1 {
-                    moves.push((from_sq_ind, *to_sq_ind, None));
+                    // Have to make sure we're not capturing our own piece, since pieces on the edge are not included in blockers
+                    if board.pieces[WOCC] & (1 << to_sq_ind) == 0 {
+                        moves.push((from_sq_ind, *to_sq_ind, None));
+                    }
                 }
             }
         } else {
@@ -792,7 +795,10 @@ impl MoveGen {
                     }
                 }
                 for to_sq_ind in &self.r_moves[from_sq_ind][key].1 {
-                    moves.push((from_sq_ind, *to_sq_ind, None));
+                    // Have to make sure we're not capturing our own piece, since pieces on the edge are not included in blockers
+                    if board.pieces[BOCC] & (1 << to_sq_ind) == 0 {
+                        moves.push((from_sq_ind, *to_sq_ind, None));
+                    }
                 }
             }
         }
@@ -853,7 +859,10 @@ impl MoveGen {
                     }
                 }
                 for to_sq_ind in &self.b_moves[from_sq_ind][key].1 {
-                    moves.push((from_sq_ind, *to_sq_ind, None));
+                    // Have to make sure we're not capturing our own piece, since pieces on the edge are not included in blockers
+                    if board.pieces[WOCC] & (1 << to_sq_ind) == 0 {
+                        moves.push((from_sq_ind, *to_sq_ind, None));
+                    }
                 }
             }
         } else {
@@ -872,7 +881,10 @@ impl MoveGen {
                     }
                 }
                 for to_sq_ind in &self.b_moves[from_sq_ind][key].1 {
-                    moves.push((from_sq_ind, *to_sq_ind, None));
+                    // Have to make sure we're not capturing our own piece, since pieces on the edge are not included in blockers
+                    if board.pieces[BOCC] & (1 << to_sq_ind) == 0 {
+                        moves.push((from_sq_ind, *to_sq_ind, None));
+                    }
                 }
             }
         }
@@ -903,7 +915,10 @@ impl MoveGen {
                     }
                 }
                 for to_sq_ind in &self.r_moves[from_sq_ind][key].1 {
-                    moves.push((from_sq_ind, *to_sq_ind, None));
+                    // Have to make sure we're not capturing our own piece, since pieces on the edge are not included in blockers
+                    if board.pieces[WOCC] & (1 << to_sq_ind) == 0 {
+                        moves.push((from_sq_ind, *to_sq_ind, None));
+                    }
                 }
                 // Mask blockers
                 blockers = board.pieces[OCC] & B_MASKS[from_sq_ind];
@@ -918,7 +933,10 @@ impl MoveGen {
                     }
                 }
                 for to_sq_ind in &self.b_moves[from_sq_ind][key].1 {
-                    moves.push((from_sq_ind, *to_sq_ind, None));
+                    // Have to make sure we're not capturing our own piece, since pieces on the edge are not included in blockers
+                    if board.pieces[WOCC] & (1 << to_sq_ind) == 0 {
+                        moves.push((from_sq_ind, *to_sq_ind, None));
+                    }
                 }
             }
         } else {
@@ -937,7 +955,10 @@ impl MoveGen {
                     }
                 }
                 for to_sq_ind in &self.r_moves[from_sq_ind][key].1 {
-                    moves.push((from_sq_ind, *to_sq_ind, None));
+                    // Have to make sure we're not capturing our own piece, since pieces on the edge are not included in blockers
+                    if board.pieces[BOCC] & (1 << to_sq_ind) == 0 {
+                        moves.push((from_sq_ind, *to_sq_ind, None));
+                    }
                 }
                 // Mask blockers
                 blockers = board.pieces[OCC] & B_MASKS[from_sq_ind];
@@ -952,7 +973,10 @@ impl MoveGen {
                     }
                 }
                 for to_sq_ind in &self.b_moves[from_sq_ind][key].1 {
-                    moves.push((from_sq_ind, *to_sq_ind, None));
+                    // Have to make sure we're not capturing our own piece, since pieces on the edge are not included in blockers
+                    if board.pieces[BOCC] & (1 << to_sq_ind) == 0 {
+                        moves.push((from_sq_ind, *to_sq_ind, None));
+                    }
                 }
             }
         }
