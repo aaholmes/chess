@@ -128,6 +128,18 @@ fn main() {
     for i in 1..5 {
         println!("{} {}", i, utils::perft(board.clone(), &move_gen, i, false));
     }
+    // let mut board = Bitboard::new();
+    // board.print();
+    // board = board.make_move(bitboard::algebraic_to_sq_ind("e2"), bitboard::algebraic_to_sq_ind("e4"), None);
+    // board.print();
+    // board = board.make_move(bitboard::algebraic_to_sq_ind("e7"), bitboard::algebraic_to_sq_ind("e6"), None);
+    // board.print();
+    // board = board.make_move(bitboard::algebraic_to_sq_ind("e4"), bitboard::algebraic_to_sq_ind("e5"), None);
+    // board.print();
+    // board = board.make_move(bitboard::algebraic_to_sq_ind("d7"), bitboard::algebraic_to_sq_ind("d5"), None);
+    // board.print();
+    // board = board.make_move(bitboard::algebraic_to_sq_ind("e5"), bitboard::algebraic_to_sq_ind("d6"), None);
+    // board.print();
     // let (captures, moves) = move_gen.gen_pseudo_legal_moves(&board);
     // for m in moves {
     //     let mut board = Bitboard::new();

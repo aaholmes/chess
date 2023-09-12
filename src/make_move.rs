@@ -24,26 +24,28 @@ impl Bitboard {
             new_board.halfmove_clock = 0;
         }
 
+
+        if from_piece.unwrap() < 2 {
+            // En passant
+            if new_board.en_passant != None {
+                if to_sq_ind == new_board.en_passant.unwrap() {
+                    // Capture the pawn.
+                    if new_board.w_to_move {
+                        new_board.pieces[BP] ^= sq_ind_to_bit(to_sq_ind - 8);
+                    } else {
+                        new_board.pieces[WP] ^= sq_ind_to_bit(to_sq_ind + 8);
+                    }
+                }
+            }
+        }
         // Reset the en passant rule.
         new_board.en_passant = None;
-
         if from_piece.unwrap() < 2 {
             // Pawn move: Reset halfmove clock.
             new_board.halfmove_clock = 0;
             if ((to_sq_ind as i8) - (from_sq_ind as i8)).abs() == 16 {
                 // Pawn double move: Set en passant square.
                 new_board.en_passant = Some((from_sq_ind + to_sq_ind) / 2);
-            }
-            // En passant
-            if new_board.en_passant != None {
-                if to_sq_ind == new_board.en_passant.unwrap() {
-                    // Capture the pawn.
-                    if new_board.w_to_move {
-                        new_board.pieces[WP] ^= sq_ind_to_bit(to_sq_ind - 8);
-                    } else {
-                        new_board.pieces[BP] ^= sq_ind_to_bit(to_sq_ind + 8);
-                    }
-                }
             }
         }
 
