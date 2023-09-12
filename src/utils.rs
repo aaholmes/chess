@@ -78,6 +78,7 @@ pub(crate) fn perft(board: Bitboard, move_gen: &MoveGen, depth: u8, verbose: boo
 }
 
 
+// 31 perft tests from https://www.chessprogramming.org/Perft_Results
 #[test]
 fn test_start_pos_perft_1() {
     let board = Bitboard::new();
@@ -203,6 +204,12 @@ fn test_pos3_perft5() {
     let board = Bitboard::new_from_fen("r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1");
     let move_gen = MoveGen::new();
     assert_eq!(perft(board, &move_gen, 5, false), 15833292);
+}
+#[test]
+fn test_pos3_perft6() {
+    let board = Bitboard::new_from_fen("r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1");
+    let move_gen = MoveGen::new();
+    assert_eq!(perft(board, &move_gen, 6, false), 706045033);
 }
 #[test]
 fn test_pos4_perft1() {
