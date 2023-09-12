@@ -15,10 +15,12 @@
 // Note also that once we implement all of this, as well as quiescence search, we can profile the code to see where the bottlenecks are.
 
 
+use std::process::abort;
 use crate::bitboard::{Bitboard, sq_ind_to_bit, WP, BP, WN, BN, WB, BB, WR, BR, WQ, BQ, WK, BK, WOCC, BOCC, OCC};
 use crate::bits::bits;
 use crate::magic_constants::{R_MAGICS, B_MAGICS, R_BITS, B_BITS, R_MASKS, B_MASKS};
 use rand;
+use crate::utils::print_bits;
 
 const NOT_A_FILE: u64 = 0xfefefefefefefefe;
 const NOT_H_FILE: u64 = 0x7f7f7f7f7f7f7f7f;
@@ -512,8 +514,26 @@ impl MoveGen {
             for i in &wp_captures[from_sq_ind] {
                 wp_capture_bitboard[from_sq_ind] |= sq_ind_to_bit(*i);
             }
+            // Also add pawn moves from pawns on the first rank, as this is used in reverse to determine checks by pawns
+            if from_sq_ind < 8 {
+                if from_sq_ind < 7 {
+                    wp_capture_bitboard[from_sq_ind] |= sq_ind_to_bit(from_sq_ind + 9);
+                }
+                if from_sq_ind > 0 {
+                    wp_capture_bitboard[from_sq_ind] |= sq_ind_to_bit(from_sq_ind + 7);
+                }
+            }
             for i in &bp_captures[from_sq_ind] {
                 bp_capture_bitboard[from_sq_ind] |= sq_ind_to_bit(*i);
+            }
+            // Also add pawn moves from pawns on the first rank, as this is used in reverse to determine checks by pawns
+            if from_sq_ind > 55 {
+                if from_sq_ind > 56 {
+                    bp_capture_bitboard[from_sq_ind] |= sq_ind_to_bit(from_sq_ind - 9);
+                }
+                if from_sq_ind < 63 {
+                    bp_capture_bitboard[from_sq_ind] |= sq_ind_to_bit(from_sq_ind - 7);
+                }
             }
             wp_promotions.push(wp_prom.clone());
             bp_promotions.push(bp_prom.clone());
@@ -700,6 +720,7 @@ impl MoveGen {
 
     fn gen_king_moves(&self, board: &Bitboard) -> (Vec<(usize, usize, Option<usize>)>, Vec<(usize, usize, Option<usize>)>) {
         // Generate all possible king moves for the current position.
+        // For castling, checks whether in check and whether the king moves through check.
         // Returns a vector of captures and a vector of non-captures, both in the form tuples (from_sq_ind, to_sq_ind, None).
         let mut moves: Vec<(usize, usize, Option<usize>)> = Vec::new();
         let mut captures: Vec<(usize, usize, Option<usize>)> = Vec::new();
@@ -707,12 +728,16 @@ impl MoveGen {
             // White to move
             if board.w_castle_k {
                 if board.pieces[OCC] & ((1 << 5) | (1 << 6)) == 0 {
-                    moves.push((4, 6, None));
+                    if !board.is_square_attacked(4, false, self) && !board.is_square_attacked(5, false, self) && !board.is_square_attacked(6, false, self) {
+                        moves.push((4, 6, None));
+                    }
                 }
             }
             if board.w_castle_q {
                 if board.pieces[OCC] & ((1 << 1) | (1 << 2) | (1 << 3)) == 0 {
-                    moves.push((4, 2, None));
+                    if !board.is_square_attacked(4, false, self) && !board.is_square_attacked(3, false, self) && !board.is_square_attacked(2, false, self) {
+                        moves.push((4, 2, None));
+                    }
                 }
             }
             for from_sq_ind in bits(&board.pieces[WK]) {
@@ -728,12 +753,16 @@ impl MoveGen {
             // Black to move
             if board.b_castle_k {
                 if board.pieces[OCC] & ((1 << 61) | (1 << 62)) == 0 {
-                    moves.push((60, 62, None));
+                    if !board.is_square_attacked(60, true, self) && !board.is_square_attacked(61, true, self) && !board.is_square_attacked(62, true, self) {
+                        moves.push((60, 62, None));
+                    }
                 }
             }
             if board.b_castle_q {
                 if board.pieces[OCC] & ((1 << 57) | (1 << 58) | (1 << 59)) == 0 {
-                    moves.push((60, 58, None));
+                    if !board.is_square_attacked(60, true, self) && !board.is_square_attacked(59, true, self) && !board.is_square_attacked(58, true, self) {
+                        moves.push((60, 58, None));
+                    }
                 }
             }
             for from_sq_ind in bits(&board.pieces[BK]) {
