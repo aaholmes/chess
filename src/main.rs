@@ -10,7 +10,7 @@ use gen_moves::MoveGen;
 use crate::bitboard::{Bitboard, sq_ind_to_algebraic};
 mod magic_constants;
 use magic_constants::{R_MAGICS, B_MAGICS};
-use crate::search::negamax_search;
+use crate::search::{alpha_beta_search, negamax_search};
 use crate::utils::perft;
 
 mod utils;
@@ -73,11 +73,11 @@ fn main() {
     println!("___");
     board.print();
     for i in 1..4 {
-        let (eval, m) = negamax_search(&board, &move_gen, &PestoEval::new(), i);
+        let (eval, m) = alpha_beta_search(&board, &move_gen, &PestoEval::new(), i);
         println!("At depth {}, best eval and move are {} {}", i, eval, utils::print_move(&m));
     }
     for _i in 0..80 {
-        let (eval, m) = negamax_search(&board, &move_gen, &PestoEval::new(), 1);
+        let (eval, m) = alpha_beta_search(&board, &move_gen, &PestoEval::new(), 1);
         board = board.make_move(m.0, m.1, m.2);
         println!("At depth {}, best eval and move are {} {}", 1, eval, utils::print_move(&m));
         board.print();
