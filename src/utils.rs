@@ -30,11 +30,11 @@ pub fn print_move(the_move: &(usize, usize, Option<usize>)) -> String {
     let mut promotion = String::from("");
     if the_move.2 != None {
         promotion = String::from("=");
-        match the_move.2.unwrap() {
-            2 => promotion.push('N'),
-            3 => promotion.push('B'),
-            4 => promotion.push('R'),
-            5 => promotion.push('Q'),
+        match the_move.2.unwrap() / 2 {
+            1 => promotion.push('N'),
+            2 => promotion.push('B'),
+            3 => promotion.push('R'),
+            4 => promotion.push('Q'),
             _ => panic!("Invalid promotion piece")
         }
     }
