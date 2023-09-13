@@ -72,14 +72,27 @@ fn main() {
     let mut board = Bitboard::new();
     println!("___");
     board.print();
-    for i in 1..4 {
-        let (eval, m) = alpha_beta_search(&board, &move_gen, &PestoEval::new(), i);
-        println!("At depth {}, best eval and move are {} {}", i, eval, utils::print_move(&m));
+    let use_ab: bool = false;
+    for i in 1..7 {
+        let (eval, m, n) = {
+            if use_ab {
+                alpha_beta_search(&board, &move_gen, &PestoEval::new(), i)
+            } else {
+                negamax_search(&board, &move_gen, &PestoEval::new(), i)
+            }
+        };
+        println!("At depth {}, searched {} nodes. best eval and move are {} {}", i, n, eval, utils::print_move(&m));
     }
-    for _i in 0..80 {
-        let (eval, m) = alpha_beta_search(&board, &move_gen, &PestoEval::new(), 1);
-        board = board.make_move(m.0, m.1, m.2);
-        println!("At depth {}, best eval and move are {} {}", 1, eval, utils::print_move(&m));
-        board.print();
-    }
+    // for _i in 0..10 {
+    //     let (eval, m, n) = {
+    //         if use_ab {
+    //             alpha_beta_search(&board, &move_gen, &PestoEval::new(), 3);
+    //         } else {
+    //             negamax_search(&board, &move_gen, &PestoEval::new(), 3);
+    //         }
+    //     };
+    //     board = board.make_move(m.0, m.1, m.2);
+    //     println!("At depth {}, searched {} nodes. best eval and move are {} {}", 3, n, eval, utils::print_move(&m));
+    //     board.print();
+    // }
 }

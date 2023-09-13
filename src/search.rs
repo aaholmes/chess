@@ -6,13 +6,15 @@ use crate::eval::PestoEval;
 use crate::utils;
 
 
-pub(crate) fn negamax_search(board: &Bitboard, move_gen: &MoveGen, pesto: &PestoEval, depth: i32) -> (i32, (usize, usize, Option<usize>)) {
+pub(crate) fn negamax_search(board: &Bitboard, move_gen: &MoveGen, pesto: &PestoEval, depth: i32) -> (i32, (usize, usize, Option<usize>), i32) {
     // Perform negamax search from the given position
     // Exhaustive search to the given depth
     // Returns the eval (in centipawns) of the final position, as well as the first move
     // to play from the current position
+    // Also returns number of nodes searched
     let mut best_eval: i32 = -1000000;
     let mut best_move: (usize, usize, Option<usize>) = (0, 0, None);
+    let mut n: i32 = 0;
     let (mut captures, moves) = move_gen.gen_pseudo_legal_moves(&board);
     captures.extend(moves);
     // Remove duplicates in captures. This is necessary because shifting piece moves to the edge of the board may or may not be captures.
@@ -23,25 +25,29 @@ pub(crate) fn negamax_search(board: &Bitboard, move_gen: &MoveGen, pesto: &Pesto
         if !new_board.is_legal(move_gen) {
             continue;
         }
-        let eval: i32 = -negamax(&new_board, move_gen, pesto, depth - 1);
+        let (mut eval, nodes) = negamax(&new_board, move_gen, pesto, depth - 1);
+        eval = -eval;
+        n += nodes;
         if eval > best_eval {
             best_eval = eval;
             best_move = m;
         }
     }
-    (best_eval, best_move)
+    (best_eval, best_move, n)
 
 }
 
-fn negamax(board: &Bitboard, move_gen: &MoveGen, pesto: &PestoEval, depth: i32) -> i32 {
+fn negamax(board: &Bitboard, move_gen: &MoveGen, pesto: &PestoEval, depth: i32) -> (i32, i32) {
     // Perform negamax search from the given position
     // Exhaustive search to the given depth
     // Returns the eval (in centipawns) of the final position
+    // Also returns number of nodes searched
     if depth == 0 {
         // Leaf node
-        return -pesto.eval(board); // TODO: put quiescence search here
+        return (-pesto.eval(board), 1); // TODO: put quiescence search here
     }
     let mut best_eval: i32 = -1000000;
+    let mut n: i32 = 0;
     let (mut captures, moves) = move_gen.gen_pseudo_legal_moves(&board);
     captures.extend(moves);
     // Remove duplicates in captures. This is necessary because shifting piece moves to the edge of the board may or may not be captures.
@@ -52,22 +58,26 @@ fn negamax(board: &Bitboard, move_gen: &MoveGen, pesto: &PestoEval, depth: i32) 
         if !new_board.is_legal(move_gen) {
             continue;
         }
-        let eval: i32 = -negamax(&new_board, move_gen, pesto, depth - 1);
+        let (mut eval, nodes) = negamax(&new_board, move_gen, pesto, depth - 1);
+        eval = -eval;
+        n += nodes;
         if eval > best_eval {
             best_eval = eval;
         }
     }
-    best_eval
+    (best_eval, n)
 }
 
-pub(crate) fn alpha_beta_search(board: &Bitboard, move_gen: &MoveGen, pesto: &PestoEval, depth: i32) -> (i32, (usize, usize, Option<usize>)) {
+pub(crate) fn alpha_beta_search(board: &Bitboard, move_gen: &MoveGen, pesto: &PestoEval, depth: i32) -> (i32, (usize, usize, Option<usize>), i32) {
     // Perform alpha-beta search from the given position
     // Exhaustive search to the given depth
     // Returns the eval (in centipawns) of the final position, as well as the first move
     // to play from the current position
+    // Also returns number of nodes searched
     let mut best_move: (usize, usize, Option<usize>) = (0, 0, None);
     let mut alpha: i32 = -1000000;
     let mut beta: i32 = 1000000;
+    let mut n: i32 = 0;
     let (mut captures, moves) = move_gen.gen_pseudo_legal_moves(&board);
     captures.extend(moves);
     // Remove duplicates in captures. This is necessary because shifting piece moves to the edge of the board may or may not be captures.
@@ -78,7 +88,9 @@ pub(crate) fn alpha_beta_search(board: &Bitboard, move_gen: &MoveGen, pesto: &Pe
         if !new_board.is_legal(move_gen) {
             continue;
         }
-        let eval: i32 = -alpha_beta(&new_board, move_gen, pesto, depth - 1, -beta, -alpha);
+        let (mut eval, nodes) = alpha_beta(&new_board, move_gen, pesto, depth - 1, -beta, -alpha);
+        eval = -eval;
+        n += nodes;
         if eval > alpha {
             alpha = eval;
             best_move = m;
@@ -87,19 +99,21 @@ pub(crate) fn alpha_beta_search(board: &Bitboard, move_gen: &MoveGen, pesto: &Pe
             break;
         }
     }
-    (alpha, best_move)
+    (alpha, best_move, n)
 }
 
 
-fn alpha_beta(board: &Bitboard, move_gen: &MoveGen, pesto: &PestoEval, depth: i32, mut alpha: i32, mut beta: i32) -> i32 {
+fn alpha_beta(board: &Bitboard, move_gen: &MoveGen, pesto: &PestoEval, depth: i32, mut alpha: i32, mut beta: i32) -> (i32, i32) {
     // Private recursive function used for alpha-beta search
     // External functions should call alpha_beta_search instead
     // Returns the eval (in centipawns) of the final position
+    // Also returns number of nodes searched
     if depth == 0 {
         // Leaf node
-        return -pesto.eval(board); // TODO: put quiescence search here
+        return (-pesto.eval(board), 1); // TODO: put quiescence search here
     }
     // Non-leaf node
+    let mut n: i32 = 0;
     let (mut captures, moves) = move_gen.gen_pseudo_legal_moves(&board);
     captures.extend(moves);
     // Remove duplicates in captures. This is necessary because shifting piece moves to the edge of the board may or may not be captures.
@@ -110,7 +124,9 @@ fn alpha_beta(board: &Bitboard, move_gen: &MoveGen, pesto: &PestoEval, depth: i3
         if !new_board.is_legal(move_gen) {
             continue;
         }
-        let eval: i32 = -alpha_beta(&new_board, move_gen, pesto, depth - 1, -beta, -alpha);
+        let (mut eval, nodes) = alpha_beta(&new_board, move_gen, pesto, depth - 1, -beta, -alpha);
+        eval = -eval;
+        n += nodes;
         if eval > alpha {
             alpha = eval;
         }
@@ -118,5 +134,5 @@ fn alpha_beta(board: &Bitboard, move_gen: &MoveGen, pesto: &PestoEval, depth: i3
             break;
         }
     }
-    return alpha;
+    return (alpha, n);
 }
