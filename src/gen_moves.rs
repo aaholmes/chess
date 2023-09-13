@@ -266,7 +266,7 @@ fn init_bishop_moves(b_magics: [u64; 64]) -> (Vec<Vec<(Vec<usize>, Vec<usize>)>>
             }
 
             // Generate the key using a multiplication and right shift
-            key = ((blockers * b_magics[from_sq_ind]) >> (64 - B_BITS[from_sq_ind])) as usize;
+            key = ((blockers.wrapping_mul(b_magics[from_sq_ind])) >> (64 - B_BITS[from_sq_ind])) as usize;
 
             // Assign the captures and moves for this blocker combination
             out1[from_sq_ind][key] = bishop_attacks(from_sq_ind, blockers);
@@ -307,7 +307,7 @@ fn init_rook_moves(r_magics: [u64; 64]) -> (Vec<Vec<(Vec<usize>, Vec<usize>)>>, 
             }
 
             // Generate the key using a multiplication and right shift
-            key = ((blockers * r_magics[from_sq_ind]) >> (64 - R_BITS[from_sq_ind])) as usize;
+            key = ((blockers.wrapping_mul(r_magics[from_sq_ind])) >> (64 - R_BITS[from_sq_ind])) as usize;
 
             // Assign the captures and moves for this blocker combination
             out1[from_sq_ind][key] = rook_attacks(from_sq_ind, blockers);
@@ -416,7 +416,7 @@ fn bishop_attacks(sq: usize, block: u64) -> (Vec<usize>, Vec<usize>) {
     }
     if rk < 7 && fl > 0 {
         for r in rk + 1 .. 8 {
-            f = fl - r + rk;
+            f = fl + rk - r;
             if r == 7 || f == 0 {
                 captures.push(f + r * 8);
                 moves.push(f + r * 8);
@@ -450,7 +450,7 @@ fn bishop_attacks(sq: usize, block: u64) -> (Vec<usize>, Vec<usize>) {
     }
     if rk > 0 && fl < 7 {
         for r in (0..rk).rev() {
-            f = fl - r + rk;
+            f = fl + rk - r;
             if r == 0 || f == 7 {
                 captures.push(f + r * 8);
                 moves.push(f + r * 8);
@@ -793,7 +793,7 @@ impl MoveGen {
                 blockers = board.pieces[OCC] & R_MASKS[from_sq_ind];
 
                 // Generate the key using a multiplication and right shift
-                key = ((blockers * self.r_magics[from_sq_ind]) >> (64 - R_BITS[from_sq_ind])) as usize;
+                key = ((blockers.wrapping_mul(self.r_magics[from_sq_ind])) >> (64 - R_BITS[from_sq_ind])) as usize;
 
                 // Return the preinitialized attack set bitboard from the table
                 for to_sq_ind in &self.r_moves[from_sq_ind][key].0 {
@@ -815,7 +815,7 @@ impl MoveGen {
                 blockers = board.pieces[OCC] & R_MASKS[from_sq_ind];
 
                 // Generate the key using a multiplication and right shift
-                key = ((blockers * self.r_magics[from_sq_ind]) >> (64 - R_BITS[from_sq_ind])) as usize;
+                key = ((blockers.wrapping_mul(self.r_magics[from_sq_ind])) >> (64 - R_BITS[from_sq_ind])) as usize;
 
                 // Return the preinitialized attack set bitboard from the table
                 for to_sq_ind in &self.r_moves[from_sq_ind][key].0 {
@@ -843,7 +843,7 @@ impl MoveGen {
         blockers = board.pieces[OCC] & B_MASKS[from_sq_ind];
 
         // Generate the key using a multiplication and right shift
-        key = ((blockers * self.b_magics[from_sq_ind]) >> (64 - B_BITS[from_sq_ind])) as usize;
+        key = ((blockers.wrapping_mul(self.b_magics[from_sq_ind])) >> (64 - B_BITS[from_sq_ind])) as usize;
 
         // Return the preinitialized capture set bitboard from the table
         self.b_move_bitboard[from_sq_ind][key]
@@ -858,7 +858,7 @@ impl MoveGen {
         blockers = board.pieces[OCC] & R_MASKS[from_sq_ind];
 
         // Generate the key using a multiplication and right shift
-        key = ((blockers * self.r_magics[from_sq_ind]) >> (64 - R_BITS[from_sq_ind])) as usize;
+        key = ((blockers.wrapping_mul(self.r_magics[from_sq_ind])) >> (64 - R_BITS[from_sq_ind])) as usize;
 
         // Return the preinitialized capture set bitboard from the table
         self.r_move_bitboard[from_sq_ind][key]
@@ -879,7 +879,7 @@ impl MoveGen {
                 blockers = board.pieces[OCC] & B_MASKS[from_sq_ind];
 
                 // Generate the key using a multiplication and right shift
-                key = ((blockers * self.b_magics[from_sq_ind]) >> (64 - B_BITS[from_sq_ind])) as usize;
+                key = ((blockers.wrapping_mul(self.b_magics[from_sq_ind])) >> (64 - B_BITS[from_sq_ind])) as usize;
 
                 // Return the preinitialized attack set bitboard from the table
                 for to_sq_ind in &self.b_moves[from_sq_ind][key].0 {
@@ -901,7 +901,7 @@ impl MoveGen {
                 blockers = board.pieces[OCC] & B_MASKS[from_sq_ind];
 
                 // Generate the key using a multiplication and right shift
-                key = ((blockers * self.b_magics[from_sq_ind]) >> (64 - B_BITS[from_sq_ind])) as usize;
+                key = ((blockers.wrapping_mul(self.b_magics[from_sq_ind])) >> (64 - B_BITS[from_sq_ind])) as usize;
 
                 // Return the preinitialized attack set bitboard from the table
                 for to_sq_ind in &self.b_moves[from_sq_ind][key].0 {
@@ -935,7 +935,7 @@ impl MoveGen {
                 blockers = board.pieces[OCC] & R_MASKS[from_sq_ind];
 
                 // Generate the key using a multiplication and right shift
-                key = ((blockers * self.r_magics[from_sq_ind]) >> (64 - R_BITS[from_sq_ind])) as usize;
+                key = ((blockers.wrapping_mul(self.r_magics[from_sq_ind])) >> (64 - R_BITS[from_sq_ind])) as usize;
 
                 // Return the preinitialized attack set bitboard from the table
                 for to_sq_ind in &self.r_moves[from_sq_ind][key].0 {
@@ -953,7 +953,7 @@ impl MoveGen {
                 blockers = board.pieces[OCC] & B_MASKS[from_sq_ind];
 
                 // Generate the key using a multiplication and right shift
-                key = ((blockers * self.b_magics[from_sq_ind]) >> (64 - B_BITS[from_sq_ind])) as usize;
+                key = ((blockers.wrapping_mul(self.b_magics[from_sq_ind])) >> (64 - B_BITS[from_sq_ind])) as usize;
 
                 // Return the preinitialized attack set bitboard from the table
                 for to_sq_ind in &self.b_moves[from_sq_ind][key].0 {
@@ -975,7 +975,7 @@ impl MoveGen {
                 blockers = board.pieces[OCC] & R_MASKS[from_sq_ind];
 
                 // Generate the key using a multiplication and right shift
-                key = ((blockers * self.r_magics[from_sq_ind]) >> (64 - R_BITS[from_sq_ind])) as usize;
+                key = ((blockers.wrapping_mul(self.r_magics[from_sq_ind])) >> (64 - R_BITS[from_sq_ind])) as usize;
 
                 // Return the preinitialized attack set bitboard from the table
                 for to_sq_ind in &self.r_moves[from_sq_ind][key].0 {
@@ -993,7 +993,7 @@ impl MoveGen {
                 blockers = board.pieces[OCC] & B_MASKS[from_sq_ind];
 
                 // Generate the key using a multiplication and right shift
-                key = ((blockers * self.b_magics[from_sq_ind]) >> (64 - B_BITS[from_sq_ind])) as usize;
+                key = ((blockers.wrapping_mul(self.b_magics[from_sq_ind])) >> (64 - B_BITS[from_sq_ind])) as usize;
 
                 // Return the preinitialized attack set bitboard from the table
                 for to_sq_ind in &self.b_moves[from_sq_ind][key].0 {
