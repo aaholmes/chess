@@ -136,3 +136,21 @@ fn alpha_beta(board: &Bitboard, move_gen: &MoveGen, pesto: &PestoEval, depth: i3
     }
     return (alpha, n);
 }
+
+pub(crate) fn iterative_deepening_ab_search(board: &Bitboard, move_gen: &MoveGen, pesto: &PestoEval, max_depth: i32) -> (i32, (usize, usize, Option<usize>), i32) {
+    // Perform iterative deepening alpha-beta search from the given position
+    // Searches to the given depth
+    // Returns the eval (in centipawns) of the final position, as well as the first move
+    // to play from the current position
+    // Also returns number of nodes searched
+    let mut eval: i32 = 0;
+    let mut best_move: (usize, usize, Option<usize>) = (0, 0, None);
+    let mut n: i32 = 0;
+    let mut nodes = 0;
+    for depth in 1..max_depth + 1 {
+        (eval, best_move, nodes) = alpha_beta_search(board, move_gen, pesto, depth);
+        n += nodes;
+        println!("At depth {}, searched {} nodes. best eval and move are {} {}", depth, n, eval, utils::print_move(&best_move));
+    }
+    (eval, best_move, n)
+}

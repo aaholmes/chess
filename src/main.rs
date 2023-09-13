@@ -10,7 +10,7 @@ use gen_moves::MoveGen;
 use crate::bitboard::{Bitboard, sq_ind_to_algebraic};
 mod magic_constants;
 use magic_constants::{R_MAGICS, B_MAGICS};
-use crate::search::{alpha_beta_search, negamax_search};
+use crate::search::{alpha_beta_search, iterative_deepening_ab_search, negamax_search};
 use crate::utils::perft;
 
 mod utils;
@@ -72,23 +72,24 @@ fn main() {
     let mut board = Bitboard::new();
     println!("___");
     board.print();
-    let use_ab: bool = false;
-    for i in 1..7 {
-        let (eval, m, n) = {
-            if use_ab {
-                alpha_beta_search(&board, &move_gen, &PestoEval::new(), i)
-            } else {
-                negamax_search(&board, &move_gen, &PestoEval::new(), i)
-            }
-        };
-        println!("At depth {}, searched {} nodes. best eval and move are {} {}", i, n, eval, utils::print_move(&m));
-    }
+    let use_ab: bool = true;
+    iterative_deepening_ab_search(&board, &move_gen, &PestoEval::new(), 7);
+    // for i in 1..8 {
+    //     let (eval, m, n) = {
+    //         if use_ab {
+    //             alpha_beta_search(&board, &move_gen, &PestoEval::new(), i)
+    //         } else {
+    //             negamax_search(&board, &move_gen, &PestoEval::new(), i)
+    //         }
+    //     };
+    //     println!("At depth {}, searched {} nodes. best eval and move are {} {}", i, n, eval, utils::print_move(&m));
+    // }
     // for _i in 0..10 {
     //     let (eval, m, n) = {
     //         if use_ab {
-    //             alpha_beta_search(&board, &move_gen, &PestoEval::new(), 3);
+    //             alpha_beta_search(&board, &move_gen, &PestoEval::new(), 3)
     //         } else {
-    //             negamax_search(&board, &move_gen, &PestoEval::new(), 3);
+    //             negamax_search(&board, &move_gen, &PestoEval::new(), 3)
     //         }
     //     };
     //     board = board.make_move(m.0, m.1, m.2);
