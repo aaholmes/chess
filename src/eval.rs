@@ -219,7 +219,7 @@ impl PestoEval {
     }
 
     pub fn eval(&self, board: &Bitboard) -> i32
-    // Computes the eval according to the Pesto evaluation function
+    // Computes the eval (in centipawns) according to the Pesto evaluation function
     // Relative to the side to move
     {
         let mut mg: [i32; 2] = [0, 0];
