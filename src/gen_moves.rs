@@ -727,16 +727,22 @@ impl MoveGen {
         if board.w_to_move {
             // White to move
             if board.w_castle_k {
-                if board.pieces[OCC] & ((1 << 5) | (1 << 6)) == 0 {
-                    if !board.is_square_attacked(4, false, self) && !board.is_square_attacked(5, false, self) && !board.is_square_attacked(6, false, self) {
-                        moves.push((4, 6, None));
+                // Make sure a rook is there because it could have been captured
+                if board.pieces[WR] & (1 << 7) != 0 {
+                    if board.pieces[OCC] & ((1 << 5) | (1 << 6)) == 0 {
+                        if !board.is_square_attacked(4, false, self) && !board.is_square_attacked(5, false, self) && !board.is_square_attacked(6, false, self) {
+                            moves.push((4, 6, None));
+                        }
                     }
                 }
             }
             if board.w_castle_q {
-                if board.pieces[OCC] & ((1 << 1) | (1 << 2) | (1 << 3)) == 0 {
-                    if !board.is_square_attacked(4, false, self) && !board.is_square_attacked(3, false, self) && !board.is_square_attacked(2, false, self) {
-                        moves.push((4, 2, None));
+                // Make sure a rook is there because it could have been captured
+                if board.pieces[WR] & (1 << 0) != 0 {
+                    if board.pieces[OCC] & ((1 << 1) | (1 << 2) | (1 << 3)) == 0 {
+                        if !board.is_square_attacked(4, false, self) && !board.is_square_attacked(3, false, self) && !board.is_square_attacked(2, false, self) {
+                            moves.push((4, 2, None));
+                        }
                     }
                 }
             }
@@ -752,16 +758,22 @@ impl MoveGen {
         } else {
             // Black to move
             if board.b_castle_k {
-                if board.pieces[OCC] & ((1 << 61) | (1 << 62)) == 0 {
-                    if !board.is_square_attacked(60, true, self) && !board.is_square_attacked(61, true, self) && !board.is_square_attacked(62, true, self) {
-                        moves.push((60, 62, None));
+                // Make sure a rook is there because it could have been captured
+                if board.pieces[BR] & (1 << 63) != 0 {
+                    if board.pieces[OCC] & ((1 << 61) | (1 << 62)) == 0 {
+                        if !board.is_square_attacked(60, true, self) && !board.is_square_attacked(61, true, self) && !board.is_square_attacked(62, true, self) {
+                            moves.push((60, 62, None));
+                        }
                     }
                 }
             }
             if board.b_castle_q {
-                if board.pieces[OCC] & ((1 << 57) | (1 << 58) | (1 << 59)) == 0 {
-                    if !board.is_square_attacked(60, true, self) && !board.is_square_attacked(59, true, self) && !board.is_square_attacked(58, true, self) {
-                        moves.push((60, 58, None));
+                // Make sure a rook is there because it could have been captured
+                if board.pieces[BR] & (1 << 56) != 0 {
+                    if board.pieces[OCC] & ((1 << 57) | (1 << 58) | (1 << 59)) == 0 {
+                        if !board.is_square_attacked(60, true, self) && !board.is_square_attacked(59, true, self) && !board.is_square_attacked(58, true, self) {
+                            moves.push((60, 58, None));
+                        }
                     }
                 }
             }
