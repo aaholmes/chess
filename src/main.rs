@@ -10,7 +10,7 @@ use gen_moves::MoveGen;
 use crate::bitboard::{Bitboard, sq_ind_to_algebraic};
 mod magic_constants;
 use magic_constants::{R_MAGICS, B_MAGICS};
-use crate::search::{alpha_beta_search, iterative_deepening_ab_search, negamax_search};
+use crate::search::{alpha_beta_search, aspiration_window_ab_search, iterative_deepening_ab_search, negamax_search};
 use crate::utils::perft;
 
 mod utils;
@@ -74,7 +74,8 @@ fn main() {
     println!("___");
     board.print();
     let use_ab: bool = true;
-    iterative_deepening_ab_search(&mut board, &move_gen, &PestoEval::new(), 8);
+    aspiration_window_ab_search(&mut board, &move_gen, &PestoEval::new(), 8);
+    // iterative_deepening_ab_search(&mut board, &move_gen, &PestoEval::new(), 8);
     // for i in 1..8 {
     //     let (eval, m, n) = {
     //         if use_ab {

@@ -68,15 +68,15 @@ fn negamax(board: &mut Bitboard, move_gen: &MoveGen, pesto: &PestoEval, depth: i
     (best_eval, n)
 }
 
-pub(crate) fn alpha_beta_search(board: &mut Bitboard, move_gen: &MoveGen, pesto: &PestoEval, depth: i32) -> (i32, (usize, usize, Option<usize>), i32) {
+pub(crate) fn alpha_beta_search(board: &mut Bitboard, move_gen: &MoveGen, pesto: &PestoEval, depth: i32, alpha_init: i32, beta_init: i32) -> (i32, (usize, usize, Option<usize>), i32) {
     // Perform alpha-beta search from the given position
     // Exhaustive search to the given depth
     // Returns the eval (in centipawns) of the final position, as well as the first move
     // to play from the current position
     // Also returns number of nodes searched
     let mut best_move: (usize, usize, Option<usize>) = (0, 0, None);
-    let mut alpha: i32 = -1000000;
-    let mut beta: i32 = 1000000;
+    let mut alpha: i32 = alpha_init;
+    let mut beta: i32 = beta_init;
     let mut n: i32 = 0;
     let (mut captures, moves) = move_gen.gen_pseudo_legal_moves_with_evals(board, &pesto);
     captures.extend(moves);
@@ -148,9 +148,49 @@ pub(crate) fn iterative_deepening_ab_search(board: &mut Bitboard, move_gen: &Mov
     let mut n: i32 = 0;
     let mut nodes = 0;
     for depth in 1..max_depth + 1 {
-        (eval, best_move, nodes) = alpha_beta_search(board, move_gen, pesto, depth);
+        (eval, best_move, nodes) = alpha_beta_search(board, move_gen, pesto, depth, -1000000, 1000000);
         n += nodes;
         println!("At depth {}, searched {} nodes. best eval and move are {} {}", depth, n, eval, utils::print_move(&best_move));
+    }
+    (eval, best_move, n)
+}
+
+pub(crate) fn aspiration_window_ab_search(board: &mut Bitboard, move_gen: &MoveGen, pesto: &PestoEval, max_depth: i32) -> (i32, (usize, usize, Option<usize>), i32) {
+    // Perform aspiration window alpha-beta search from the given position
+    let lower_bound_param: i32 = -25;
+    let upper_bound_param: i32 = 25;
+
+    let mut lower_bound: i32 = lower_bound_param;
+    let mut upper_bound: i32 = upper_bound_param;
+    let mut target_eval: i32 = board.eval;
+    let mut eval: i32 = target_eval;
+    let mut best_move: (usize, usize, Option<usize>) = (0, 0, None);
+    let mut n: i32 = 0;
+    let mut nodes = 0;
+    for depth in 1..max_depth + 1 {
+        let mut lower_window_scale: i32 = 1;
+        let mut upper_window_scale: i32 = 1;
+        while true {
+            lower_bound = target_eval + lower_bound_param * lower_window_scale;
+            upper_bound = target_eval + upper_bound_param * upper_window_scale;
+            println!("Aspiration window search with window {} {}", lower_bound, upper_bound);
+            (eval, best_move, nodes) = alpha_beta_search(board, move_gen, pesto, depth, lower_bound, upper_bound);
+            n += nodes;
+            println!("At depth {}, searched {} nodes. best eval and move are {} {}", depth, n, eval, utils::print_move(&best_move));
+            if eval == lower_bound {
+                println!("\nLower bound hit; retrying with larger window");
+                lower_window_scale *= 9;
+            } else if eval == upper_bound {
+                println!("\nUpper bound hit; retrying with larger window");
+                upper_window_scale *= 9;
+            } else {
+                println!("\nAspiration window search successful!");
+                println!("Best move: {}", utils::print_move(&best_move));
+                println!("Eval: {}\n", eval);
+                target_eval = eval;
+                break;
+            }
+        }
     }
     (eval, best_move, n)
 }
