@@ -56,7 +56,7 @@ fn main() {
     // board = board.make_move(bitboard::algebraic_to_sq_ind("e1"), bitboard::algebraic_to_sq_ind("g1"), None);
     // println!("{}", pesto.eval(&board));
     // assert_eq!(pesto.eval(&board), 52);
-    board = Bitboard::new();
+    board = Bitboard::new_from_fen("r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1");
     // board = board.make_move(bitboard::algebraic_to_sq_ind("e2"), bitboard::algebraic_to_sq_ind("e4"), None);
     board.print();
     let move_gen = MoveGen::new();
@@ -74,7 +74,7 @@ fn main() {
     println!("___");
     board.print();
     let use_ab: bool = true;
-    iterative_deepening_ab_search(&mut board, &move_gen, &PestoEval::new(), 9);
+    iterative_deepening_ab_search(&mut board, &move_gen, &PestoEval::new(), 8);
     // for i in 1..8 {
     //     let (eval, m, n) = {
     //         if use_ab {

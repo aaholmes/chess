@@ -633,6 +633,10 @@ impl MoveGen {
         moves.append(&mut moves_queens);
         moves.append(&mut moves_kings);
         // Here let's sort captures by MVV-LVA
+        captures.sort_unstable_by_key(|m| -self.mvv_lva(board, m.0, m.1));
+        // for m in &captures {
+        //     println!("Capture: {} {} has eval {}", sq_ind_to_algebraic(m.0), sq_ind_to_algebraic(m.1), self.mvv_lva(board, m.0, m.1));
+        // }
         // Also sort moves by pesto eval change
         pesto.eval_update_board(board);
         // println!("Initial position eval {} game_phase {}", board.eval, board.game_phase.unwrap());
@@ -640,7 +644,20 @@ impl MoveGen {
         // for m in &moves {
         //     println!("Move: {} {} has eval {}", sq_ind_to_algebraic(m.0), sq_ind_to_algebraic(m.1), pesto.move_eval(board, m.0, m.1));
         // }
+        // abort();
         (captures, moves)
+    }
+
+    fn mvv_lva(&self, board: &Bitboard, from_sq_ind: usize, to_sq_ind: usize) -> i32 {
+        // Return the MVV-LVA score for a capture move.
+        // To enable sorting by MVV, then by LVA, we return the score as 10 * victim - attacker,
+        // where value is 012345 for kpnbrq
+        if board.get_piece(to_sq_ind) == None {
+            return 0;
+        }
+        let victim = board.get_piece(to_sq_ind).unwrap() / 2;
+        let attacker = board.get_piece(from_sq_ind).unwrap() / 2;
+        10 * victim as i32 - attacker as i32
     }
 
     fn gen_pawn_moves(&self, board: &Bitboard) -> (Vec<(usize, usize, Option<usize>)>, Vec<(usize, usize, Option<usize>)>, Vec<(usize, usize, Option<usize>)>) {
