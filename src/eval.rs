@@ -4,7 +4,7 @@
 // TODO: Add pawn structure and king safety, possibly using a simple NN with a conv layer for pawns (e.g. 3 3x3 filters, yielding a 3x4x6 layer) and 2 dense layers combining its output with king position
 
 use std::cmp::min;
-use crate::bitboard::{Bitboard, flip_sq_ind_vertically};
+use crate::bitboard::{Bitboard, BK, BR, flip_sq_ind_vertically, WK, WR};
 
 pub(crate) struct PestoEval {
     mg_table: [[i32; 64]; 12],
@@ -315,8 +315,23 @@ impl PestoEval {
 
         let piece: usize = board.get_piece(from_sq_ind).unwrap();
 
-        let mg_score: i32 = self.mg_table[piece][to_sq_ind] - self.mg_table[piece][from_sq_ind];
-        let eg_score: i32 = self.eg_table[piece][to_sq_ind] - self.eg_table[piece][from_sq_ind];
+        let mut mg_score: i32 = self.mg_table[piece][to_sq_ind] - self.mg_table[piece][from_sq_ind];
+        let mut eg_score: i32 = self.eg_table[piece][to_sq_ind] - self.eg_table[piece][from_sq_ind];
+
+        // Castling
+        if piece == WK && from_sq_ind == 4 {
+            if to_sq_ind == 6 { // White kingside castle
+                mg_score += self.mg_table[WR][5] - self.mg_table[WR][7];
+            } else if to_sq_ind == 2 { // White queenside castle
+                mg_score += self.mg_table[WR][3] - self.mg_table[WR][0];
+            }
+        } else if piece == BK && from_sq_ind == 60 {
+            if to_sq_ind == 62 { // Black kingside castle
+                mg_score += self.mg_table[BR][61] - self.mg_table[BR][63];
+            } else if to_sq_ind == 58 { // Black queenside castle
+                mg_score += self.mg_table[BR][59] - self.mg_table[BR][56];
+            }
+        }
 
         let mg_phase: i32 = min(24, board.game_phase.unwrap()); // Can exceed 24 in case of early promotion
         let eg_phase: i32 = 24 - mg_phase;

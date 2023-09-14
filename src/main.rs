@@ -74,7 +74,7 @@ fn main() {
     println!("___");
     board.print();
     let use_ab: bool = true;
-    iterative_deepening_ab_search(&mut board, &move_gen, &PestoEval::new(), 7);
+    iterative_deepening_ab_search(&mut board, &move_gen, &PestoEval::new(), 9);
     // for i in 1..8 {
     //     let (eval, m, n) = {
     //         if use_ab {
