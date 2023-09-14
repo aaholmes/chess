@@ -16,10 +16,11 @@
 
 
 use std::process::abort;
-use crate::bitboard::{Bitboard, sq_ind_to_bit, WP, BP, WN, BN, WB, BB, WR, BR, WQ, BQ, WK, BK, WOCC, BOCC, OCC};
+use crate::bitboard::{Bitboard, sq_ind_to_bit, WP, BP, WN, BN, WB, BB, WR, BR, WQ, BQ, WK, BK, WOCC, BOCC, OCC, sq_ind_to_algebraic};
 use crate::bits::bits;
 use crate::magic_constants::{R_MAGICS, B_MAGICS, R_BITS, B_BITS, R_MASKS, B_MASKS};
 use rand;
+use crate::eval::PestoEval;
 use crate::utils::print_bits;
 
 const NOT_A_FILE: u64 = 0xfefefefefefefefe;
@@ -606,6 +607,39 @@ impl MoveGen {
         moves.append(&mut moves_rooks);
         moves.append(&mut moves_queens);
         moves.append(&mut moves_kings);
+        (captures, moves)
+    }
+
+    pub fn gen_pseudo_legal_moves_with_evals(&self, board: &mut Bitboard, pesto: &PestoEval) -> (Vec<(usize, usize, Option<usize>)>, Vec<(usize, usize, Option<usize>)>) {
+        // Generate all pseudo-legal moves for the current position, i.e., these moves may move into check.
+        // Elsewhere we need to check for legality and perform move ordering.
+        // Returns a vector of captures and a vector of non-captures, both in the form tuples (from_sq_ind, to_sq_ind, promotion).
+        // Includes promotions as captures here
+        let (mut captures, mut promotions, mut moves) = self.gen_pawn_moves(board);
+        let (mut captures_knights, mut moves_knights) = self.gen_knight_moves(board);
+        let (mut captures_kings, mut moves_kings) = self.gen_king_moves(board);
+        let (mut captures_rooks, mut moves_rooks) = self.gen_rook_moves(board);
+        let (mut captures_bishops, mut moves_bishops) = self.gen_bishop_moves(board);
+        let (mut captures_queens, mut moves_queens) = self.gen_queen_moves(board);
+        captures.append(&mut captures_knights);
+        captures.append(&mut captures_bishops);
+        captures.append(&mut captures_rooks);
+        captures.append(&mut captures_queens);
+        captures.append(&mut captures_kings);
+        captures.append(&mut promotions);
+        moves.append(&mut moves_knights);
+        moves.append(&mut moves_bishops);
+        moves.append(&mut moves_rooks);
+        moves.append(&mut moves_queens);
+        moves.append(&mut moves_kings);
+        // Here let's sort captures by MVV-LVA
+        // Also sort moves by pesto eval change
+        pesto.eval_update_board(board);
+        // println!("Initial position eval {} game_phase {}", board.eval, board.game_phase.unwrap());
+        moves.sort_unstable_by_key(|m| -pesto.move_eval(board, m.0, m.1));
+        // for m in &moves {
+        //     println!("Move: {} {} has eval {}", sq_ind_to_algebraic(m.0), sq_ind_to_algebraic(m.1), pesto.move_eval(board, m.0, m.1));
+        // }
         (captures, moves)
     }
 

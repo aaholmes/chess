@@ -57,23 +57,24 @@ fn main() {
     // println!("{}", pesto.eval(&board));
     // assert_eq!(pesto.eval(&board), 52);
     board = Bitboard::new();
+    // board = board.make_move(bitboard::algebraic_to_sq_ind("e2"), bitboard::algebraic_to_sq_ind("e4"), None);
     board.print();
     let move_gen = MoveGen::new();
-    let (captures, moves) = move_gen.gen_pseudo_legal_moves(&board);
+    let (captures, moves) = move_gen.gen_pseudo_legal_moves_with_evals(&mut board, &pesto);
     println!("Captures:");
     for c in captures {
         println!("{} {}", sq_ind_to_algebraic(c.0), sq_ind_to_algebraic(c.1));
     }
     println!("Moves:");
     for m in moves {
-        let new_board = board.make_move(m.0, m.1, m.2);
+        let mut new_board = board.make_move(m.0, m.1, m.2);
         println!("{} {} {}", sq_ind_to_algebraic(m.0), sq_ind_to_algebraic(m.1), pesto.eval(&new_board));
     }
     let mut board = Bitboard::new();
     println!("___");
     board.print();
     let use_ab: bool = true;
-    iterative_deepening_ab_search(&board, &move_gen, &PestoEval::new(), 7);
+    iterative_deepening_ab_search(&mut board, &move_gen, &PestoEval::new(), 7);
     // for i in 1..8 {
     //     let (eval, m, n) = {
     //         if use_ab {

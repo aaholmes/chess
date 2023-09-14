@@ -31,7 +31,12 @@ pub struct Bitboard {
     pub(crate) en_passant: Option<usize>, // index of square where en passant is possible
     pub(crate) halfmove_clock: u8, // number of halfmoves since last capture or pawn advance
     pub(crate) fullmove_clock: u8, // number of fullmoves since start of game
-    pub(crate) pieces: Vec<u64>
+    pub(crate) pieces: Vec<u64>, // 0-11: white pawns, black pawns, white knights, black knights, white bishops, black bishops, white rooks, black rooks, white queens, black queens, white king, black king
+                                 // 12: white occupied squares
+                                 // 13: black occupied squares
+                                 // 14: all occupied squares
+    pub(crate) eval: i32,
+    pub(crate) game_phase: Option<i32>
 }
 
 // Little Endian Rank Mapping
@@ -122,7 +127,9 @@ impl Bitboard {
                 0x000000000000FFFF,
                 0xFFFF000000000000,
                 0xFFFF00000000FFFF
-            ].try_into().unwrap()
+            ].try_into().unwrap(),
+            eval: 0,
+            game_phase: None
         }
     }
 
@@ -261,7 +268,9 @@ impl Bitboard {
             en_passant: { if self.en_passant == None { None } else { Some(flip_sq_ind_vertically(self.en_passant.unwrap())) } },
             halfmove_clock: self.halfmove_clock,
             fullmove_clock: self.fullmove_clock,
-            pieces: self.pieces.iter().map(|&x| flip_vertically(x)).collect()
+            pieces: self.pieces.iter().map(|&x| flip_vertically(x)).collect(),
+            eval: -self.eval,
+            game_phase: self.game_phase
         }
     }
 

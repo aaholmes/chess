@@ -140,11 +140,21 @@ const MG_KING_TABLE: [i32; 64] = [
     -36, -36, -36, -36, -36, -36, -38, -36,
     -36, -36, -36, -36, -36, -36, -36, -36,
     -17, -20, -12, -27, -30, -25, -14, -36,
-    -12,  -1, -12, -12, -12, -12, -12, -12,
+    -12, -12, -12, -12, -12, -12, -12, -12,
      -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,
       1,   7,  -1,  -1,  -1,  -1,   9,   8,
       9,  36,  12,   9,   9,   9,  24,  14,
 ];
+// const MG_KING_TABLE: [i32; 64] = [
+//     -65, -38, -38, -38, -56, -38, -38, -38,
+//     -36, -36, -36, -36, -36, -36, -38, -36,
+//     -36, -36, -36, -36, -36, -36, -36, -36,
+//     -17, -20, -12, -27, -30, -25, -14, -36,
+//     -12,  -1, -12, -12, -12, -12, -12, -12,
+//      -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,
+//       1,   7,  -1,  -1,  -1,  -1,   9,   8,
+//       9,  36,  12,   9,   9,   9,  24,  14,
+// ];
 // const MG_KING_TABLE: [i32; 64] = [
 //     -65, -30, -30, -30, -56, -38, -38, -38,
 //     -20, -27, -30, -30, -30, -36, -38, -36,
@@ -249,6 +259,68 @@ impl PestoEval {
         }
         let mg_phase: i32 = min(24, game_phase); // Can exceed 24 in case of early promotion
         let eg_phase: i32 = 24 - mg_phase;
-        return (mg_score * mg_phase + eg_score * eg_phase) / 24;
+
+        (mg_score * mg_phase + eg_score * eg_phase) / 24
+    }
+
+    pub fn eval_update_board(&self, board: &mut Bitboard) -> i32 {
+        // Evaluate and save the eval and game phase so we can quickly compute move evals from this position
+        let mut mg: [i32; 2] = [0, 0];
+        let mut eg: [i32; 2] = [0, 0];
+        let mut game_phase: i32 = 0;
+
+        // Evaluate each piece
+        for piece in 0..12 {
+            for sq in 0..64 {
+                if board.pieces[piece] & (1 << sq) != 0 {
+                    mg[player(piece)] += self.mg_table[piece][sq];
+                    eg[player(piece)] += self.eg_table[piece][sq];
+                    game_phase += GAMEPHASE_INC[piece];
+                }
+            }
+        }
+
+        // Tapered eval
+        let mg_score: i32;
+        let eg_score: i32;
+        if board.w_to_move {
+            mg_score = mg[1] - mg[0];
+            eg_score = eg[1] - eg[0];
+        } else {
+            mg_score = mg[0] - mg[1];
+            eg_score = eg[0] - eg[1];
+        }
+        let mg_phase: i32 = min(24, game_phase); // Can exceed 24 in case of early promotion
+        let eg_phase: i32 = 24 - mg_phase;
+
+        let eval: i32 = (mg_score * mg_phase + eg_score * eg_phase) / 24;
+
+        // Save eval and game phase so we can quickly compute move evals from this position
+        board.eval = eval;
+        board.game_phase = Some(game_phase);
+
+        eval
+    }
+
+    pub fn move_eval(&self, board: &Bitboard, from_sq_ind: usize, to_sq_ind: usize) -> i32 {
+        // Evaluate the move (in centipawns) according to the Pesto evaluation function
+        // Since Pesto only depends on piece square tables, we can just use the change in value of the moved piece
+        // We don't include captures here, since we will use MVV-LVA for that instead
+        // We also don't include promotions, since we will also treat those separately
+        // Note that this is relative to the side to move
+
+        if board.game_phase == None {
+            panic!("Game phase not set");
+        }
+
+        let piece: usize = board.get_piece(from_sq_ind).unwrap();
+
+        let mg_score: i32 = self.mg_table[piece][to_sq_ind] - self.mg_table[piece][from_sq_ind];
+        let eg_score: i32 = self.eg_table[piece][to_sq_ind] - self.eg_table[piece][from_sq_ind];
+
+        let mg_phase: i32 = min(24, board.game_phase.unwrap()); // Can exceed 24 in case of early promotion
+        let eg_phase: i32 = 24 - mg_phase;
+
+        (mg_score * mg_phase + eg_score * eg_phase) / 24
     }
 }
