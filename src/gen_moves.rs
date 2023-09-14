@@ -640,7 +640,7 @@ impl MoveGen {
         // Also sort moves by pesto eval change
         pesto.eval_update_board(board);
         // println!("Initial position eval {} game_phase {}", board.eval, board.game_phase.unwrap());
-        moves.sort_unstable_by_key(|m| -pesto.move_eval(board, m.0, m.1));
+        moves.sort_unstable_by_key(|m| -pesto.move_eval(board, self, m.0, m.1));
         // for m in &moves {
         //     println!("Move: {} {} has eval {}", sq_ind_to_algebraic(m.0), sq_ind_to_algebraic(m.1), pesto.move_eval(board, m.0, m.1));
         // }

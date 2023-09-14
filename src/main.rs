@@ -56,7 +56,7 @@ fn main() {
     // board = board.make_move(bitboard::algebraic_to_sq_ind("e1"), bitboard::algebraic_to_sq_ind("g1"), None);
     // println!("{}", pesto.eval(&board));
     // assert_eq!(pesto.eval(&board), 52);
-    board = Bitboard::new_from_fen("r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1");
+    board = Bitboard::new_from_fen("q3k2r/Pp1p1ppp/1b3nbN/nP1N4/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1");
     // board = board.make_move(bitboard::algebraic_to_sq_ind("e2"), bitboard::algebraic_to_sq_ind("e4"), None);
     board.print();
     let move_gen = MoveGen::new();

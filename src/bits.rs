@@ -30,6 +30,17 @@ pub fn btest(n: u128, b: i32) -> bool {
     !(n & (1 << b) == 0)
 }
 
+pub fn popcnt(n: u64) -> i32 {
+    // Returns number of set bits
+    let mut count = 0;
+    let mut nn = n;
+    while nn != 0 {
+        nn &= nn - 1;
+        count += 1;
+    }
+    count
+}
+
 pub fn parity(mut n: u128) -> i32 {
     // Returns 1 if even number of bits, -1 if odd number
     n ^= n >> 64;

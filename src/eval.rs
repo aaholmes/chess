@@ -3,8 +3,11 @@
 // opening and endgame, optimized by Texel tuning.
 // TODO: Add pawn structure and king safety, possibly using a simple NN with a conv layer for pawns (e.g. 3 3x3 filters, yielding a 3x4x6 layer) and 2 dense layers combining its output with king position
 
+use std::arch::x86_64::_popcnt64;
 use std::cmp::min;
-use crate::bitboard::{Bitboard, BK, BR, flip_sq_ind_vertically, WK, WR};
+use crate::bitboard::{Bitboard, flip_sq_ind_vertically, WK, BK, WN, BN, WR, BR, WQ, BQ};
+use crate::bits::popcnt;
+use crate::gen_moves::MoveGen;
 
 pub(crate) struct PestoEval {
     mg_table: [[i32; 64]; 12],
@@ -302,18 +305,83 @@ impl PestoEval {
         eval
     }
 
-    pub fn move_eval(&self, board: &Bitboard, from_sq_ind: usize, to_sq_ind: usize) -> i32 {
+    pub fn move_eval(&self, board: &Bitboard, move_gen: &MoveGen, from_sq_ind: usize, to_sq_ind: usize) -> i32 {
         // Evaluate the move (in centipawns) according to the Pesto evaluation function
         // Since Pesto only depends on piece square tables, we can just use the change in value of the moved piece
         // We don't include captures here, since we will use MVV-LVA for that instead
         // We also don't include promotions, since we will also treat those separately
+        // However, we rank knight forks and threats above other non-captures
+        // Note that our implementation doesn't detect a fork of two queens, since that is very rare
+        // This yields the following move order:
+        // captures in MVV-LVA order, promotions, knight forks, knight threats, other moves in pesto order
         // Note that this is relative to the side to move
+
+        let piece: usize = board.get_piece(from_sq_ind).unwrap();
+
+        // If knight, check for knight fork
+        if board.w_to_move {
+            if piece == WN {
+                if move_gen.n_move_bitboard[to_sq_ind] & board.pieces[BK] != 0 {
+                    if move_gen.n_move_bitboard[to_sq_ind] & board.pieces[BQ] != 0 {
+                        // Fork king and queen
+                        return 1000;
+                    // } else if move_gen.n_move_bitboard[to_sq_ind] & board.pieces[BR] != 0 {
+                    //     // Fork king and rook
+                    //     return 900;
+                    }
+                // } else if move_gen.n_move_bitboard[to_sq_ind] & board.pieces[BQ] != 0 {
+                //     if move_gen.n_move_bitboard[to_sq_ind] & board.pieces[BR] != 0 {
+                //         // Fork queen and rook
+                //         return 800;
+                //     }
+                // } else if popcnt(move_gen.n_move_bitboard[to_sq_ind] & board.pieces[BR]) >= 2 {
+                //     // Fork two rooks
+                //     return 700;
+                // } else if move_gen.n_move_bitboard[to_sq_ind] & board.pieces[BK] != 0 {
+                //     // Attack king
+                //     return 675;
+                // } else if move_gen.n_move_bitboard[to_sq_ind] & board.pieces[BQ] != 0 {
+                //     // Attack queen
+                //     return 650;
+                // } else if move_gen.n_move_bitboard[to_sq_ind] & board.pieces[BR] != 0 {
+                //     // Attack rook
+                //     return 625;
+                }
+            }
+        } else {
+            if piece == BN {
+                if move_gen.n_move_bitboard[to_sq_ind] & board.pieces[WK] != 0 {
+                    if move_gen.n_move_bitboard[to_sq_ind] & board.pieces[WQ] != 0 {
+                        // Fork king and queen
+                        return 1000;
+                    // } else if move_gen.n_move_bitboard[to_sq_ind] & board.pieces[WR] != 0 {
+                    //     // Fork king and rook
+                    //     return 900;
+                    }
+                // } else if move_gen.n_move_bitboard[to_sq_ind] & board.pieces[WQ] != 0 {
+                //     if move_gen.n_move_bitboard[to_sq_ind] & board.pieces[WR] != 0 {
+                //         // Fork queen and rook
+                //         return 800;
+                //     }
+                // } else if popcnt(move_gen.n_move_bitboard[to_sq_ind] & board.pieces[WR]) >= 2 {
+                //     // Fork two rooks
+                //     return 700;
+                // } else if move_gen.n_move_bitboard[to_sq_ind] & board.pieces[WK] != 0 {
+                //     // Attack king
+                //     return 675;
+                // } else if move_gen.n_move_bitboard[to_sq_ind] & board.pieces[WQ] != 0 {
+                //     // Attack queen
+                //     return 650;
+                // } else if move_gen.n_move_bitboard[to_sq_ind] & board.pieces[WR] != 0 {
+                //     // Attack rook
+                //     return 625;
+                }
+            }
+        }
 
         if board.game_phase == None {
             panic!("Game phase not set");
         }
-
-        let piece: usize = board.get_piece(from_sq_ind).unwrap();
 
         let mut mg_score: i32 = self.mg_table[piece][to_sq_ind] - self.mg_table[piece][from_sq_ind];
         let mut eg_score: i32 = self.eg_table[piece][to_sq_ind] - self.eg_table[piece][from_sq_ind];
