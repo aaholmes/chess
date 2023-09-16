@@ -79,5 +79,5 @@ fn main() {
     board.print();
     let use_ab: bool = true;
     // iterative_deepening_ab_search(&mut board, &move_gen, &PestoEval::new(), 2);
-    aspiration_window_ab_search(&mut board, &move_gen, &PestoEval::new(), 2);
+    aspiration_window_ab_search(&mut board, &move_gen, &PestoEval::new(), 4);
 }

@@ -189,10 +189,10 @@ pub(crate) fn aspiration_window_ab_search(board: &mut Bitboard, move_gen: &MoveG
             println!("At depth {}, searched {} nodes. best eval and move are {} {}", depth, n, eval, utils::print_move(&best_move));
             if eval == lower_bound {
                 println!("\nLower bound hit; retrying with larger window");
-                lower_window_scale *= 9;
+                lower_window_scale *= 2;
             } else if eval == upper_bound {
                 println!("\nUpper bound hit; retrying with larger window");
-                upper_window_scale *= 9;
+                upper_window_scale *= 2;
             } else {
                 println!("\nAspiration window search successful!");
                 println!("Best move: {}", utils::print_move(&best_move));
