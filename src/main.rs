@@ -60,7 +60,7 @@ fn main() {
     // board = board.make_move(bitboard::algebraic_to_sq_ind("e2"), bitboard::algebraic_to_sq_ind("e4"), None);
     board.print();
     let move_gen = MoveGen::new();
-    let (captures, moves) = move_gen.gen_pseudo_legal_moves_with_evals(&mut board, &pesto);
+    let (mut captures, moves) = move_gen.gen_pseudo_legal_moves_with_evals(&mut board, &pesto);
     println!("Captures:");
     for c in captures {
         println!("{} {}", sq_ind_to_algebraic(c.0), sq_ind_to_algebraic(c.1));
@@ -71,31 +71,13 @@ fn main() {
         println!("{} {} {}", sq_ind_to_algebraic(m.0), sq_ind_to_algebraic(m.1), pesto.eval(&new_board));
     }
     let mut board = Bitboard::new();
+    board = board.make_move(bitboard::algebraic_to_sq_ind("d2"), bitboard::algebraic_to_sq_ind("d4"), None);
+    board = board.make_move(bitboard::algebraic_to_sq_ind("d7"), bitboard::algebraic_to_sq_ind("d5"), None);
+    board = board.make_move(bitboard::algebraic_to_sq_ind("c2"), bitboard::algebraic_to_sq_ind("c4"), None);
+    board = board.make_move(bitboard::algebraic_to_sq_ind("e7"), bitboard::algebraic_to_sq_ind("e6"), None);
     println!("___");
     board.print();
     let use_ab: bool = true;
-    aspiration_window_ab_search(&mut board, &move_gen, &PestoEval::new(), 8);
-    // iterative_deepening_ab_search(&mut board, &move_gen, &PestoEval::new(), 8);
-    // for i in 1..8 {
-    //     let (eval, m, n) = {
-    //         if use_ab {
-    //             alpha_beta_search(&board, &move_gen, &PestoEval::new(), i)
-    //         } else {
-    //             negamax_search(&board, &move_gen, &PestoEval::new(), i)
-    //         }
-    //     };
-    //     println!("At depth {}, searched {} nodes. best eval and move are {} {}", i, n, eval, utils::print_move(&m));
-    // }
-    // for _i in 0..10 {
-    //     let (eval, m, n) = {
-    //         if use_ab {
-    //             alpha_beta_search(&board, &move_gen, &PestoEval::new(), 3)
-    //         } else {
-    //             negamax_search(&board, &move_gen, &PestoEval::new(), 3)
-    //         }
-    //     };
-    //     board = board.make_move(m.0, m.1, m.2);
-    //     println!("At depth {}, searched {} nodes. best eval and move are {} {}", 3, n, eval, utils::print_move(&m));
-    //     board.print();
-    // }
+    // iterative_deepening_ab_search(&mut board, &move_gen, &PestoEval::new(), 2);
+    aspiration_window_ab_search(&mut board, &move_gen, &PestoEval::new(), 2);
 }
