@@ -71,13 +71,18 @@ fn main() {
         println!("{} {} {}", sq_ind_to_algebraic(m.0), sq_ind_to_algebraic(m.1), pesto.eval(&new_board));
     }
     let mut board = Bitboard::new();
+    board = board.make_move(bitboard::algebraic_to_sq_ind("e2"), bitboard::algebraic_to_sq_ind("e4"), None);
+    board = board.make_move(bitboard::algebraic_to_sq_ind("e7"), bitboard::algebraic_to_sq_ind("e6"), None);
     board = board.make_move(bitboard::algebraic_to_sq_ind("d2"), bitboard::algebraic_to_sq_ind("d4"), None);
     board = board.make_move(bitboard::algebraic_to_sq_ind("d7"), bitboard::algebraic_to_sq_ind("d5"), None);
-    board = board.make_move(bitboard::algebraic_to_sq_ind("c2"), bitboard::algebraic_to_sq_ind("c4"), None);
-    board = board.make_move(bitboard::algebraic_to_sq_ind("e7"), bitboard::algebraic_to_sq_ind("e6"), None);
     println!("___");
     board.print();
     let use_ab: bool = true;
     // iterative_deepening_ab_search(&mut board, &move_gen, &PestoEval::new(), 2);
-    aspiration_window_ab_search(&mut board, &move_gen, &PestoEval::new(), 4);
+    for i in 0..10 {
+        let (eval, m, nodes) = aspiration_window_ab_search(&mut board, &move_gen, &PestoEval::new(), 4);
+        println!("Eval: {} Move: {} Nodes: {}", eval, sq_ind_to_algebraic(m.0), nodes);
+        board = board.make_move(m.0, m.1, m.2);
+        board.print();
+    }
 }

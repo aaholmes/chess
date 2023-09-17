@@ -304,6 +304,34 @@ impl Bitboard {
         return !self.is_square_attacked(king_sq_ind, self.w_to_move, move_gen);
     }
 
+    pub(crate) fn is_checkmate_or_stalemate(&self, move_gen: &MoveGen) -> (bool, bool) {
+        // Determines whether this position is checkmate, i.e. the side to move cannot capture the king and has no legal moves.
+        for m in move_gen.gen_pseudo_legal_moves(self) {
+            let mut new_board = self.make_move(m.0, m.1, m.2);
+            if new_board.is_legal(move_gen) {
+                return (false, false);
+            }
+        }
+        // If we get here, there are no legal moves.
+        let is_check = self.is_check(move_gen);
+        if is_check {
+            return (true, false);
+        } else {
+            return (false, true);
+        }
+    }
+
+    pub(crate) fn is_check(&self, move_gen: &MoveGen) -> bool {
+        // Determines whether this position is check
+        let king_sq_ind: usize;
+        if self.w_to_move {
+            king_sq_ind = bit_to_sq_ind(self.pieces[WK]);
+        } else {
+            king_sq_ind = bit_to_sq_ind(self.pieces[BK]);
+        }
+        return self.is_square_attacked(king_sq_ind, !self.w_to_move, move_gen);
+    }
+
     pub(crate) fn is_square_attacked(&self, sq_ind: usize, by_white: bool, move_gen: &MoveGen) -> bool {
         // Find out if the square is attacked by a given side (white if by_white is true, black if by_white is false).
         if by_white {

@@ -7,19 +7,19 @@ The goal is to make a reasonably good chess engine inspired by
 2. The Berserk chess engine - one of the best open source engines, and appears to be only a few years old.
 
 ## Goals for first version
-1. Bitboards
-2. Move generation including magic bitboards
-3. Negamax search
-4. Alpha-beta pruning
-5. Iterative deepening
-6. Pesto evaluation function (tapered)
+1. Bitboards (DONE)
+2. Move generation including magic bitboards (DONE)
+3. Negamax search (DONE)
+4. Alpha-beta pruning (DONE)
+5. Iterative deepening (DONE except for move ordering)
+6. Pesto evaluation function (tapered) (DONE)
 7. Move ordering:
    1. Mate killer heuristic
-   2. MVV-LVA
-   3. Knight forks
-   4. Non-captures ordered according to Pesto eval
-8. Quiescence search
-9. Aspiration windows
+   2. MVV-LVA (DONE)
+   3. Knight forks (DONE)
+   4. Non-captures ordered according to Pesto eval (DONE)
+8. Quiescence search (DONE)
+9. Aspiration windows (DONE)
 10. Transposition table
 11. Null move pruning
 12. UCI protocol
