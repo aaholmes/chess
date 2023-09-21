@@ -3,8 +3,8 @@
 
 
 The goal is to make a reasonably good chess engine inspired by
-1. The book "Neural Networks for Chess" by Dominik Klein - they say that the future best engines will continue to be alpha-beta pruning with a fast neural network evaluation function.
-2. The Berserk chess engine - one of the best open source engines, and appears to be only a few years old.
+1. The book "Neural Networks for Chess" by Dominik Klein
+2. The Berserk chess engine - one of the best chess engines in the world, and appears to be developed primarily by one person over just a few years
 
 ## Goals for first version
 1. Bitboards (DONE)
@@ -24,19 +24,19 @@ The goal is to make a reasonably good chess engine inspired by
 11. Null move pruning
 12. UCI protocol
 
-I believe that this will already be enough to make a pretty strong engine.
+I believe that this will already be enough to make an engine that's at least entertaining to play against.
 
 ## Goals for second version
 1. Time management
-2. Neural network evaluation function (DenseNet NNUE plus tapered Pesto)
+2. Endgame tablebases
 3. Opening book
-4. Endgame tablebases
-5. Parallel search
+4. Parallel search
+5. Neural network evaluation function (start by augmenting the tapered Pesto eval with a shallow neural network that just looks at king and pawn positions, since king safety and pawn structure are the Pesto eval's biggest weaknesses)
 
-If I get this far, the engine should be very strong.
+If I get this far, the engine should be very strong and we can start staging matches against early versions of other engines.
  
 ## Programming language
-We will use Rust for the first version. In the long term we may want to use Rust for the search, Python for the neural network, and Julia as a driver.
+We will use Rust for the first version. When we start using neural networks, we may want to interface with either PyTorch or Julia. 
 
 ## Credits
 Image generated using Canva
