@@ -311,8 +311,9 @@ pub(crate) fn mate_search(board: &mut Bitboard, move_gen: &MoveGen, max_depth: i
     let mut n: i32 = 0;
     let mut alpha = -1000000;
     let beta = 1000000;
-    for d in 1..max_depth * 2 {
-        println!("Performing mate search at depth {}", d);
+    for d in 1..max_depth + 1 {
+        let depth = 2 * d - 1; // Consider only odd depths, since we are only searching for forced mates
+        println!("Performing mate search at depth {}", depth);
         let (mut captures, moves) = move_gen.gen_pseudo_legal_moves(board);
         captures.extend(moves);
         for m in captures {
@@ -323,10 +324,8 @@ pub(crate) fn mate_search(board: &mut Bitboard, move_gen: &MoveGen, max_depth: i
             if !new_board.is_check(move_gen) {
                 continue;
             }
-            println!("Considering move {}", utils::print_move(&m));
-            let (score, nodes) = mate_search_recursive(&mut new_board, move_gen, d - 1, -beta, -alpha, false);
+            let (score, nodes) = mate_search_recursive(&mut new_board, move_gen, depth - 1, -beta, -alpha, false);
             eval = -score;
-            println!("Results of mate search recursive: {} {}", eval, nodes);
             n += nodes;
             if eval > alpha {
                 alpha = eval;
@@ -336,7 +335,7 @@ pub(crate) fn mate_search(board: &mut Bitboard, move_gen: &MoveGen, max_depth: i
                 break;
             }
         }
-        println!("At depth {}, searched {} nodes. best eval {}", d, n, eval);
+        println!("At depth {}, searched {} nodes. best eval {}", depth, n, eval);
         // If checkmate found, stop searching
         if eval == 1000000 {
             println!("Mate search: Checkmate! No need to go deeper");
@@ -352,17 +351,14 @@ fn mate_search_recursive(board: &mut Bitboard, move_gen: &MoveGen, depth: i32, m
     // External functions should call mate_search instead
     // Returns the eval (in centipawns) of the final position
     // Also returns number of nodes searched
-    println!("Mate search at depth {} with alpha {} and beta {}", depth, alpha, beta);
     if depth == 0 {
         // Leaf node
         // Check whether this is checkmate (could be either side)
         let (checkmate, stalemate) = board.is_checkmate_or_stalemate(move_gen);
         if checkmate {
-            println!("Mate search: Checkmate!");
             return (-1000000, 1);
         } else if stalemate {
-            println!("Mate search: Stalemate! (This should never happen!)");
-            return (0, 1);
+            panic!("Stalemate in mate search!");
         } else {
             return (0, 1);
         }
@@ -379,7 +375,6 @@ fn mate_search_recursive(board: &mut Bitboard, move_gen: &MoveGen, depth: i32, m
         if side_to_move && !new_board.is_check(move_gen) {
             continue;
         }
-        println!("Considering move {}", utils::print_move(&m));
         let (mut eval, nodes) = mate_search_recursive(&mut new_board, move_gen, depth - 1, -beta, -alpha, !side_to_move);
         eval = -eval;
         n += nodes;
