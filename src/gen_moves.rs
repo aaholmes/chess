@@ -15,13 +15,11 @@
 // Note also that once we implement all of this, as well as quiescence search, we can profile the code to see where the bottlenecks are.
 
 
-use std::process::abort;
-use crate::bitboard::{Bitboard, sq_ind_to_bit, WP, BP, WN, BN, WB, BB, WR, BR, WQ, BQ, WK, BK, WOCC, BOCC, OCC, sq_ind_to_algebraic};
+use crate::bitboard::{Bitboard, sq_ind_to_bit, WP, BP, WN, BN, WB, BB, WR, BR, WQ, BQ, WK, BK, WOCC, BOCC, OCC};
 use crate::bits::bits;
 use crate::magic_constants::{R_MAGICS, B_MAGICS, R_BITS, B_BITS, R_MASKS, B_MASKS};
 use rand;
 use crate::eval::PestoEval;
-use crate::utils::print_bits;
 
 const NOT_A_FILE: u64 = 0xfefefefefefefefe;
 const NOT_H_FILE: u64 = 0x7f7f7f7f7f7f7f7f;
@@ -505,11 +503,7 @@ impl MoveGen {
         let mut wp_prom: Vec<usize>;
         let mut bp_prom: Vec<usize>;
         for from_sq_ind in 0..64 {
-            wp_cap = vec![];
-            bp_cap = vec![];
-            wp_prom = vec![];
-            bp_prom = vec![];
-            (wp_cap, wp_prom, bp_cap, bp_prom) = init_pawn_captures_promotions(from_sq_ind);
+            let (wp_cap, wp_prom, bp_cap, bp_prom) = init_pawn_captures_promotions(from_sq_ind);
             wp_captures.push(wp_cap.clone());
             bp_captures.push(bp_cap.clone());
             for i in &wp_captures[from_sq_ind] {
@@ -546,9 +540,7 @@ impl MoveGen {
             for i in &k_moves[from_sq_ind] {
                 k_move_bitboard[from_sq_ind] |= sq_ind_to_bit(*i);
             }
-            wp = vec![];
-            bp = vec![];
-            (wp, bp) = init_pawn_moves(from_sq_ind);
+            let (wp, bp) = init_pawn_moves(from_sq_ind);
             wp_moves.push(wp.clone());
             bp_moves.push(bp.clone());
         }
@@ -644,12 +636,12 @@ impl MoveGen {
     }
     pub fn gen_pseudo_legal_captures(&self, board: &Bitboard) -> Vec<(usize, usize, Option<usize>)> {
         // Same as above, but only generate captures
-        let (mut captures, mut promotions, mut moves) = self.gen_pawn_moves(board);
-        let (mut captures_knights, mut moves_knights) = self.gen_knight_moves(board);
-        let (mut captures_kings, mut moves_kings) = self.gen_king_moves(board);
-        let (mut captures_rooks, mut moves_rooks) = self.gen_rook_moves(board);
-        let (mut captures_bishops, mut moves_bishops) = self.gen_bishop_moves(board);
-        let (mut captures_queens, mut moves_queens) = self.gen_queen_moves(board);
+        let (mut captures, mut promotions, _moves) = self.gen_pawn_moves(board);
+        let (mut captures_knights, _moves_knights) = self.gen_knight_moves(board);
+        let (mut captures_kings, _moves_kings) = self.gen_king_moves(board);
+        let (mut captures_rooks, _moves_rooks) = self.gen_rook_moves(board);
+        let (mut captures_bishops, _moves_bishops) = self.gen_bishop_moves(board);
+        let (mut captures_queens, _moves_queens) = self.gen_queen_moves(board);
         captures.append(&mut captures_knights);
         captures.append(&mut captures_bishops);
         captures.append(&mut captures_rooks);
@@ -915,13 +907,12 @@ impl MoveGen {
     pub fn gen_bishop_potential_captures(&self, board: &Bitboard, from_sq_ind: usize) -> u64 {
         // Generate potential bishop captures from the given square.
         // Used to determine whether a king is in check.
-        let mut blockers: u64;
-        let mut key: usize;
+
         // Mask blockers
-        blockers = board.pieces[OCC] & B_MASKS[from_sq_ind];
+        let blockers: u64 = board.pieces[OCC] & B_MASKS[from_sq_ind];
 
         // Generate the key using a multiplication and right shift
-        key = ((blockers.wrapping_mul(self.b_magics[from_sq_ind])) >> (64 - B_BITS[from_sq_ind])) as usize;
+        let key: usize = ((blockers.wrapping_mul(self.b_magics[from_sq_ind])) >> (64 - B_BITS[from_sq_ind])) as usize;
 
         // Return the preinitialized capture set bitboard from the table
         self.b_move_bitboard[from_sq_ind][key]
@@ -930,13 +921,12 @@ impl MoveGen {
     pub fn gen_rook_potential_captures(&self, board: &Bitboard, from_sq_ind: usize) -> u64 {
         // Generate potential rook captures from the given square.
         // Used to determine whether a king is in check.
-        let mut blockers: u64;
-        let mut key: usize;
+
         // Mask blockers
-        blockers = board.pieces[OCC] & R_MASKS[from_sq_ind];
+        let blockers: u64 = board.pieces[OCC] & R_MASKS[from_sq_ind];
 
         // Generate the key using a multiplication and right shift
-        key = ((blockers.wrapping_mul(self.r_magics[from_sq_ind])) >> (64 - R_BITS[from_sq_ind])) as usize;
+        let key: usize = ((blockers.wrapping_mul(self.r_magics[from_sq_ind])) >> (64 - R_BITS[from_sq_ind])) as usize;
 
         // Return the preinitialized capture set bitboard from the table
         self.r_move_bitboard[from_sq_ind][key]

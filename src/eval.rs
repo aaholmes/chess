@@ -3,10 +3,8 @@
 // opening and endgame, optimized by Texel tuning.
 // TODO: Add pawn structure and king safety, possibly using a simple NN with a conv layer for pawns (e.g. 3 3x3 filters, yielding a 3x4x6 layer) and 2 dense layers combining its output with king position
 
-use std::arch::x86_64::_popcnt64;
 use std::cmp::min;
 use crate::bitboard::{Bitboard, flip_sq_ind_vertically, WK, BK, WN, BN, WR, BR, WQ, BQ};
-use crate::bits::popcnt;
 use crate::gen_moves::MoveGen;
 
 pub(crate) struct PestoEval {
@@ -384,7 +382,7 @@ impl PestoEval {
         }
 
         let mut mg_score: i32 = self.mg_table[piece][to_sq_ind] - self.mg_table[piece][from_sq_ind];
-        let mut eg_score: i32 = self.eg_table[piece][to_sq_ind] - self.eg_table[piece][from_sq_ind];
+        let eg_score: i32 = self.eg_table[piece][to_sq_ind] - self.eg_table[piece][from_sq_ind];
 
         // Castling
         if piece == WK && from_sq_ind == 4 {

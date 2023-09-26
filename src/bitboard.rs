@@ -306,10 +306,21 @@ impl Bitboard {
 
     pub(crate) fn is_checkmate_or_stalemate(&self, move_gen: &MoveGen) -> (bool, bool) {
         // Determines whether this position is checkmate, i.e. the side to move cannot capture the king and has no legal moves.
-        for m in move_gen.gen_pseudo_legal_moves(self) {
-            let mut new_board = self.make_move(m.0, m.1, m.2);
-            if new_board.is_legal(move_gen) {
-                return (false, false);
+        let (captures, moves) = move_gen.gen_pseudo_legal_moves(self);
+        if captures.len() > 0 {
+            for c in captures {
+                let new_board = self.make_move(c.0, c.1, c.2);
+                if new_board.is_legal(move_gen) {
+                    return (false, false);
+                }
+            }
+        }
+        if moves.len() > 0 {
+            for m in moves {
+                let new_board = self.make_move(m.0, m.1, m.2);
+                if new_board.is_legal(move_gen) {
+                    return (false, false);
+                }
             }
         }
         // If we get here, there are no legal moves.
