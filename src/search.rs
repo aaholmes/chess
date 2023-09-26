@@ -313,7 +313,7 @@ pub(crate) fn mate_search(board: &mut Bitboard, move_gen: &MoveGen, max_depth: i
     let beta = 1000000;
     for d in 1..max_depth + 1 {
         let depth = 2 * d - 1; // Consider only odd depths, since we are only searching for forced mates
-        println!("Performing mate search at depth {}", depth);
+        println!("Performing mate search at depth {} ply", depth);
         let (mut captures, moves) = move_gen.gen_pseudo_legal_moves(board);
         captures.extend(moves);
         for m in captures {
@@ -335,7 +335,7 @@ pub(crate) fn mate_search(board: &mut Bitboard, move_gen: &MoveGen, max_depth: i
                 break;
             }
         }
-        println!("At depth {}, searched {} nodes. best eval {}", depth, n, eval);
+        println!("At depth {} ply, searched {} nodes. best eval {}", depth, n, eval);
         // If checkmate found, stop searching
         if eval == 1000000 {
             println!("Mate search: Checkmate! No need to go deeper");
