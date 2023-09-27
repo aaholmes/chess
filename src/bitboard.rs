@@ -1,42 +1,42 @@
 use crate::gen_moves::MoveGen;
 
 // Piece labels
-pub(crate) const WP: usize = 0;
-pub(crate) const BP: usize = 1;
-pub(crate) const WN: usize = 2;
-pub(crate) const BN: usize = 3;
-pub(crate) const WB: usize = 4;
-pub(crate) const BB: usize = 5;
-pub(crate) const WR: usize = 6;
-pub(crate) const BR: usize = 7;
-pub(crate) const WQ: usize = 8;
-pub(crate) const BQ: usize = 9;
-pub(crate) const WK: usize = 10;
-pub(crate) const BK: usize = 11;
-pub(crate) const WOCC: usize = 12; // White occupied squares
-pub(crate) const BOCC: usize = 13; // Black occupied squares
-pub(crate) const OCC: usize = 14; // All occupied squares
+pub const WP: usize = 0;
+pub const BP: usize = 1;
+pub const WN: usize = 2;
+pub const BN: usize = 3;
+pub const WB: usize = 4;
+pub const BB: usize = 5;
+pub const WR: usize = 6;
+pub const BR: usize = 7;
+pub const WQ: usize = 8;
+pub const BQ: usize = 9;
+pub const WK: usize = 10;
+pub const BK: usize = 11;
+pub const WOCC: usize = 12; // White occupied squares
+pub const BOCC: usize = 13; // Black occupied squares
+pub const OCC: usize = 14; // All occupied squares
 
 
 // Define the bitboard data type.
 // We will use a 64-bit unsigned integer to represent the bitboard for each piece.
 #[derive(Clone)]
 pub struct Bitboard {
-    pub(crate) game_result: Option<i32>, // None = in progress, 1 = white wins, -1 = black wins, 0 = draw
-    pub(crate) w_to_move: bool,
-    pub(crate) w_castle_k: bool,
-    pub(crate) w_castle_q: bool,
-    pub(crate) b_castle_k: bool,
-    pub(crate) b_castle_q: bool,
-    pub(crate) en_passant: Option<usize>, // index of square where en passant is possible
-    pub(crate) halfmove_clock: u8, // number of halfmoves since last capture or pawn advance
-    pub(crate) fullmove_clock: u8, // number of fullmoves since start of game
-    pub(crate) pieces: Vec<u64>, // 0-11: white pawns, black pawns, white knights, black knights, white bishops, black bishops, white rooks, black rooks, white queens, black queens, white king, black king
-                                 // 12: white occupied squares
-                                 // 13: black occupied squares
-                                 // 14: all occupied squares
-    pub(crate) eval: i32,
-    pub(crate) game_phase: Option<i32>
+    pub game_result: Option<i32>, // None = in progress, 1 = white wins, -1 = black wins, 0 = draw
+    pub w_to_move: bool,
+    pub w_castle_k: bool,
+    pub w_castle_q: bool,
+    pub b_castle_k: bool,
+    pub b_castle_q: bool,
+    pub en_passant: Option<usize>, // index of square where en passant is possible
+    pub halfmove_clock: u8, // number of halfmoves since last capture or pawn advance
+    pub fullmove_clock: u8, // number of fullmoves since start of game
+    pub pieces: Vec<u64>, // 0-11: white pawns, black pawns, white knights, black knights, white bishops, black bishops, white rooks, black rooks, white queens, black queens, white king, black king
+                          // 12: white occupied squares
+                          // 13: black occupied squares
+                          // 14: all occupied squares
+    pub eval: i32,
+    pub game_phase: Option<i32>
 }
 
 // Little Endian Rank Mapping
@@ -100,7 +100,7 @@ pub fn flip_vertically(bit: u64) -> u64 {
 }
 
 impl Bitboard {
-    pub(crate) fn new() -> Bitboard {
+    pub fn new() -> Bitboard {
         Bitboard {
             game_result: None,
             w_to_move: true,
@@ -134,7 +134,7 @@ impl Bitboard {
     }
 
     // FEN reader
-    pub(crate) fn new_from_fen(fen: &str) -> Bitboard {
+    pub fn new_from_fen(fen: &str) -> Bitboard {
         let parts = fen.split(' ').collect::<Vec<&str>>();
         let mut board = Bitboard::new();
         board.pieces = [0; 15].try_into().unwrap();
@@ -285,7 +285,7 @@ impl Bitboard {
         None
     }
 
-    pub(crate) fn is_legal(&self, move_gen: &MoveGen) -> bool {
+    pub fn is_legal(&self, move_gen: &MoveGen) -> bool {
         // Determines whether this position is legal, i.e. the side to move cannot capture the king.
         let king_sq_ind: usize;
         if self.w_to_move {
@@ -304,12 +304,12 @@ impl Bitboard {
         return !self.is_square_attacked(king_sq_ind, self.w_to_move, move_gen);
     }
 
-    pub(crate) fn is_checkmate_or_stalemate(&self, move_gen: &MoveGen) -> (bool, bool) {
+    pub fn is_checkmate_or_stalemate(&self, move_gen: &MoveGen) -> (bool, bool) {
         // Determines whether this position is checkmate, i.e. the side to move cannot capture the king and has no legal moves.
         let (captures, moves) = move_gen.gen_pseudo_legal_moves(self);
         if captures.len() > 0 {
             for c in captures {
-                let new_board = self.make_move(c.0, c.1, c.2);
+                let new_board = self.make_move(c);
                 if new_board.is_legal(move_gen) {
                     return (false, false);
                 }
@@ -317,7 +317,7 @@ impl Bitboard {
         }
         if moves.len() > 0 {
             for m in moves {
-                let new_board = self.make_move(m.0, m.1, m.2);
+                let new_board = self.make_move(m);
                 if new_board.is_legal(move_gen) {
                     return (false, false);
                 }
@@ -332,7 +332,7 @@ impl Bitboard {
         }
     }
 
-    pub(crate) fn is_check(&self, move_gen: &MoveGen) -> bool {
+    pub fn is_check(&self, move_gen: &MoveGen) -> bool {
         // Determines whether this position is check
         let king_sq_ind: usize;
         if self.w_to_move {
@@ -343,7 +343,7 @@ impl Bitboard {
         return self.is_square_attacked(king_sq_ind, !self.w_to_move, move_gen);
     }
 
-    pub(crate) fn is_square_attacked(&self, sq_ind: usize, by_white: bool, move_gen: &MoveGen) -> bool {
+    pub fn is_square_attacked(&self, sq_ind: usize, by_white: bool, move_gen: &MoveGen) -> bool {
         // Find out if the square is attacked by a given side (white if by_white is true, black if by_white is false).
         if by_white {
             // Can the king reach an enemy bishop or queen by a bishop move?

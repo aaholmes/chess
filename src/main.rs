@@ -17,6 +17,6 @@ fn main() {
     let move_gen = MoveGen::new();
     let mut board = Bitboard::new_from_fen("4kb1r/p2n1ppp/4q3/4p1B1/4P3/1Q6/PPP2PPP/2KR4 w k - 1 0");
     board.print();
-    let (eval, best_move, nodes) = mate_search(&mut board, &move_gen, 3);
-    println!("Eval: {} Best move: {}{}, Nodes: {}", eval, sq_ind_to_algebraic(best_move.0), sq_ind_to_algebraic(best_move.1), nodes);
+    let (eval, best_move, nodes) = mate_search(&mut board, &move_gen, 3, true);
+    println!("Eval: {} Best move: {}{}, Nodes: {}", eval, sq_ind_to_algebraic(best_move.from), sq_ind_to_algebraic(best_move.to), nodes);
 }

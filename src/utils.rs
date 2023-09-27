@@ -1,7 +1,7 @@
 // Utility functions
 
 use crate::bitboard::{Bitboard, coords_to_sq_ind, sq_ind_to_algebraic, sq_ind_to_bit};
-use crate::gen_moves::MoveGen;
+use crate::gen_moves::{Move, MoveGen};
 
 // Print u64 as an 8x8 board
 pub fn print_bits(bits: u64) {
@@ -24,13 +24,13 @@ pub fn print_bits(bits: u64) {
 }
 
 // Print a move in algebraic notation
-pub fn print_move(the_move: &(usize, usize, Option<usize>)) -> String {
-    let from = sq_ind_to_algebraic(the_move.0);
-    let to = sq_ind_to_algebraic(the_move.1);
+pub fn print_move(the_move: &Move) -> String {
+    let from = sq_ind_to_algebraic(the_move.from);
+    let to = sq_ind_to_algebraic(the_move.to);
     let mut promotion = String::from("");
-    if the_move.2 != None {
+    if the_move.promotion != None {
         promotion = String::from("=");
-        match the_move.2.unwrap() / 2 {
+        match the_move.promotion.unwrap() / 2 {
             1 => promotion.push('N'),
             2 => promotion.push('B'),
             3 => promotion.push('R'),
@@ -44,7 +44,7 @@ pub fn print_move(the_move: &(usize, usize, Option<usize>)) -> String {
 // Perft - performance test
 // Count the number of nodes in a tree of depth n
 // For debugging only
-pub(crate) fn perft(board: Bitboard, move_gen: &MoveGen, depth: u8, verbose: bool) -> u64 {
+pub fn perft(board: Bitboard, move_gen: &MoveGen, depth: u8, verbose: bool) -> u64 {
     let (mut captures, moves) = move_gen.gen_pseudo_legal_moves(&board);
     captures.extend(moves);
     // Remove duplicates in captures. This is necessary because shifting piece moves to the edge of the board may or may not be captures.
@@ -57,7 +57,7 @@ pub(crate) fn perft(board: Bitboard, move_gen: &MoveGen, depth: u8, verbose: boo
         }
         let mut test_board: Bitboard;
         for i in captures {
-            test_board = board.make_move(i.0, i.1, i.2);
+            test_board = board.make_move(i);
             if test_board.is_legal(move_gen) {
                 nodes += 1;
             }
@@ -68,7 +68,7 @@ pub(crate) fn perft(board: Bitboard, move_gen: &MoveGen, depth: u8, verbose: boo
         if verbose {
             println!("{} {}", print_move(&c), depth);
         }
-        let new_board = board.make_move(c.0, c.1, c.2);
+        let new_board = board.make_move(c);
         if !new_board.is_legal(move_gen) {
             continue;
         }

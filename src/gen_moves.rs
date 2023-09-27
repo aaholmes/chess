@@ -12,7 +12,6 @@
 // We want to use two heaps, one for captures and one for non-captures, with each element of the heap being a vector of sorted moves.
 // Note that non-captures can be pre-sorted, but captures require the piece value of the captured piece and so they have to be internally sorted, which may be just as fast as sorting the entire vector.
 // Note also that the pesto eval has 25 game modes, ranging from opening to endgame, so our non-capture move ordering should be different for each game mode.
-// Note also that once we implement all of this, as well as quiescence search, we can profile the code to see where the bottlenecks are.
 
 
 use crate::bitboard::{Bitboard, sq_ind_to_bit, WP, BP, WN, BN, WB, BB, WR, BR, WQ, BQ, WK, BK, WOCC, BOCC, OCC};
@@ -32,9 +31,36 @@ const NOT_78_RANK: u64 = 0x0000ffffffffffff;
 const RANK_2: u64 = 0x000000000000ff00;
 const RANK_7: u64 = 0x00ff000000000000;
 
-pub(crate) struct MoveGen {
-    // Generate all possible moves for a given position.
-    // For now, only non-sliding moves.
+// Struct representing a move
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Move {
+    pub from: usize,
+    pub to: usize,
+    pub promotion: Option<usize>
+}
+
+impl Move {
+    pub fn new(from: usize, to: usize, promotion: Option<usize>) -> Move {
+        // New move
+        Move {
+            from,
+            to,
+            promotion
+        }
+    }
+
+    pub fn null() -> Move {
+        // Null move
+        Move {
+            from: 0,
+            to: 0,
+            promotion: None
+        }
+    }
+}
+
+// Struct representing the move generator, that generates pseudo-legal moves
+pub struct MoveGen {
     pub wp_captures: Vec<Vec<usize>>,
     pub bp_captures: Vec<Vec<usize>>,
     pub wp_capture_bitboard: [u64; 64],
@@ -467,17 +493,17 @@ fn bishop_attacks(sq: usize, block: u64) -> (Vec<usize>, Vec<usize>) {
     (captures, moves)
 }
 
-fn append_promotions(promotions: &mut Vec<(usize, usize, Option<usize>)>, from_sq_ind: usize, to_sq_ind: &usize, w_to_move: bool) {
+fn append_promotions(promotions: &mut Vec<Move>, from_sq_ind: usize, to_sq_ind: &usize, w_to_move: bool) {
     if w_to_move {
-        promotions.push((from_sq_ind, *to_sq_ind, Some(WQ)));
-        promotions.push((from_sq_ind, *to_sq_ind, Some(WR)));
-        promotions.push((from_sq_ind, *to_sq_ind, Some(WN)));
-        promotions.push((from_sq_ind, *to_sq_ind, Some(WB)));
+        promotions.push(Move::new(from_sq_ind, *to_sq_ind, Some(WQ)));
+        promotions.push(Move::new(from_sq_ind, *to_sq_ind, Some(WR)));
+        promotions.push(Move::new(from_sq_ind, *to_sq_ind, Some(WN)));
+        promotions.push(Move::new(from_sq_ind, *to_sq_ind, Some(WB)));
     } else {
-        promotions.push((from_sq_ind, *to_sq_ind, Some(BQ)));
-        promotions.push((from_sq_ind, *to_sq_ind, Some(BR)));
-        promotions.push((from_sq_ind, *to_sq_ind, Some(BN)));
-        promotions.push((from_sq_ind, *to_sq_ind, Some(BB)));
+        promotions.push(Move::new(from_sq_ind, *to_sq_ind, Some(BQ)));
+        promotions.push(Move::new(from_sq_ind, *to_sq_ind, Some(BR)));
+        promotions.push(Move::new(from_sq_ind, *to_sq_ind, Some(BN)));
+        promotions.push(Move::new(from_sq_ind, *to_sq_ind, Some(BB)));
     }
 }
 
@@ -577,7 +603,7 @@ impl MoveGen {
         move_gen
     }
 
-    pub fn gen_pseudo_legal_moves(&self, board: &Bitboard) -> (Vec<(usize, usize, Option<usize>)>, Vec<(usize, usize, Option<usize>)>) {
+    pub fn gen_pseudo_legal_moves(&self, board: &Bitboard) -> (Vec<Move>, Vec<Move>) {
         // Generate all pseudo-legal moves for the current position, i.e., these moves may move into check.
         // Elsewhere we need to check for legality and perform move ordering.
         // Returns a vector of captures and a vector of non-captures, both in the form tuples (from_sq_ind, to_sq_ind, promotion).
@@ -602,7 +628,7 @@ impl MoveGen {
         (captures, moves)
     }
 
-    pub fn gen_pseudo_legal_moves_with_evals(&self, board: &mut Bitboard, pesto: &PestoEval) -> (Vec<(usize, usize, Option<usize>)>, Vec<(usize, usize, Option<usize>)>) {
+    pub fn gen_pseudo_legal_moves_with_evals(&self, board: &mut Bitboard, pesto: &PestoEval) -> (Vec<Move>, Vec<Move>) {
         // Generate all pseudo-legal moves for the current position, i.e., these moves may move into check.
         // Elsewhere we need to check for legality and perform move ordering.
         // Returns a vector of captures and a vector of non-captures, both in the form tuples (from_sq_ind, to_sq_ind, promotion).
@@ -626,15 +652,15 @@ impl MoveGen {
         moves.append(&mut moves_kings);
 
         // Here let's sort captures by MVV-LVA
-        captures.sort_unstable_by_key(|m| -self.mvv_lva(board, m.0, m.1));
+        captures.sort_unstable_by_key(|m| -self.mvv_lva(board, m.from, m.to));
 
         // Also sort moves by pesto eval change
         pesto.eval_update_board(board);
-        moves.sort_unstable_by_key(|m| -pesto.move_eval(board, self, m.0, m.1));
+        moves.sort_unstable_by_key(|m| -pesto.move_eval(board, self, m.from, m.to));
 
         (captures, moves)
     }
-    pub fn gen_pseudo_legal_captures(&self, board: &Bitboard) -> Vec<(usize, usize, Option<usize>)> {
+    pub fn gen_pseudo_legal_captures(&self, board: &Bitboard) -> Vec<Move> {
         // Same as above, but only generate captures
         let (mut captures, mut promotions, _moves) = self.gen_pawn_moves(board);
         let (mut captures_knights, _moves_knights) = self.gen_knight_moves(board);
@@ -650,7 +676,7 @@ impl MoveGen {
         captures.append(&mut promotions);
 
         // Here let's sort captures by MVV-LVA
-        captures.sort_unstable_by_key(|m| -self.mvv_lva(board, m.0, m.1));
+        captures.sort_unstable_by_key(|m| -self.mvv_lva(board, m.from, m.to));
 
     captures
     }
@@ -667,14 +693,14 @@ impl MoveGen {
         10 * victim as i32 - attacker as i32
     }
 
-    fn gen_pawn_moves(&self, board: &Bitboard) -> (Vec<(usize, usize, Option<usize>)>, Vec<(usize, usize, Option<usize>)>, Vec<(usize, usize, Option<usize>)>) {
+    fn gen_pawn_moves(&self, board: &Bitboard) -> (Vec<Move>, Vec<Move>, Vec<Move>) {
         // Generate all possible pawn moves for the current position.
         // Returns a vector of captures and a vector of non-captures, both in the form tuples (from_sq_ind, to_sq_ind, None).
         // Treats promotions as captures.
         // Lists promotions in the following order: queen, rook, knight, bishop, since bishop promotions are very rare.
-        let mut moves: Vec<(usize, usize, Option<usize>)> = Vec::new();
-        let mut captures: Vec<(usize, usize, Option<usize>)> = Vec::new();
-        let mut promotions: Vec<(usize, usize, Option<usize>)> = Vec::new();
+        let mut moves: Vec<Move> = Vec::new();
+        let mut captures: Vec<Move> = Vec::new();
+        let mut promotions: Vec<Move> = Vec::new();
         if board.w_to_move {
             // White to move
             for from_sq_ind in bits(&board.pieces[WP]) {
@@ -683,7 +709,7 @@ impl MoveGen {
                         if from_sq_ind > 47 && from_sq_ind < 56 {
                             append_promotions(&mut promotions, from_sq_ind, to_sq_ind, board.w_to_move);
                         } else {
-                            captures.push((from_sq_ind, *to_sq_ind, None));
+                            captures.push(Move::new(from_sq_ind, *to_sq_ind, None));
                         }
                     }
                 }
@@ -699,10 +725,10 @@ impl MoveGen {
                         } else {
                             if from_sq_ind > 7 && from_sq_ind < 16 {
                                 if board.pieces[OCC] & (1 << (from_sq_ind + 8)) == 0 {
-                                    moves.push((from_sq_ind, *to_sq_ind, None));
+                                    moves.push(Move::new(from_sq_ind, *to_sq_ind, None));
                                 }
                             } else {
-                                moves.push((from_sq_ind, *to_sq_ind, None));
+                                moves.push(Move::new(from_sq_ind, *to_sq_ind, None));
                             }
                         }
                     }
@@ -716,7 +742,7 @@ impl MoveGen {
                         if from_sq_ind > 7 && from_sq_ind < 16 {
                             append_promotions(&mut promotions, from_sq_ind, to_sq_ind, board.w_to_move);
                         } else {
-                            captures.push((from_sq_ind, *to_sq_ind, None));
+                            captures.push(Move::new(from_sq_ind, *to_sq_ind, None));
                         }
                     }
                 }
@@ -732,10 +758,10 @@ impl MoveGen {
                         } else {
                             if from_sq_ind > 47 && from_sq_ind < 56 {
                                 if board.pieces[OCC] & (1 << (from_sq_ind - 8)) == 0 {
-                                    moves.push((from_sq_ind, *to_sq_ind, None));
+                                    moves.push(Move::new(from_sq_ind, *to_sq_ind, None));
                                 }
                             } else {
-                                moves.push((from_sq_ind, *to_sq_ind, None));
+                                moves.push(Move::new(from_sq_ind, *to_sq_ind, None));
                             }
                         }
                     }
@@ -745,19 +771,19 @@ impl MoveGen {
         (captures, promotions, moves)
     }
 
-    fn gen_knight_moves(&self, board: &Bitboard) -> (Vec<(usize, usize, Option<usize>)>, Vec<(usize, usize, Option<usize>)>) {
+    fn gen_knight_moves(&self, board: &Bitboard) -> (Vec<Move>, Vec<Move>) {
         // Generate all possible knight moves for the current position.
         // Returns a vector of captures and a vector of non-captures, both in the form tuples (from_sq_ind, to_sq_ind, None).
-        let mut moves: Vec<(usize, usize, Option<usize>)> = Vec::new();
-        let mut captures: Vec<(usize, usize, Option<usize>)> = Vec::new();
+        let mut moves: Vec<Move> = Vec::new();
+        let mut captures: Vec<Move> = Vec::new();
         if board.w_to_move {
             // White to move
             for from_sq_ind in bits(&board.pieces[WN]) {
                 for to_sq_ind in &self.n_moves[from_sq_ind] {
                     if board.pieces[BOCC] & (1 << to_sq_ind) != 0 {
-                        captures.push((from_sq_ind, *to_sq_ind, None));
+                        captures.push(Move::new(from_sq_ind, *to_sq_ind, None));
                     } else if board.pieces[WOCC] & (1 << to_sq_ind) == 0 {
-                        moves.push((from_sq_ind, *to_sq_ind, None));
+                        moves.push(Move::new(from_sq_ind, *to_sq_ind, None));
                     }
                 }
             }
@@ -766,9 +792,9 @@ impl MoveGen {
             for from_sq_ind in bits(&board.pieces[BN]) {
                 for to_sq_ind in &self.n_moves[from_sq_ind] {
                     if board.pieces[WOCC] & (1 << to_sq_ind) != 0 {
-                        captures.push((from_sq_ind, *to_sq_ind, None));
+                        captures.push(Move::new(from_sq_ind, *to_sq_ind, None));
                     } else if board.pieces[BOCC] & (1 << to_sq_ind) == 0 {
-                        moves.push((from_sq_ind, *to_sq_ind, None));
+                        moves.push(Move::new(from_sq_ind, *to_sq_ind, None));
                     }
                 }
             }
@@ -776,12 +802,12 @@ impl MoveGen {
         (captures, moves)
     }
 
-    fn gen_king_moves(&self, board: &Bitboard) -> (Vec<(usize, usize, Option<usize>)>, Vec<(usize, usize, Option<usize>)>) {
+    fn gen_king_moves(&self, board: &Bitboard) -> (Vec<Move>, Vec<Move>) {
         // Generate all possible king moves for the current position.
         // For castling, checks whether in check and whether the king moves through check.
         // Returns a vector of captures and a vector of non-captures, both in the form tuples (from_sq_ind, to_sq_ind, None).
-        let mut moves: Vec<(usize, usize, Option<usize>)> = Vec::new();
-        let mut captures: Vec<(usize, usize, Option<usize>)> = Vec::new();
+        let mut moves: Vec<Move> = Vec::new();
+        let mut captures: Vec<Move> = Vec::new();
         if board.w_to_move {
             // White to move
             if board.w_castle_k {
@@ -789,7 +815,7 @@ impl MoveGen {
                 if board.pieces[WR] & (1 << 7) != 0 {
                     if board.pieces[OCC] & ((1 << 5) | (1 << 6)) == 0 {
                         if !board.is_square_attacked(4, false, self) && !board.is_square_attacked(5, false, self) && !board.is_square_attacked(6, false, self) {
-                            moves.push((4, 6, None));
+                            moves.push(Move::new(4, 6, None));
                         }
                     }
                 }
@@ -799,7 +825,7 @@ impl MoveGen {
                 if board.pieces[WR] & (1 << 0) != 0 {
                     if board.pieces[OCC] & ((1 << 1) | (1 << 2) | (1 << 3)) == 0 {
                         if !board.is_square_attacked(4, false, self) && !board.is_square_attacked(3, false, self) && !board.is_square_attacked(2, false, self) {
-                            moves.push((4, 2, None));
+                            moves.push(Move::new(4, 2, None));
                         }
                     }
                 }
@@ -807,9 +833,9 @@ impl MoveGen {
             for from_sq_ind in bits(&board.pieces[WK]) {
                 for to_sq_ind in &self.k_moves[from_sq_ind] {
                     if board.pieces[BOCC] & (1 << to_sq_ind) != 0 {
-                        captures.push((from_sq_ind, *to_sq_ind, None));
+                        captures.push(Move::new(from_sq_ind, *to_sq_ind, None));
                     } else if board.pieces[WOCC] & (1 << to_sq_ind) == 0 {
-                        moves.push((from_sq_ind, *to_sq_ind, None));
+                        moves.push(Move::new(from_sq_ind, *to_sq_ind, None));
                     }
                 }
             }
@@ -820,7 +846,7 @@ impl MoveGen {
                 if board.pieces[BR] & (1 << 63) != 0 {
                     if board.pieces[OCC] & ((1 << 61) | (1 << 62)) == 0 {
                         if !board.is_square_attacked(60, true, self) && !board.is_square_attacked(61, true, self) && !board.is_square_attacked(62, true, self) {
-                            moves.push((60, 62, None));
+                            moves.push(Move::new(60, 62, None));
                         }
                     }
                 }
@@ -830,7 +856,7 @@ impl MoveGen {
                 if board.pieces[BR] & (1 << 56) != 0 {
                     if board.pieces[OCC] & ((1 << 57) | (1 << 58) | (1 << 59)) == 0 {
                         if !board.is_square_attacked(60, true, self) && !board.is_square_attacked(59, true, self) && !board.is_square_attacked(58, true, self) {
-                            moves.push((60, 58, None));
+                            moves.push(Move::new(60, 58, None));
                         }
                     }
                 }
@@ -838,9 +864,9 @@ impl MoveGen {
             for from_sq_ind in bits(&board.pieces[BK]) {
                 for to_sq_ind in &self.k_moves[from_sq_ind] {
                     if board.pieces[WOCC] & (1 << to_sq_ind) != 0 {
-                        captures.push((from_sq_ind, *to_sq_ind, None));
+                        captures.push(Move::new(from_sq_ind, *to_sq_ind, None));
                     } else if board.pieces[BOCC] & (1 << to_sq_ind) == 0 {
-                        moves.push((from_sq_ind, *to_sq_ind, None));
+                        moves.push(Move::new(from_sq_ind, *to_sq_ind, None));
                     }
                 }
             }
@@ -848,12 +874,12 @@ impl MoveGen {
         (captures, moves)
     }
 
-    fn gen_rook_moves(&self, board: &Bitboard) -> (Vec<(usize, usize, Option<usize>)>, Vec<(usize, usize, Option<usize>)>) {
+    fn gen_rook_moves(&self, board: &Bitboard) -> (Vec<Move>, Vec<Move>) {
         // Generate all possible rook moves for the current position.
         // Returns a vector of captures and a vector of non-captures, both in the form tuples (from_sq_ind, to_sq_ind, None).
         // Uses magic bitboards.
-        let mut moves: Vec<(usize, usize, Option<usize>)> = Vec::new();
-        let mut captures: Vec<(usize, usize, Option<usize>)> = Vec::new();
+        let mut moves: Vec<Move> = Vec::new();
+        let mut captures: Vec<Move> = Vec::new();
         let mut blockers: u64;
         let mut key: usize;
         if board.w_to_move {
@@ -868,13 +894,13 @@ impl MoveGen {
                 // Return the preinitialized attack set bitboard from the table
                 for to_sq_ind in &self.r_moves[from_sq_ind][key].0 {
                     if board.pieces[BOCC] & (1 << to_sq_ind) != 0 {
-                        captures.push((from_sq_ind, *to_sq_ind, None));
+                        captures.push(Move::new(from_sq_ind, *to_sq_ind, None));
                     }
                 }
                 for to_sq_ind in &self.r_moves[from_sq_ind][key].1 {
                     // Have to make sure we're not capturing our own piece, since pieces on the edge are not included in blockers
                     if board.pieces[WOCC] & (1 << to_sq_ind) == 0 {
-                        moves.push((from_sq_ind, *to_sq_ind, None));
+                        moves.push(Move::new(from_sq_ind, *to_sq_ind, None));
                     }
                 }
             }
@@ -890,13 +916,13 @@ impl MoveGen {
                 // Return the preinitialized attack set bitboard from the table
                 for to_sq_ind in &self.r_moves[from_sq_ind][key].0 {
                     if board.pieces[WOCC] & (1 << to_sq_ind) != 0 {
-                        captures.push((from_sq_ind, *to_sq_ind, None));
+                        captures.push(Move::new(from_sq_ind, *to_sq_ind, None));
                     }
                 }
                 for to_sq_ind in &self.r_moves[from_sq_ind][key].1 {
                     // Have to make sure we're not capturing our own piece, since pieces on the edge are not included in blockers
                     if board.pieces[BOCC] & (1 << to_sq_ind) == 0 {
-                        moves.push((from_sq_ind, *to_sq_ind, None));
+                        moves.push(Move::new(from_sq_ind, *to_sq_ind, None));
                     }
                 }
             }
@@ -932,12 +958,12 @@ impl MoveGen {
         self.r_move_bitboard[from_sq_ind][key]
     }
 
-    fn gen_bishop_moves(&self, board: &Bitboard) -> (Vec<(usize, usize, Option<usize>)>, Vec<(usize, usize, Option<usize>)>) {
+    fn gen_bishop_moves(&self, board: &Bitboard) -> (Vec<Move>, Vec<Move>) {
         // Generate all possible bishop moves for the current position.
         // Returns a vector of captures and a vector of non-captures, both in the form tuples (from_sq_ind, to_sq_ind, None).
         // Uses magic bitboards.
-        let mut moves: Vec<(usize, usize, Option<usize>)> = Vec::new();
-        let mut captures: Vec<(usize, usize, Option<usize>)> = Vec::new();
+        let mut moves: Vec<Move> = Vec::new();
+        let mut captures: Vec<Move> = Vec::new();
         let mut blockers: u64;
         let mut key: usize;
         if board.w_to_move {
@@ -952,13 +978,13 @@ impl MoveGen {
                 // Return the preinitialized attack set bitboard from the table
                 for to_sq_ind in &self.b_moves[from_sq_ind][key].0 {
                     if board.pieces[BOCC] & (1 << to_sq_ind) != 0 {
-                        captures.push((from_sq_ind, *to_sq_ind, None));
+                        captures.push(Move::new(from_sq_ind, *to_sq_ind, None));
                     }
                 }
                 for to_sq_ind in &self.b_moves[from_sq_ind][key].1 {
                     // Have to make sure we're not capturing our own piece, since pieces on the edge are not included in blockers
                     if board.pieces[WOCC] & (1 << to_sq_ind) == 0 {
-                        moves.push((from_sq_ind, *to_sq_ind, None));
+                        moves.push(Move::new(from_sq_ind, *to_sq_ind, None));
                     }
                 }
             }
@@ -974,13 +1000,13 @@ impl MoveGen {
                 // Return the preinitialized attack set bitboard from the table
                 for to_sq_ind in &self.b_moves[from_sq_ind][key].0 {
                     if board.pieces[WOCC] & (1 << to_sq_ind) != 0 {
-                        captures.push((from_sq_ind, *to_sq_ind, None));
+                        captures.push(Move::new(from_sq_ind, *to_sq_ind, None));
                     }
                 }
                 for to_sq_ind in &self.b_moves[from_sq_ind][key].1 {
                     // Have to make sure we're not capturing our own piece, since pieces on the edge are not included in blockers
                     if board.pieces[BOCC] & (1 << to_sq_ind) == 0 {
-                        moves.push((from_sq_ind, *to_sq_ind, None));
+                        moves.push(Move::new(from_sq_ind, *to_sq_ind, None));
                     }
                 }
             }
@@ -988,12 +1014,12 @@ impl MoveGen {
         (captures, moves)
     }
 
-    fn gen_queen_moves(&self, board: &Bitboard) -> (Vec<(usize, usize, Option<usize>)>, Vec<(usize, usize, Option<usize>)>) {
+    fn gen_queen_moves(&self, board: &Bitboard) -> (Vec<Move>, Vec<Move>) {
         // Generate all possible queen moves for the current position.
         // Returns a vector of captures and a vector of non-captures, both in the form tuples (from_sq_ind, to_sq_ind, None).
         // Uses magic bitboards.
-        let mut moves: Vec<(usize, usize, Option<usize>)> = Vec::new();
-        let mut captures: Vec<(usize, usize, Option<usize>)> = Vec::new();
+        let mut moves: Vec<Move> = Vec::new();
+        let mut captures: Vec<Move> = Vec::new();
         let mut blockers: u64;
         let mut key: usize;
         if board.w_to_move {
@@ -1008,13 +1034,13 @@ impl MoveGen {
                 // Return the preinitialized attack set bitboard from the table
                 for to_sq_ind in &self.r_moves[from_sq_ind][key].0 {
                     if board.pieces[BOCC] & (1 << to_sq_ind) != 0 {
-                        captures.push((from_sq_ind, *to_sq_ind, None));
+                        captures.push(Move::new(from_sq_ind, *to_sq_ind, None));
                     }
                 }
                 for to_sq_ind in &self.r_moves[from_sq_ind][key].1 {
                     // Have to make sure we're not capturing our own piece, since pieces on the edge are not included in blockers
                     if board.pieces[WOCC] & (1 << to_sq_ind) == 0 {
-                        moves.push((from_sq_ind, *to_sq_ind, None));
+                        moves.push(Move::new(from_sq_ind, *to_sq_ind, None));
                     }
                 }
                 // Mask blockers
@@ -1026,13 +1052,13 @@ impl MoveGen {
                 // Return the preinitialized attack set bitboard from the table
                 for to_sq_ind in &self.b_moves[from_sq_ind][key].0 {
                     if board.pieces[BOCC] & (1 << to_sq_ind) != 0 {
-                        captures.push((from_sq_ind, *to_sq_ind, None));
+                        captures.push(Move::new(from_sq_ind, *to_sq_ind, None));
                     }
                 }
                 for to_sq_ind in &self.b_moves[from_sq_ind][key].1 {
                     // Have to make sure we're not capturing our own piece, since pieces on the edge are not included in blockers
                     if board.pieces[WOCC] & (1 << to_sq_ind) == 0 {
-                        moves.push((from_sq_ind, *to_sq_ind, None));
+                        moves.push(Move::new(from_sq_ind, *to_sq_ind, None));
                     }
                 }
             }
@@ -1048,13 +1074,13 @@ impl MoveGen {
                 // Return the preinitialized attack set bitboard from the table
                 for to_sq_ind in &self.r_moves[from_sq_ind][key].0 {
                     if board.pieces[WOCC] & (1 << to_sq_ind) != 0 {
-                        captures.push((from_sq_ind, *to_sq_ind, None));
+                        captures.push(Move::new(from_sq_ind, *to_sq_ind, None));
                     }
                 }
                 for to_sq_ind in &self.r_moves[from_sq_ind][key].1 {
                     // Have to make sure we're not capturing our own piece, since pieces on the edge are not included in blockers
                     if board.pieces[BOCC] & (1 << to_sq_ind) == 0 {
-                        moves.push((from_sq_ind, *to_sq_ind, None));
+                        moves.push(Move::new(from_sq_ind, *to_sq_ind, None));
                     }
                 }
                 // Mask blockers
@@ -1066,13 +1092,13 @@ impl MoveGen {
                 // Return the preinitialized attack set bitboard from the table
                 for to_sq_ind in &self.b_moves[from_sq_ind][key].0 {
                     if board.pieces[WOCC] & (1 << to_sq_ind) != 0 {
-                        captures.push((from_sq_ind, *to_sq_ind, None));
+                        captures.push(Move::new(from_sq_ind, *to_sq_ind, None));
                     }
                 }
                 for to_sq_ind in &self.b_moves[from_sq_ind][key].1 {
                     // Have to make sure we're not capturing our own piece, since pieces on the edge are not included in blockers
                     if board.pieces[BOCC] & (1 << to_sq_ind) == 0 {
-                        moves.push((from_sq_ind, *to_sq_ind, None));
+                        moves.push(Move::new(from_sq_ind, *to_sq_ind, None));
                     }
                 }
             }
