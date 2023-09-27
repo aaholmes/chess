@@ -4,7 +4,7 @@
 use crate::bitboard::Bitboard;
 use crate::gen_moves::{Move, MoveGen};
 use crate::eval::PestoEval;
-use crate::utils;
+use crate::utils::print_move;
 
 
 pub fn negamax_search(board: &mut Bitboard, move_gen: &MoveGen, pesto: &PestoEval, depth: i32) -> (i32, Move, i32) {
@@ -42,7 +42,7 @@ fn negamax(board: &mut Bitboard, move_gen: &MoveGen, pesto: &PestoEval, depth: i
     // Also returns number of nodes searched
     if depth == 0 {
         // Leaf node
-        return (-pesto.eval(board), 1); // TODO: put quiescence search here
+        return (-pesto.eval(board), 1);
     }
     let mut best_eval: i32 = -1000000;
     let mut n: i32 = 0;
@@ -96,7 +96,7 @@ pub fn alpha_beta_search(board: &mut Bitboard, move_gen: &MoveGen, pesto: &Pesto
     captures.extend(moves);
     for m in captures {
         if verbose {
-            println!("Considering move {} at root of search tree", utils::print_move(&m));
+            println!("Considering move {} at root of search tree", print_move(&m));
         }
         let mut new_board: Bitboard = board.make_move(m);
         if !new_board.is_legal(move_gen) {
@@ -114,7 +114,7 @@ pub fn alpha_beta_search(board: &mut Bitboard, move_gen: &MoveGen, pesto: &Pesto
         }
     }
     if verbose {
-        println!("Alpha beta search at depth {} searched {} nodes. Best eval and move are {} {}", depth, n, alpha, utils::print_move(&best_move));
+        println!("Alpha beta search at depth {} searched {} nodes. Best eval and move are {} {}", depth, n, alpha, print_move(&best_move));
     }
     (alpha, best_move, n)
 }
@@ -142,7 +142,7 @@ fn alpha_beta(board: &mut Bitboard, move_gen: &MoveGen, pesto: &PestoEval, depth
     captures.extend(moves);
     for m in captures {
         if verbose {
-            println!("Considering move {}", utils::print_move(&m));
+            println!("Considering move {}", print_move(&m));
         }
         let mut new_board: Bitboard = board.make_move(m);
         if !new_board.is_legal(move_gen) {
@@ -156,7 +156,7 @@ fn alpha_beta(board: &mut Bitboard, move_gen: &MoveGen, pesto: &PestoEval, depth
         }
         if alpha >= beta {
             if verbose {
-                println!("Inner Alpha beta search at depth {} searched {} nodes. Best eval and move are {} {}", depth, n, alpha, utils::print_move(&m));
+                println!("Inner Alpha beta search at depth {} searched {} nodes. Best eval and move are {} {}", depth, n, alpha, print_move(&m));
             }
             break;
         }
@@ -179,7 +179,7 @@ pub fn iterative_deepening_ab_search(board: &mut Bitboard, move_gen: &MoveGen, p
         (eval, best_move, nodes) = alpha_beta_search(board, move_gen, pesto, depth, -1000000, 1000000, verbose);
         n += nodes;
         if verbose {
-            println!("At depth {}, searched {} nodes. best eval and move are {} {}", depth, n, eval, utils::print_move(&best_move));
+            println!("At depth {}, searched {} nodes. best eval and move are {} {}", depth, n, eval, print_move(&best_move));
         }
     }
     (eval, best_move, n)
@@ -215,7 +215,7 @@ pub fn aspiration_window_ab_search(board: &mut Bitboard, move_gen: &MoveGen, pes
             (eval, best_move, nodes) = alpha_beta_search(board, move_gen, pesto, depth, lower_bound, upper_bound, verbose);
             n += nodes;
             if verbose {
-                println!("At depth {}, searched {} nodes. best eval and move are {} {}", depth, n, eval, utils::print_move(&best_move));
+                println!("At depth {}, searched {} nodes. best eval and move are {} {}", depth, n, eval, print_move(&best_move));
             }
             if eval == lower_bound {
                 if verbose {
@@ -230,7 +230,7 @@ pub fn aspiration_window_ab_search(board: &mut Bitboard, move_gen: &MoveGen, pes
             } else {
                 if verbose {
                     println!("\nAspiration window search successful!");
-                    println!("Best move: {}", utils::print_move(&best_move));
+                    println!("Best move: {}", print_move(&best_move));
                     println!("Eval: {}\n", eval);
                 }
                 target_eval = eval;

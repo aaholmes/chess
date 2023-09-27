@@ -4,7 +4,8 @@
 // TODO: Add pawn structure and king safety, possibly using a simple NN
 
 use std::cmp::min;
-use crate::bitboard::{Bitboard, flip_sq_ind_vertically, WK, BK, WN, BN, WR, BR, WQ, BQ};
+use crate::bitboard::{Bitboard, flip_sq_ind_vertically, WP, BP, WK, BK, WN, BN, WR, BR, WQ, BQ, WOCC, BOCC};
+use crate::bits::popcnt;
 use crate::gen_moves::MoveGen;
 
 pub struct PestoEval {
@@ -308,29 +309,85 @@ impl PestoEval {
         // Since Pesto only depends on piece square tables, we can just use the change in value of the moved piece
         // We don't include captures here, since we will use MVV-LVA for that instead
         // We also don't include promotions, since we will also treat those separately
-        // However, we rank knight forks and threats above other non-captures
+        // However, we rank pawn and knight forks above other non-captures
         // Note that our implementation doesn't detect a fork of two queens, since that is very rare
         // This yields the following move order:
-        // captures in MVV-LVA order, promotions, knight forks, knight threats, other moves in pesto order
+        // captures in MVV-LVA order, promotions, pawn and knight forks, other moves in pesto order
         // Note that this is relative to the side to move
 
         let piece: usize = board.get_piece(from_sq_ind).unwrap();
 
-        // If knight, check for knight fork
+
+        // Pawn forks
         if board.w_to_move {
-            if piece == WN && move_gen.n_move_bitboard[to_sq_ind] & board.pieces[BK] != 0 && move_gen.n_move_bitboard[to_sq_ind] & board.pieces[BQ] != 0 {
+            if piece == WP {
+                if move_gen.wp_capture_bitboard[to_sq_ind] & board.pieces[BK] != 0 && move_gen.wp_capture_bitboard[to_sq_ind] & board.pieces[BQ] != 0 {
+                    // Fork king and queen
+                    return 1000;
+                } else if move_gen.wp_capture_bitboard[to_sq_ind] & board.pieces[BK] != 0 && move_gen.wp_capture_bitboard[to_sq_ind] & board.pieces[BR] != 0 {
+                    // Fork king and rook
+                    return 900;
+                } else if move_gen.wp_capture_bitboard[to_sq_ind] & board.pieces[BQ] != 0 && move_gen.wp_capture_bitboard[to_sq_ind] & board.pieces[BR] != 0 {
+                    // Fork queen and rook
+                    return 800;
+                } else if popcnt(move_gen.wp_capture_bitboard[to_sq_ind] & board.pieces[BR]) == 2 {
+                    // Fork two rooks
+                    return 700;
+                } else if popcnt(move_gen.wp_capture_bitboard[to_sq_ind] & board.pieces[BOCC] & !board.pieces[BP]) == 2 {
+                    // Fork two non-pawn pieces
+                    return 600;
+                }
+            }
+        } else if piece == BP {
+            if move_gen.bp_capture_bitboard[to_sq_ind] & board.pieces[WK] != 0 && move_gen.bp_capture_bitboard[to_sq_ind] & board.pieces[WQ] != 0 {
                 // Fork king and queen
                 return 1000;
-            // } else if move_gen.n_move_bitboard[to_sq_ind] & board.pieces[BR] != 0 {
-            //     // Fork king and rook
-            //     return 900;
+            } else if move_gen.bp_capture_bitboard[to_sq_ind] & board.pieces[WK] != 0 && move_gen.bp_capture_bitboard[to_sq_ind] & board.pieces[WR] != 0 {
+                // Fork king and rook
+                return 900;
+            } else if move_gen.bp_capture_bitboard[to_sq_ind] & board.pieces[WQ] != 0 && move_gen.bp_capture_bitboard[to_sq_ind] & board.pieces[WR] != 0 {
+                // Fork queen and rook
+                return 800;
+            } else if popcnt(move_gen.bp_capture_bitboard[to_sq_ind] & board.pieces[WR]) == 2 {
+                // Fork two rooks
+                return 700;
+            } else if popcnt(move_gen.bp_capture_bitboard[to_sq_ind] & board.pieces[WOCC] & !board.pieces[WP]) == 2 {
+                // Fork two non-pawn pieces
+                return 600;
             }
-        } else if piece == BN && move_gen.n_move_bitboard[to_sq_ind] & board.pieces[WK] != 0 && move_gen.n_move_bitboard[to_sq_ind] & board.pieces[WQ] != 0 {
-            // Fork king and queen
-            return 1000;
-        // } else if move_gen.n_move_bitboard[to_sq_ind] & board.pieces[WR] != 0 {
-        //     // Fork king and rook
-        //     return 900;
+        }
+
+        // Knight forks
+        if board.w_to_move {
+            if piece == WN {
+                if move_gen.n_move_bitboard[to_sq_ind] & board.pieces[BK] != 0 && move_gen.n_move_bitboard[to_sq_ind] & board.pieces[BQ] != 0 {
+                    // Fork king and queen
+                    return 950;
+                } else if move_gen.n_move_bitboard[to_sq_ind] & board.pieces[BK] != 0 && move_gen.n_move_bitboard[to_sq_ind] & board.pieces[BR] != 0 {
+                    // Fork king and rook
+                    return 850;
+                } else if move_gen.n_move_bitboard[to_sq_ind] & board.pieces[BQ] != 0 && move_gen.n_move_bitboard[to_sq_ind] & board.pieces[BR] != 0 {
+                    // Fork queen and rook
+                    return 750;
+                } else if popcnt(move_gen.n_move_bitboard[to_sq_ind] & board.pieces[BR]) > 1 {
+                    // Fork two rooks
+                    return 650;
+                }
+            }
+        } else if piece == BN {
+            if move_gen.n_move_bitboard[to_sq_ind] & board.pieces[WK] != 0 && move_gen.n_move_bitboard[to_sq_ind] & board.pieces[WQ] != 0 {
+                // Fork king and queen
+                return 950;
+            } else if move_gen.n_move_bitboard[to_sq_ind] & board.pieces[WK] != 0 && move_gen.n_move_bitboard[to_sq_ind] & board.pieces[WR] != 0 {
+                // Fork king and rook
+                return 850;
+            } else if move_gen.n_move_bitboard[to_sq_ind] & board.pieces[WQ] != 0 && move_gen.n_move_bitboard[to_sq_ind] & board.pieces[WR] != 0 {
+                // Fork queen and rook
+                return 750;
+            } else if popcnt(move_gen.n_move_bitboard[to_sq_ind] & board.pieces[WR]) > 1 {
+                // Fork two rooks
+                return 650;
+            }
         }
 
         if board.game_phase.is_none() {

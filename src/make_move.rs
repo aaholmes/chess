@@ -9,7 +9,17 @@ impl Bitboard {
         // Assumes the move is legal.
 
         let mut new_board: Bitboard = self.clone();
+        new_board.w_to_move = !new_board.w_to_move;
         new_board.halfmove_clock += 1;
+        if new_board.w_to_move {
+            new_board.fullmove_clock += 1;
+        }
+
+        // Null move: remove en passant ability and return new board
+        if the_move.from == 0 && the_move.to == 0 {
+            new_board.en_passant = None;
+            return new_board;
+        }
 
         let from_bit = sq_ind_to_bit(the_move.from);
         let to_bit = sq_ind_to_bit(the_move.to);
@@ -102,10 +112,6 @@ impl Bitboard {
             }
         }
 
-        new_board.w_to_move = !new_board.w_to_move;
-        if new_board.w_to_move {
-            new_board.fullmove_clock += 1;
-        }
         new_board.pieces[WOCC] = new_board.pieces[WP] | new_board.pieces[WN] | new_board.pieces[WB] | new_board.pieces[WR] | new_board.pieces[WQ] | new_board.pieces[WK];
         new_board.pieces[BOCC] = new_board.pieces[BP] | new_board.pieces[BN] | new_board.pieces[BB] | new_board.pieces[BR] | new_board.pieces[BQ] | new_board.pieces[BK];
         new_board.pieces[OCC] = new_board.pieces[WOCC] | new_board.pieces[BOCC];

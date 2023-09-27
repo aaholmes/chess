@@ -16,7 +16,7 @@ The goal is to make a reasonably good chess engine inspired by
 7. Move ordering:
    1. Mate killer heuristic
    2. MVV-LVA (DONE)
-   3. Knight forks (DONE), pawn forks
+   3. Pawn and knight forks (DONE) 
    4. Non-captures ordered according to Pesto eval (DONE)
 8. Mate search (DONE)
 9. Quiescence search (DONE)
