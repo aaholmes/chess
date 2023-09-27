@@ -17,7 +17,7 @@
 use crate::bitboard::{Bitboard, sq_ind_to_bit, WP, BP, WN, BN, WB, BB, WR, BR, WQ, BQ, WK, BK, WOCC, BOCC, OCC};
 use crate::bits::bits;
 use crate::magic_constants::{R_MAGICS, B_MAGICS, R_BITS, B_BITS, R_MASKS, B_MASKS};
-use rand;
+
 use crate::eval::PestoEval;
 
 const NOT_A_FILE: u64 = 0xfefefefefefefefe;
@@ -137,12 +137,10 @@ fn find_magic_numbers() -> ([u64; 64], [u64; 64]) {
                         b_magics[from_sq_ind] = magic;
                         break;
                     }
-                } else {
-                    if keys.len() == (1 << R_BITS[from_sq_ind]) {
-                        println!("Found rook magic number for square {} with {} bits: {}", from_sq_ind, R_BITS[from_sq_ind], magic);
-                        r_magics[from_sq_ind] = magic;
-                        break;
-                    }
+                } else if keys.len() == (1 << R_BITS[from_sq_ind]) {
+                    println!("Found rook magic number for square {} with {} bits: {}", from_sq_ind, R_BITS[from_sq_ind], magic);
+                    r_magics[from_sq_ind] = magic;
+                    break;
                 }
             }
         }
@@ -359,52 +357,44 @@ fn rook_attacks(sq: usize, block: u64) -> (Vec<usize>, Vec<usize>) {
         if r == 7 {
             captures.push(fl + r * 8);
             moves.push(fl + r * 8);
+        } else if (block & (1 << (fl + r * 8))) != 0 {
+            captures.push(fl + r * 8);
+            break;
         } else {
-            if (block & (1 << (fl + r * 8))) != 0 {
-                captures.push(fl + r * 8);
-                break;
-            } else {
-                moves.push(fl + r * 8);
-            }
+            moves.push(fl + r * 8);
         }
     }
     for r in (0 .. rk).rev() {
         if r == 0 {
             captures.push(fl + r * 8);
             moves.push(fl + r * 8);
+        } else if (block & (1 << (fl + r * 8))) != 0 {
+            captures.push(fl + r * 8);
+            break;
         } else {
-            if (block & (1 << (fl + r * 8))) != 0 {
-                captures.push(fl + r * 8);
-                break;
-            } else {
-                moves.push(fl + r * 8);
-            }
+            moves.push(fl + r * 8);
         }
     }
     for f in fl + 1 .. 8 {
         if f == 7 {
             captures.push(f + rk * 8);
             moves.push(f + rk * 8);
+        } else if (block & (1 << (f + rk * 8))) != 0 {
+            captures.push(f + rk * 8);
+            break;
         } else {
-            if (block & (1 << (f + rk * 8))) != 0 {
-                captures.push(f + rk * 8);
-                break;
-            } else {
-                moves.push(f + rk * 8);
-            }
+            moves.push(f + rk * 8);
         }
     }
     for f in (0 .. fl).rev() {
         if f == 0 {
             captures.push(f + rk * 8);
             moves.push(f + rk * 8);
+        } else if (block & (1 << (f + rk * 8))) != 0 {
+            captures.push(f + rk * 8);
+            break;
         } else {
-            if (block & (1 << (f + rk * 8))) != 0 {
-                captures.push(f + rk * 8);
-                break;
-            } else {
-                moves.push(f + rk * 8);
-            }
+            moves.push(f + rk * 8);
         }
     }
     (captures, moves)
@@ -429,13 +419,11 @@ fn bishop_attacks(sq: usize, block: u64) -> (Vec<usize>, Vec<usize>) {
                 captures.push(f + r * 8);
                 moves.push(f + r * 8);
                 break;
+            } else if (block & (1 << (f + r * 8))) != 0 {
+                captures.push(f + r * 8);
+                break;
             } else {
-                if (block & (1 << (f + r * 8))) != 0 {
-                    captures.push(f + r * 8);
-                    break;
-                } else {
-                    moves.push(f + r * 8);
-                }
+                moves.push(f + r * 8);
             }
         }
     }
@@ -446,13 +434,11 @@ fn bishop_attacks(sq: usize, block: u64) -> (Vec<usize>, Vec<usize>) {
                 captures.push(f + r * 8);
                 moves.push(f + r * 8);
                 break;
+            } else if (block & (1 << (f + r * 8))) != 0 {
+                captures.push(f + r * 8);
+                break;
             } else {
-                if (block & (1 << (f + r * 8))) != 0 {
-                    captures.push(f + r * 8);
-                    break;
-                } else {
-                    moves.push(f + r * 8);
-                }
+                moves.push(f + r * 8);
             }
         }
     }
@@ -463,13 +449,11 @@ fn bishop_attacks(sq: usize, block: u64) -> (Vec<usize>, Vec<usize>) {
                 captures.push(f + r * 8);
                 moves.push(f + r * 8);
                 break;
+            } else if (block & (1 << (f + r * 8))) != 0 {
+                captures.push(f + r * 8);
+                break;
             } else {
-                if (block & (1 << (f + r * 8))) != 0 {
-                    captures.push(f + r * 8);
-                    break;
-                } else {
-                    moves.push(f + r * 8);
-                }
+                moves.push(f + r * 8);
             }
         }
     }
@@ -480,13 +464,11 @@ fn bishop_attacks(sq: usize, block: u64) -> (Vec<usize>, Vec<usize>) {
                 captures.push(f + r * 8);
                 moves.push(f + r * 8);
                 break;
+            } else if (block & (1 << (f + r * 8))) != 0 {
+                captures.push(f + r * 8);
+                break;
             } else {
-                if (block & (1 << (f + r * 8))) != 0 {
-                    captures.push(f + r * 8);
-                    break;
-                } else {
-                    moves.push(f + r * 8);
-                }
+                moves.push(f + r * 8);
             }
         }
     }
@@ -522,12 +504,12 @@ impl MoveGen {
         let mut k_move_bitboard: [u64; 64] = [0; 64];
         let mut wp_moves: Vec<Vec<usize>> = Vec::new();
         let mut bp_moves: Vec<Vec<usize>> = Vec::new();
-        let mut wp: Vec<usize>;
-        let mut bp: Vec<usize>;
-        let mut wp_cap: Vec<usize>;
-        let mut bp_cap: Vec<usize>;
-        let mut wp_prom: Vec<usize>;
-        let mut bp_prom: Vec<usize>;
+        let mut _wp: Vec<usize>;
+        let mut _bp: Vec<usize>;
+        let mut _wp_cap: Vec<usize>;
+        let mut _bp_cap: Vec<usize>;
+        let mut _wp_prom: Vec<usize>;
+        let mut _bp_prom: Vec<usize>;
         for from_sq_ind in 0..64 {
             let (wp_cap, wp_prom, bp_cap, bp_prom) = init_pawn_captures_promotions(from_sq_ind);
             wp_captures.push(wp_cap.clone());
@@ -685,7 +667,7 @@ impl MoveGen {
         // Return the MVV-LVA score for a capture move.
         // To enable sorting by MVV, then by LVA, we return the score as 10 * victim - attacker,
         // where value is 012345 for kpnbrq
-        if board.get_piece(to_sq_ind) == None {
+        if board.get_piece(to_sq_ind).is_none() {
             return 0;
         }
         let victim = board.get_piece(to_sq_ind).unwrap() / 2;
@@ -714,22 +696,20 @@ impl MoveGen {
                     }
                 }
                 for to_sq_ind in &self.wp_promotions[from_sq_ind] {
-                    if board.get_piece(*to_sq_ind) == None {
+                    if board.get_piece(*to_sq_ind).is_none() {
                         append_promotions(&mut promotions, from_sq_ind, to_sq_ind, board.w_to_move);
                     }
                 }
                 for to_sq_ind in &self.wp_moves[from_sq_ind] {
-                    if board.get_piece(*to_sq_ind) == None {
+                    if board.get_piece(*to_sq_ind).is_none() {
                         if from_sq_ind > 47 && from_sq_ind < 56 {
                             append_promotions(&mut captures, from_sq_ind, to_sq_ind, board.w_to_move);
-                        } else {
-                            if from_sq_ind > 7 && from_sq_ind < 16 {
-                                if board.pieces[OCC] & (1 << (from_sq_ind + 8)) == 0 {
-                                    moves.push(Move::new(from_sq_ind, *to_sq_ind, None));
-                                }
-                            } else {
+                        } else if from_sq_ind > 7 && from_sq_ind < 16 {
+                            if board.pieces[OCC] & (1 << (from_sq_ind + 8)) == 0 {
                                 moves.push(Move::new(from_sq_ind, *to_sq_ind, None));
                             }
+                        } else {
+                            moves.push(Move::new(from_sq_ind, *to_sq_ind, None));
                         }
                     }
                 }
@@ -747,22 +727,20 @@ impl MoveGen {
                     }
                 }
                 for to_sq_ind in &self.bp_promotions[from_sq_ind] {
-                    if board.get_piece(*to_sq_ind) == None {
+                    if board.get_piece(*to_sq_ind).is_none() {
                         append_promotions(&mut promotions, from_sq_ind, to_sq_ind, board.w_to_move);
                     }
                 }
                 for to_sq_ind in &self.bp_moves[from_sq_ind] {
-                    if board.get_piece(*to_sq_ind) == None {
+                    if board.get_piece(*to_sq_ind).is_none() {
                         if from_sq_ind > 7 && from_sq_ind < 16 {
                             append_promotions(&mut captures, from_sq_ind, to_sq_ind, board.w_to_move);
-                        } else {
-                            if from_sq_ind > 47 && from_sq_ind < 56 {
-                                if board.pieces[OCC] & (1 << (from_sq_ind - 8)) == 0 {
-                                    moves.push(Move::new(from_sq_ind, *to_sq_ind, None));
-                                }
-                            } else {
+                        } else if from_sq_ind > 47 && from_sq_ind < 56 {
+                            if board.pieces[OCC] & (1 << (from_sq_ind - 8)) == 0 {
                                 moves.push(Move::new(from_sq_ind, *to_sq_ind, None));
                             }
+                        } else {
+                            moves.push(Move::new(from_sq_ind, *to_sq_ind, None));
                         }
                     }
                 }
@@ -812,22 +790,14 @@ impl MoveGen {
             // White to move
             if board.w_castle_k {
                 // Make sure a rook is there because it could have been captured
-                if board.pieces[WR] & (1 << 7) != 0 {
-                    if board.pieces[OCC] & ((1 << 5) | (1 << 6)) == 0 {
-                        if !board.is_square_attacked(4, false, self) && !board.is_square_attacked(5, false, self) && !board.is_square_attacked(6, false, self) {
-                            moves.push(Move::new(4, 6, None));
-                        }
-                    }
+                if board.pieces[WR] & (1 << 7) != 0 && board.pieces[OCC] & ((1 << 5) | (1 << 6)) == 0 && !board.is_square_attacked(4, false, self) && !board.is_square_attacked(5, false, self) && !board.is_square_attacked(6, false, self) {
+                    moves.push(Move::new(4, 6, None));
                 }
             }
             if board.w_castle_q {
                 // Make sure a rook is there because it could have been captured
-                if board.pieces[WR] & (1 << 0) != 0 {
-                    if board.pieces[OCC] & ((1 << 1) | (1 << 2) | (1 << 3)) == 0 {
-                        if !board.is_square_attacked(4, false, self) && !board.is_square_attacked(3, false, self) && !board.is_square_attacked(2, false, self) {
-                            moves.push(Move::new(4, 2, None));
-                        }
-                    }
+                if board.pieces[WR] & (1 << 0) != 0 && board.pieces[OCC] & ((1 << 1) | (1 << 2) | (1 << 3)) == 0 && !board.is_square_attacked(4, false, self) && !board.is_square_attacked(3, false, self) && !board.is_square_attacked(2, false, self) {
+                    moves.push(Move::new(4, 2, None));
                 }
             }
             for from_sq_ind in bits(&board.pieces[WK]) {
@@ -843,22 +813,14 @@ impl MoveGen {
             // Black to move
             if board.b_castle_k {
                 // Make sure a rook is there because it could have been captured
-                if board.pieces[BR] & (1 << 63) != 0 {
-                    if board.pieces[OCC] & ((1 << 61) | (1 << 62)) == 0 {
-                        if !board.is_square_attacked(60, true, self) && !board.is_square_attacked(61, true, self) && !board.is_square_attacked(62, true, self) {
-                            moves.push(Move::new(60, 62, None));
-                        }
-                    }
+                if board.pieces[BR] & (1 << 63) != 0 && board.pieces[OCC] & ((1 << 61) | (1 << 62)) == 0 && !board.is_square_attacked(60, true, self) && !board.is_square_attacked(61, true, self) && !board.is_square_attacked(62, true, self) {
+                    moves.push(Move::new(60, 62, None));
                 }
             }
             if board.b_castle_q {
                 // Make sure a rook is there because it could have been captured
-                if board.pieces[BR] & (1 << 56) != 0 {
-                    if board.pieces[OCC] & ((1 << 57) | (1 << 58) | (1 << 59)) == 0 {
-                        if !board.is_square_attacked(60, true, self) && !board.is_square_attacked(59, true, self) && !board.is_square_attacked(58, true, self) {
-                            moves.push(Move::new(60, 58, None));
-                        }
-                    }
+                if board.pieces[BR] & (1 << 56) != 0 && board.pieces[OCC] & ((1 << 57) | (1 << 58) | (1 << 59)) == 0 && !board.is_square_attacked(60, true, self) && !board.is_square_attacked(59, true, self) && !board.is_square_attacked(58, true, self) {
+                    moves.push(Move::new(60, 58, None));
                 }
             }
             for from_sq_ind in bits(&board.pieces[BK]) {

@@ -89,14 +89,14 @@ pub fn flip_sq_ind_vertically(sq_ind: usize) -> usize {
 }
 
 pub fn flip_vertically(bit: u64) -> u64 {
-    return  ( (bit << 56)                    ) |
+    ( (bit << 56)                    ) |
         ( (bit << 40) & (0x00ff000000000000) ) |
         ( (bit << 24) & (0x0000ff0000000000) ) |
         ( (bit <<  8) & (0x000000ff00000000) ) |
         ( (bit >>  8) & (0x00000000ff000000) ) |
         ( (bit >> 24) & (0x0000000000ff0000) ) |
         ( (bit >> 40) & (0x000000000000ff00) ) |
-        ( (bit >> 56) );
+        ( (bit >> 56) )
 }
 
 impl Bitboard {
@@ -148,7 +148,7 @@ impl Bitboard {
             if c == '/' {
                 rank -= 1;
                 file = 0;
-            } else if c.is_digit(10) {
+            } else if c.is_ascii_digit() {
                 file += c.to_digit(10).unwrap() as usize;
             } else {
                 let sq_ind = coords_to_sq_ind(file, rank);
@@ -265,7 +265,7 @@ impl Bitboard {
             w_castle_q: self.b_castle_q,
             b_castle_k: self.w_castle_k,
             b_castle_q: self.w_castle_q,
-            en_passant: { if self.en_passant == None { None } else { Some(flip_sq_ind_vertically(self.en_passant.unwrap())) } },
+            en_passant: { if self.en_passant.is_none() { None } else { Some(flip_sq_ind_vertically(self.en_passant.unwrap())) } },
             halfmove_clock: self.halfmove_clock,
             fullmove_clock: self.fullmove_clock,
             pieces: self.pieces.iter().map(|&x| flip_vertically(x)).collect(),
@@ -277,12 +277,7 @@ impl Bitboard {
     pub fn get_piece(&self, sq_ind: usize) -> Option<usize> {
         // Get the piece at a given square index.
         let bit = sq_ind_to_bit(sq_ind);
-        for i in 0..12 {
-            if bit & self.pieces[i] != 0 {
-                return Some(i);
-            }
-        }
-        None
+        (0..12).find(|&i| bit & self.pieces[i] != 0)
     }
 
     pub fn is_legal(&self, move_gen: &MoveGen) -> bool {
@@ -301,13 +296,13 @@ impl Bitboard {
                 self.print();
             }
         }
-        return !self.is_square_attacked(king_sq_ind, self.w_to_move, move_gen);
+        !self.is_square_attacked(king_sq_ind, self.w_to_move, move_gen)
     }
 
     pub fn is_checkmate_or_stalemate(&self, move_gen: &MoveGen) -> (bool, bool) {
         // Determines whether this position is checkmate, i.e. the side to move cannot capture the king and has no legal moves.
         let (captures, moves) = move_gen.gen_pseudo_legal_moves(self);
-        if captures.len() > 0 {
+        if !captures.is_empty() {
             for c in captures {
                 let new_board = self.make_move(c);
                 if new_board.is_legal(move_gen) {
@@ -315,7 +310,7 @@ impl Bitboard {
                 }
             }
         }
-        if moves.len() > 0 {
+        if !moves.is_empty() {
             for m in moves {
                 let new_board = self.make_move(m);
                 if new_board.is_legal(move_gen) {
@@ -326,9 +321,9 @@ impl Bitboard {
         // If we get here, there are no legal moves.
         let is_check = self.is_check(move_gen);
         if is_check {
-            return (true, false);
+            (true, false)
         } else {
-            return (false, true);
+            (false, true)
         }
     }
 
@@ -340,7 +335,7 @@ impl Bitboard {
         } else {
             king_sq_ind = bit_to_sq_ind(self.pieces[BK]);
         }
-        return self.is_square_attacked(king_sq_ind, !self.w_to_move, move_gen);
+        self.is_square_attacked(king_sq_ind, !self.w_to_move, move_gen)
     }
 
     pub fn is_square_attacked(&self, sq_ind: usize, by_white: bool, move_gen: &MoveGen) -> bool {

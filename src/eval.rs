@@ -318,66 +318,22 @@ impl PestoEval {
 
         // If knight, check for knight fork
         if board.w_to_move {
-            if piece == WN {
-                if move_gen.n_move_bitboard[to_sq_ind] & board.pieces[BK] != 0 {
-                    if move_gen.n_move_bitboard[to_sq_ind] & board.pieces[BQ] != 0 {
-                        // Fork king and queen
-                        return 1000;
-                    // } else if move_gen.n_move_bitboard[to_sq_ind] & board.pieces[BR] != 0 {
-                    //     // Fork king and rook
-                    //     return 900;
-                    }
-                // } else if move_gen.n_move_bitboard[to_sq_ind] & board.pieces[BQ] != 0 {
-                //     if move_gen.n_move_bitboard[to_sq_ind] & board.pieces[BR] != 0 {
-                //         // Fork queen and rook
-                //         return 800;
-                //     }
-                // } else if popcnt(move_gen.n_move_bitboard[to_sq_ind] & board.pieces[BR]) >= 2 {
-                //     // Fork two rooks
-                //     return 700;
-                // } else if move_gen.n_move_bitboard[to_sq_ind] & board.pieces[BK] != 0 {
-                //     // Attack king
-                //     return 675;
-                // } else if move_gen.n_move_bitboard[to_sq_ind] & board.pieces[BQ] != 0 {
-                //     // Attack queen
-                //     return 650;
-                // } else if move_gen.n_move_bitboard[to_sq_ind] & board.pieces[BR] != 0 {
-                //     // Attack rook
-                //     return 625;
-                }
+            if piece == WN && move_gen.n_move_bitboard[to_sq_ind] & board.pieces[BK] != 0 && move_gen.n_move_bitboard[to_sq_ind] & board.pieces[BQ] != 0 {
+                // Fork king and queen
+                return 1000;
+            // } else if move_gen.n_move_bitboard[to_sq_ind] & board.pieces[BR] != 0 {
+            //     // Fork king and rook
+            //     return 900;
             }
-        } else {
-            if piece == BN {
-                if move_gen.n_move_bitboard[to_sq_ind] & board.pieces[WK] != 0 {
-                    if move_gen.n_move_bitboard[to_sq_ind] & board.pieces[WQ] != 0 {
-                        // Fork king and queen
-                        return 1000;
-                    // } else if move_gen.n_move_bitboard[to_sq_ind] & board.pieces[WR] != 0 {
-                    //     // Fork king and rook
-                    //     return 900;
-                    }
-                // } else if move_gen.n_move_bitboard[to_sq_ind] & board.pieces[WQ] != 0 {
-                //     if move_gen.n_move_bitboard[to_sq_ind] & board.pieces[WR] != 0 {
-                //         // Fork queen and rook
-                //         return 800;
-                //     }
-                // } else if popcnt(move_gen.n_move_bitboard[to_sq_ind] & board.pieces[WR]) >= 2 {
-                //     // Fork two rooks
-                //     return 700;
-                // } else if move_gen.n_move_bitboard[to_sq_ind] & board.pieces[WK] != 0 {
-                //     // Attack king
-                //     return 675;
-                // } else if move_gen.n_move_bitboard[to_sq_ind] & board.pieces[WQ] != 0 {
-                //     // Attack queen
-                //     return 650;
-                // } else if move_gen.n_move_bitboard[to_sq_ind] & board.pieces[WR] != 0 {
-                //     // Attack rook
-                //     return 625;
-                }
-            }
+        } else if piece == BN && move_gen.n_move_bitboard[to_sq_ind] & board.pieces[WK] != 0 && move_gen.n_move_bitboard[to_sq_ind] & board.pieces[WQ] != 0 {
+            // Fork king and queen
+            return 1000;
+        // } else if move_gen.n_move_bitboard[to_sq_ind] & board.pieces[WR] != 0 {
+        //     // Fork king and rook
+        //     return 900;
         }
 
-        if board.game_phase == None {
+        if board.game_phase.is_none() {
             panic!("Game phase not set");
         }
 

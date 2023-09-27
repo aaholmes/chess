@@ -27,7 +27,7 @@ pub fn ibclr(n: u128, b: i32) -> u128 {
 }
 
 pub fn btest(n: u128, b: i32) -> bool {
-    !(n & (1 << b) == 0)
+    n & (1 << b) != 0
 }
 
 pub fn popcnt(n: u64) -> i32 {

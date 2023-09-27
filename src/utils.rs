@@ -28,7 +28,7 @@ pub fn print_move(the_move: &Move) -> String {
     let from = sq_ind_to_algebraic(the_move.from);
     let to = sq_ind_to_algebraic(the_move.to);
     let mut promotion = String::from("");
-    if the_move.promotion != None {
+    if the_move.promotion.is_some() {
         promotion = String::from("=");
         match the_move.promotion.unwrap() / 2 {
             1 => promotion.push('N'),
@@ -53,7 +53,7 @@ pub fn perft(board: Bitboard, move_gen: &MoveGen, depth: u8, verbose: bool) -> u
     let mut nodes = 0;
     if depth == 1 {
         if verbose {
-            println!("Moves: {:?}", captures.iter().map(|x| print_move(x)).collect::<Vec<String>>());
+            println!("Moves: {:?}", captures.iter().map(print_move).collect::<Vec<String>>());
         }
         let mut test_board: Bitboard;
         for i in captures {

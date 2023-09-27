@@ -1,6 +1,6 @@
 // Alpha-beta negamax search
 
-use std::process::abort;
+
 use crate::bitboard::Bitboard;
 use crate::gen_moves::{Move, MoveGen};
 use crate::eval::PestoEval;
@@ -16,7 +16,7 @@ pub fn negamax_search(board: &mut Bitboard, move_gen: &MoveGen, pesto: &PestoEva
     let mut best_eval: i32 = -1000000;
     let mut best_move: Move = Move::null();
     let mut n: i32 = 0;
-    let (mut captures, moves) = move_gen.gen_pseudo_legal_moves_with_evals(board, &pesto);
+    let (mut captures, moves) = move_gen.gen_pseudo_legal_moves_with_evals(board, pesto);
     captures.extend(moves);
     for m in captures {
         let mut new_board: Bitboard = board.make_move(m);
@@ -46,7 +46,7 @@ fn negamax(board: &mut Bitboard, move_gen: &MoveGen, pesto: &PestoEval, depth: i
     }
     let mut best_eval: i32 = -1000000;
     let mut n: i32 = 0;
-    let (mut captures, moves) = move_gen.gen_pseudo_legal_moves_with_evals(board, &pesto);
+    let (mut captures, moves) = move_gen.gen_pseudo_legal_moves_with_evals(board, pesto);
     captures.extend(moves);
     for m in captures {
         let mut new_board: Bitboard = board.make_move(m);
@@ -92,7 +92,7 @@ pub fn alpha_beta_search(board: &mut Bitboard, move_gen: &MoveGen, pesto: &Pesto
         }
         return (0, best_move, 1);
     }
-    let (mut captures, moves) = move_gen.gen_pseudo_legal_moves_with_evals(board, &pesto);
+    let (mut captures, moves) = move_gen.gen_pseudo_legal_moves_with_evals(board, pesto);
     captures.extend(moves);
     for m in captures {
         if verbose {
@@ -138,7 +138,7 @@ fn alpha_beta(board: &mut Bitboard, move_gen: &MoveGen, pesto: &PestoEval, depth
     // Non-leaf node
     let mut n: i32 = 1;
     // TODO: Here, consider best move from previous search first
-    let (mut captures, moves) = move_gen.gen_pseudo_legal_moves_with_evals(board, &pesto);
+    let (mut captures, moves) = move_gen.gen_pseudo_legal_moves_with_evals(board, pesto);
     captures.extend(moves);
     for m in captures {
         if verbose {
@@ -263,7 +263,7 @@ fn q_search_consistent_side_to_move_for_final_eval(board: &mut Bitboard, move_ge
         // This side can either play a capture, or evaluate the position, whichever is better
         let eval = -pesto.eval(board);
         let captures = move_gen.gen_pseudo_legal_captures(board);
-        if captures.len() == 0 {
+        if captures.is_empty() {
             if verbose {
                 println!("Quiescence: No captures left! Eval: {}", eval);
             }
@@ -302,7 +302,7 @@ fn q_search_consistent_side_to_move_for_final_eval(board: &mut Bitboard, move_ge
         }
     } else {
         // Other side simply plays best move
-        let (mut captures, moves) = move_gen.gen_pseudo_legal_moves_with_evals(board, &pesto);
+        let (mut captures, moves) = move_gen.gen_pseudo_legal_moves_with_evals(board, pesto);
         let mut n: i32 = 1;
         captures.extend(moves);
         for c in captures {

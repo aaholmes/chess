@@ -15,12 +15,12 @@ impl Bitboard {
         let to_bit = sq_ind_to_bit(the_move.to);
 
         let from_piece = self.get_piece(the_move.from);
-        if from_piece == None {
+        if from_piece.is_none() {
             panic!("No piece at from_sq_ind");
         }
 
         let to_piece = self.get_piece(the_move.to);
-        if to_piece != None {
+        if to_piece.is_some() {
             // Capture: Remove the captured piece before moving.
             new_board.pieces[to_piece.unwrap()] ^= to_bit;
             new_board.halfmove_clock = 0;
@@ -29,14 +29,12 @@ impl Bitboard {
 
         if from_piece.unwrap() < 2 {
             // En passant
-            if new_board.en_passant != None {
-                if the_move.to == new_board.en_passant.unwrap() {
-                    // Capture the pawn.
-                    if new_board.w_to_move {
-                        new_board.pieces[BP] ^= sq_ind_to_bit(the_move.to - 8);
-                    } else {
-                        new_board.pieces[WP] ^= sq_ind_to_bit(the_move.to + 8);
-                    }
+            if new_board.en_passant.is_some() && the_move.to == new_board.en_passant.unwrap() {
+                // Capture the pawn.
+                if new_board.w_to_move {
+                    new_board.pieces[BP] ^= sq_ind_to_bit(the_move.to - 8);
+                } else {
+                    new_board.pieces[WP] ^= sq_ind_to_bit(the_move.to + 8);
                 }
             }
         }
@@ -56,7 +54,7 @@ impl Bitboard {
         new_board.pieces[from_piece.unwrap()] ^= to_bit;
 
         // Promotion
-        if the_move.promotion != None {
+        if the_move.promotion.is_some() {
             new_board.pieces[from_piece.unwrap()] ^= to_bit;
             new_board.pieces[the_move.promotion.unwrap()] ^= to_bit;
         }
@@ -111,6 +109,6 @@ impl Bitboard {
         new_board.pieces[WOCC] = new_board.pieces[WP] | new_board.pieces[WN] | new_board.pieces[WB] | new_board.pieces[WR] | new_board.pieces[WQ] | new_board.pieces[WK];
         new_board.pieces[BOCC] = new_board.pieces[BP] | new_board.pieces[BN] | new_board.pieces[BB] | new_board.pieces[BR] | new_board.pieces[BQ] | new_board.pieces[BK];
         new_board.pieces[OCC] = new_board.pieces[WOCC] | new_board.pieces[BOCC];
-        return new_board;
+        new_board
     }
 }
