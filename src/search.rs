@@ -137,6 +137,7 @@ fn alpha_beta(board: &mut Bitboard, move_gen: &MoveGen, pesto: &PestoEval, depth
     }
     // Non-leaf node
     let mut n: i32 = 1;
+    // TODO: Here, consider best move from previous search first
     let (mut captures, moves) = move_gen.gen_pseudo_legal_moves_with_evals(board, &pesto);
     captures.extend(moves);
     for m in captures {
@@ -186,7 +187,8 @@ pub fn iterative_deepening_ab_search(board: &mut Bitboard, move_gen: &MoveGen, p
 
 pub fn aspiration_window_ab_search(board: &mut Bitboard, move_gen: &MoveGen, pesto: &PestoEval, max_depth: i32, verbose: bool) -> (i32, Move, i32) {
     // Perform aspiration window alpha-beta search from the given position
-    // Also uses iterative deepening
+    // Also uses iterative deepening: After searching at a given depth, starts a new search at that depth + 1, but looks at most promising variation first
+    // This is really helpful for alpha-beta pruning
     let lower_bound_param: i32 = -25;
     let upper_bound_param: i32 = 25;
 
@@ -279,41 +281,41 @@ fn q_search_consistent_side_to_move_for_final_eval(board: &mut Bitboard, move_ge
                 }
                 alpha = eval;
             }
-            let mut nodes: i32 = 1;
+            let mut n: i32 = 1;
             for c in captures {
                 let mut new_board = board.make_move(c);
                 if !new_board.is_legal(move_gen) {
                     continue;
                 }
-                let (mut score, nn) = q_search_consistent_side_to_move_for_final_eval(&mut new_board, move_gen, pesto, -beta, -alpha, !eval_after_even_moves, verbose);
+                let (mut score, nodes) = q_search_consistent_side_to_move_for_final_eval(&mut new_board, move_gen, pesto, -beta, -alpha, !eval_after_even_moves, verbose);
                 score = -score;
                 println!("Capture eval: {}", score);
-                nodes += nn;
+                n += nodes;
                 if score > alpha {
                     alpha = score;
                     if score >= beta {
-                        return (beta, nodes);
+                        return (beta, n);
                     }
                 }
             }
-            (alpha, nodes)
+            (alpha, n)
         }
     } else {
         // Other side simply plays best move
         let (mut captures, moves) = move_gen.gen_pseudo_legal_moves_with_evals(board, &pesto);
-        let mut nodes: i32 = 1;
+        let mut n: i32 = 1;
         captures.extend(moves);
         for c in captures {
             let mut new_board = board.make_move(c);
             if !new_board.is_legal(move_gen) {
                 continue;
             }
-            let (mut score, nn) = q_search_consistent_side_to_move_for_final_eval(&mut new_board, move_gen, pesto, -beta, -alpha, !eval_after_even_moves, verbose);
+            let (mut score, nodes) = q_search_consistent_side_to_move_for_final_eval(&mut new_board, move_gen, pesto, -beta, -alpha, !eval_after_even_moves, verbose);
             score = -score;
             if verbose {
                 println!("Other side eval: {}", score);
             }
-            nodes += nn;
+            n += nodes;
             if score > alpha {
                 alpha = score;
             }
@@ -321,7 +323,7 @@ fn q_search_consistent_side_to_move_for_final_eval(board: &mut Bitboard, move_ge
                 break;
             }
         }
-        (alpha, nodes)
+        (alpha, n)
     }
 }
 
