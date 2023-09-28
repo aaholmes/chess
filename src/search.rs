@@ -338,7 +338,7 @@ fn q_search_consistent_side_to_move_for_final_eval(board: &mut Bitboard, move_ge
 // This is an iterative deepening, alpha-beta search, where alpha-beta is just used for the side to move to avoid getting mated,
 // and the iterative deepening stops as soon as a forced mate is found
 // That way, we first find mate in 1, then mate in 2, etc
-pub fn mate_search(board: &mut Bitboard, move_gen: &MoveGen, max_depth: i32, verbose: bool) -> (i32, Move, i32) {
+pub fn mate_search(board: &Bitboard, move_gen: &MoveGen, max_depth: i32, verbose: bool) -> (i32, Move, i32) {
     let mut eval: i32 = 0;
     let mut best_move: Move = Move::null();
     let mut n: i32 = 0;

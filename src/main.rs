@@ -1,22 +1,32 @@
+mod agent;
+use crate::agent::{Agent, SimpleAgent};
 mod bitboard;
+use crate::bitboard::{Bitboard, sq_ind_to_algebraic};
 mod bits;
 mod eval;
-
-mod make_move;
+use crate::eval::PestoEval;
 mod gen_moves;
 use gen_moves::MoveGen;
-use crate::bitboard::{Bitboard, sq_ind_to_algebraic};
 mod magic_constants;
-
-mod utils;
+mod make_move;
 mod search;
-use crate::search::mate_search;
+mod utils;
 
 fn main() {
-    // Demonstrates finding forced mate in 2 (from a famous game: Morphy vs. the Duke and the Count, 1858)
     let move_gen = MoveGen::new();
+    let pesto = PestoEval::new();
+    let simple_agent = SimpleAgent::new(5, 2, true, &move_gen, &pesto);
+
+    // Play a move from starting position
+    let mut board = Bitboard::new();
+    board.print();
+    let m = simple_agent.get_move(&mut board);
+    println!("Move: {}{}", sq_ind_to_algebraic(m.from), sq_ind_to_algebraic(m.to));
+    println!("\n---\n");
+
+    // Find forced mate in 2 (from a famous game: Morphy vs. the Duke and the Count, 1858)
     let mut board = Bitboard::new_from_fen("4kb1r/p2n1ppp/4q3/4p1B1/4P3/1Q6/PPP2PPP/2KR4 w k - 1 0");
     board.print();
-    let (eval, best_move, nodes) = mate_search(&mut board, &move_gen, 3, true);
-    println!("Eval: {} Best move: {}{}, Nodes: {}", eval, sq_ind_to_algebraic(best_move.from), sq_ind_to_algebraic(best_move.to), nodes);
+    let m = simple_agent.get_move(&mut board);
+    println!("Move: {}{}", sq_ind_to_algebraic(m.from), sq_ind_to_algebraic(m.to));
 }
