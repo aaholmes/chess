@@ -1,11 +1,11 @@
 mod agent;
-use crate::agent::{Agent, SimpleAgent};
+use agent::{Agent, SimpleAgent};
 mod arena;
 use arena::Arena;
 mod bitboard;
 mod bits;
 mod eval;
-use crate::eval::PestoEval;
+use eval::PestoEval;
 mod gen_moves;
 use gen_moves::MoveGen;
 mod magic_constants;
