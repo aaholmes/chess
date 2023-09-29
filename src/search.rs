@@ -289,7 +289,9 @@ fn q_search_consistent_side_to_move_for_final_eval(board: &mut Bitboard, move_ge
                 }
                 let (mut score, nodes) = q_search_consistent_side_to_move_for_final_eval(&mut new_board, move_gen, pesto, -beta, -alpha, !eval_after_even_moves, verbose);
                 score = -score;
-                println!("Capture eval: {}", score);
+                if verbose {
+                    println!("Capture eval: {}", score);
+                }
                 n += nodes;
                 if score > alpha {
                     alpha = score;
