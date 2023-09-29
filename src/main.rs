@@ -19,6 +19,7 @@ fn main() {
     let pesto = PestoEval::new();
     let white = SimpleAgent::new(5, 2, false, &move_gen, &pesto);
     let black = SimpleAgent::new(5, 2, false, &move_gen, &pesto);
-    let arena = Arena::new(&white, &black, 10);
+    let mut arena = Arena::new(&white, &black, 10);
     arena.play_game();
+    arena.board.print();
 }

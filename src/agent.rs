@@ -34,15 +34,11 @@ impl Agent for SimpleAgent<'_> {
     fn get_move(&self, board: &mut Bitboard) -> Move {
         let (eval, m, nodes) = mate_search(board, self.move_gen, self.mate_search_depth, self.verbose);
         if eval == 1000000 {
-            if self.verbose {
-                println!("Found checkmate after searching {} nodes!", nodes);
-            }
+            println!("Found checkmate after searching {} nodes!", nodes);
             return m;
         }
         let (eval, m, n) = aspiration_window_ab_search(board, self.move_gen, self.pesto, self.ab_search_depth, self.verbose);
-        if self.verbose {
-            println!("Aspiration window search searched another {} nodes ({} total)! Eval: {}", n, nodes + n, eval);
-        }
+        println!("Mate search searched {} nodes, aspiration window search searched another {} nodes ({} total)! Eval: {}", nodes, n, nodes + n, eval);
         m
     }
 }
