@@ -3,7 +3,6 @@ use crate::agent::{Agent, SimpleAgent};
 mod arena;
 use arena::Arena;
 mod bitboard;
-use crate::bitboard::{Bitboard, sq_ind_to_algebraic};
 mod bits;
 mod eval;
 use crate::eval::PestoEval;
