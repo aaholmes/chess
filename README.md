@@ -1,6 +1,6 @@
 # Kingfisher
-![kingfisher_logo](https://github.com/aaholmes/chess/assets/4913443/059cd779-912b-439b-8eee-e4f513c25b01)
 
+<img width="1038" alt="Screenshot 2023-08-24 at 1 44 31 PM" src="https://github.com/aaholmes/chess/assets/4913443/ceab66cf-67c8-4685-bd28-d454c38ce756">
 
 The goal is to make a reasonably good chess engine inspired by
 1. The book "Neural Networks for Chess" by Dominik Klein
