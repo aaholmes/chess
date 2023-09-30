@@ -11,6 +11,7 @@ use gen_moves::MoveGen;
 mod magic_constants;
 mod make_move;
 mod search;
+mod transposition;
 mod utils;
 
 fn main() {
