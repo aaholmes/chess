@@ -5,6 +5,7 @@ use std::hash::Hash;
 use crate::bitboard::Bitboard;
 use crate::gen_moves::Move;
 
+#[derive(PartialEq)]
 struct TranspositionEntry {
     depth: i32,
     score: i32,

@@ -20,7 +20,7 @@ pub const OCC: usize = 14; // All occupied squares
 
 // Define the bitboard data type.
 // We will use a 64-bit unsigned integer to represent the bitboard for each piece.
-#[derive(Clone)]
+#[derive(Clone, Eq, PartialEq)]
 pub struct Bitboard {
     pub game_result: Option<i32>, // None = in progress, 1 = white wins, -1 = black wins, 0 = draw
     pub w_to_move: bool,
