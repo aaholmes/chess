@@ -588,7 +588,7 @@ impl MoveGen {
     pub fn gen_pseudo_legal_moves(&self, board: &Bitboard) -> (Vec<Move>, Vec<Move>) {
         // Generate all pseudo-legal moves for the current position, i.e., these moves may move into check.
         // Elsewhere we need to check for legality and perform move ordering.
-        // Returns a vector of captures and a vector of non-captures, both in the form tuples (from_sq_ind, to_sq_ind, promotion).
+        // Returns a vector of captures and a vector of non-captures.
         // Includes promotions as captures here
         let (mut captures, mut promotions, mut moves) = self.gen_pawn_moves(board);
         let (mut captures_knights, mut moves_knights) = self.gen_knight_moves(board);
@@ -613,7 +613,7 @@ impl MoveGen {
     pub fn gen_pseudo_legal_moves_with_evals(&self, board: &mut Bitboard, pesto: &PestoEval) -> (Vec<Move>, Vec<Move>) {
         // Generate all pseudo-legal moves for the current position, i.e., these moves may move into check.
         // Elsewhere we need to check for legality and perform move ordering.
-        // Returns a vector of captures and a vector of non-captures, both in the form tuples (from_sq_ind, to_sq_ind, promotion).
+        // Returns a vector of captures and a vector of non-captures.
         // Includes promotions as captures here
         let (mut captures, mut promotions, mut moves) = self.gen_pawn_moves(board);
         let (mut captures_knights, mut moves_knights) = self.gen_knight_moves(board);
@@ -677,7 +677,7 @@ impl MoveGen {
 
     fn gen_pawn_moves(&self, board: &Bitboard) -> (Vec<Move>, Vec<Move>, Vec<Move>) {
         // Generate all possible pawn moves for the current position.
-        // Returns a vector of captures and a vector of non-captures, both in the form tuples (from_sq_ind, to_sq_ind, None).
+        // Returns a vector of captures and a vector of non-captures.
         // Treats promotions as captures.
         // Lists promotions in the following order: queen, rook, knight, bishop, since bishop promotions are very rare.
         let mut moves: Vec<Move> = Vec::new();
@@ -751,9 +751,9 @@ impl MoveGen {
 
     fn gen_knight_moves(&self, board: &Bitboard) -> (Vec<Move>, Vec<Move>) {
         // Generate all possible knight moves for the current position.
-        // Returns a vector of captures and a vector of non-captures, both in the form tuples (from_sq_ind, to_sq_ind, None).
-        let mut moves: Vec<Move> = Vec::new();
-        let mut captures: Vec<Move> = Vec::new();
+        // Returns a vector of captures and a vector of non-captures.
+        let mut moves: Vec<Move> = Vec::with_capacity(16);
+        let mut captures: Vec<Move> = Vec::with_capacity(16);
         if board.w_to_move {
             // White to move
             for from_sq_ind in bits(&board.pieces[WN]) {
@@ -783,9 +783,9 @@ impl MoveGen {
     fn gen_king_moves(&self, board: &Bitboard) -> (Vec<Move>, Vec<Move>) {
         // Generate all possible king moves for the current position.
         // For castling, checks whether in check and whether the king moves through check.
-        // Returns a vector of captures and a vector of non-captures, both in the form tuples (from_sq_ind, to_sq_ind, None).
-        let mut moves: Vec<Move> = Vec::new();
-        let mut captures: Vec<Move> = Vec::new();
+        // Returns a vector of captures and a vector of non-captures.
+        let mut moves: Vec<Move> = Vec::with_capacity(10);
+        let mut captures: Vec<Move> = Vec::with_capacity(8);
         if board.w_to_move {
             // White to move
             if board.w_castle_k {
@@ -838,7 +838,7 @@ impl MoveGen {
 
     fn gen_rook_moves(&self, board: &Bitboard) -> (Vec<Move>, Vec<Move>) {
         // Generate all possible rook moves for the current position.
-        // Returns a vector of captures and a vector of non-captures, both in the form tuples (from_sq_ind, to_sq_ind, None).
+        // Returns a vector of captures and a vector of non-captures.
         // Uses magic bitboards.
         let mut moves: Vec<Move> = Vec::new();
         let mut captures: Vec<Move> = Vec::new();
@@ -922,7 +922,7 @@ impl MoveGen {
 
     fn gen_bishop_moves(&self, board: &Bitboard) -> (Vec<Move>, Vec<Move>) {
         // Generate all possible bishop moves for the current position.
-        // Returns a vector of captures and a vector of non-captures, both in the form tuples (from_sq_ind, to_sq_ind, None).
+        // Returns a vector of captures and a vector of non-captures.
         // Uses magic bitboards.
         let mut moves: Vec<Move> = Vec::new();
         let mut captures: Vec<Move> = Vec::new();
@@ -978,7 +978,7 @@ impl MoveGen {
 
     fn gen_queen_moves(&self, board: &Bitboard) -> (Vec<Move>, Vec<Move>) {
         // Generate all possible queen moves for the current position.
-        // Returns a vector of captures and a vector of non-captures, both in the form tuples (from_sq_ind, to_sq_ind, None).
+        // Returns a vector of captures and a vector of non-captures.
         // Uses magic bitboards.
         let mut moves: Vec<Move> = Vec::new();
         let mut captures: Vec<Move> = Vec::new();

@@ -18,9 +18,9 @@ struct TranspositionTable {
 
 impl TranspositionTable {
     pub fn check_table(&self, board: &Bitboard, depth: i32) -> Option<&TranspositionEntry> {
-        // Checks the table for a given board position and search depth
-        // If it exists, returns a reference to the entry
-        // Else, returns None
+        // Check the table for a given board position and search depth
+        // If it exists, return a reference to the entry
+        // Else, return None
         let out = self.table.get(board);
         if out == None {
             return None;
