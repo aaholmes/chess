@@ -1,3 +1,8 @@
+//! Defines the Move struct and related methods for representing chess moves.
+//!
+//! This module provides the core Move type used throughout the chess engine
+//! to represent and manipulate chess moves.
+
 /// Represents a chess move.
 ///
 /// This struct contains information about the source square, destination square,
@@ -42,7 +47,7 @@ impl Move {
     ///
     /// # Returns
     ///
-    /// A `Move` set to 0
+    /// A `Move` instance representing a null move, with `from` and `to` set to 0
     /// and `promotion` set to `None`.
     pub fn null() -> Move {
         // Null move

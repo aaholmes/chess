@@ -1,3 +1,8 @@
+//! Magic bitboard implementation for chess move generation.
+//!
+//! This module provides functions for initializing and using magic bitboards,
+//! which are an efficient method for generating sliding piece moves in chess.
+
 // Generate all possible moves for a given position
 // We divide it up into two functions: one for generating moves for a single piece, and one for generating moves for all pieces.
 // The latter will call the former for each piece.
@@ -100,6 +105,15 @@ pub fn find_magic_numbers() -> ([u64; 64], [u64; 64]) {
     (b_magics, r_magics)
 }
 
+/// Initializes king moves for a given square.
+///
+/// # Arguments
+///
+/// * `from_sq_ind` - The square index (0-63) of the king.
+///
+/// # Returns
+///
+/// A vector of usize representing possible king move destinations.
 pub fn init_king_moves(from_sq_ind: usize) -> Vec<usize> {
     // Initialize the king moves for a given square, ignoring castling
     let from_bit: u64 = sq_ind_to_bit(from_sq_ind);
@@ -131,6 +145,15 @@ pub fn init_king_moves(from_sq_ind: usize) -> Vec<usize> {
     out
 }
 
+/// Initializes knight moves for a given square.
+///
+/// # Arguments
+///
+/// * `from_sq_ind` - The square index (0-63) of the knight.
+///
+/// # Returns
+///
+/// A vector of usize representing possible knight move destinations.
 pub fn init_knight_moves(from_sq_ind: usize) -> Vec<usize> {
     // Initialize the knight moves a given square.
     let from_bit: u64 = sq_ind_to_bit(from_sq_ind);
@@ -162,6 +185,19 @@ pub fn init_knight_moves(from_sq_ind: usize) -> Vec<usize> {
     out
 }
 
+/// Initializes pawn captures and promotions for a given square.
+///
+/// # Arguments
+///
+/// * `from_sq_ind` - The square index (0-63) of the pawn.
+///
+/// # Returns
+///
+/// A tuple containing four vectors of usize:
+/// - White pawn captures
+/// - White pawn promotions
+/// - Black pawn captures
+/// - Black pawn promotions
 pub fn init_pawn_captures_promotions(from_sq_ind: usize) -> (Vec<usize>, Vec<usize>, Vec<usize>, Vec<usize>) {
     // Initialize the pawn captures and promotions for a given square.
     // Separate for white and black.
@@ -193,6 +229,17 @@ pub fn init_pawn_captures_promotions(from_sq_ind: usize) -> (Vec<usize>, Vec<usi
     (w_cap, w_prom, b_cap, b_prom)
 }
 
+/// Initializes pawn moves for a given square.
+///
+/// # Arguments
+///
+/// * `from_sq_ind` - The square index (0-63) of the pawn.
+///
+/// # Returns
+///
+/// A tuple containing two vectors of usize:
+/// - The first vector represents white pawn moves.
+/// - The second vector represents black pawn moves.
 pub fn init_pawn_moves(from_sq_ind: usize) -> (Vec<usize>, Vec<usize>) {
     // Initialize the pawn moves for a given square.
     // Separate for white and black.
@@ -212,10 +259,18 @@ pub fn init_pawn_moves(from_sq_ind: usize) -> (Vec<usize>, Vec<usize>) {
     (white, black)
 }
 
+/// Initializes the magic bitboards for bishop moves.
+///
+/// # Arguments
+///
+/// * `b_magics` - An array of 64 pre-computed magic numbers for bishops.
+///
+/// # Returns
+///
+/// A tuple containing:
+/// - A vector of vectors of tuples, where each tuple contains two vectors of usize (for captures and moves).
+/// - A vector of vectors of u64 (bitboards).
 pub fn init_bishop_moves(b_magics: [u64; 64]) -> (Vec<Vec<(Vec<usize>, Vec<usize>)>>, Vec<Vec<u64>>) {
-    // Initialize the bishop moves for each square and blocker combination.
-    // Uses magic bitboards.
-    // Returns, for each square and key, both vectors of captures and moves, as well as a bitboard of potential captures (for detecting check).
     let mut out1: Vec<Vec<(Vec<usize>, Vec<usize>)>> = Vec::new();
     let mut out2: Vec<Vec<u64>> = Vec::new();
     let mut blockers: u64;
@@ -253,10 +308,18 @@ pub fn init_bishop_moves(b_magics: [u64; 64]) -> (Vec<Vec<(Vec<usize>, Vec<usize
     (out1, out2)
 }
 
+/// Initializes the magic bitboards for rook moves.
+///
+/// # Arguments
+///
+/// * `r_magics` - An array of 64 pre-computed magic numbers for rooks.
+///
+/// # Returns
+///
+/// A tuple containing:
+/// - A vector of vectors of tuples, where each tuple contains two vectors of usize (for captures and moves).
+/// - A vector of vectors of u64 (bitboards).
 pub fn init_rook_moves(r_magics: [u64; 64]) -> (Vec<Vec<(Vec<usize>, Vec<usize>)>>, Vec<Vec<u64>>) {
-    // Initialize the rook moves for each square and blocker combination.
-    // Uses magic bitboards.
-    // Returns, for each square and key, both vectors of captures and moves, as well as a bitboard of potential captures (for detecting check).
     let mut out1: Vec<Vec<(Vec<usize>, Vec<usize>)>> = Vec::new();
     let mut out2: Vec<Vec<u64>> = Vec::new();
     let mut blockers: u64;
@@ -294,6 +357,18 @@ pub fn init_rook_moves(r_magics: [u64; 64]) -> (Vec<Vec<(Vec<usize>, Vec<usize>)
     (out1, out2)
 }
 
+/// Generates rook attacks for a given square and blocking bitboard.
+///
+/// # Arguments
+///
+/// * `sq` - The square index (0-63) of the rook.
+/// * `block` - A bitboard representing the blocking pieces.
+///
+/// # Returns
+///
+/// A tuple containing two vectors of usize:
+/// - The first vector represents capture squares.
+/// - The second vector represents move squares.
 pub fn rook_attacks(sq: usize, block: u64) -> (Vec<usize>, Vec<usize>) {
     // Return the attacks for a rook on a given square, given a blocking mask.
     // Return the captures and moves separately
@@ -352,6 +427,18 @@ pub fn rook_attacks(sq: usize, block: u64) -> (Vec<usize>, Vec<usize>) {
     (captures, moves)
 }
 
+/// Generates bishop attacks for a given square and blocking bitboard.
+///
+/// # Arguments
+///
+/// * `sq` - The square index (0-63) of the bishop.
+/// * `block` - A bitboard representing the blocking pieces.
+///
+/// # Returns
+///
+/// A tuple containing two vectors of usize:
+/// - The first vector represents capture squares.
+/// - The second vector represents move squares.
 pub fn bishop_attacks(sq: usize, block: u64) -> (Vec<usize>, Vec<usize>) {
     // Return the attacks for a bishop on a given square, given a blocking mask.
     // Return the captures and moves separately
@@ -427,6 +514,17 @@ pub fn bishop_attacks(sq: usize, block: u64) -> (Vec<usize>, Vec<usize>) {
     (captures, moves)
 }
 
+/// Appends promotion moves to a vector of moves.
+///
+/// # Arguments
+///
+/// * `moves` - A mutable reference to a vector of Move structs.
+/// * `from` - The starting square of the pawn.
+/// * `to` - The destination square of the pawn.
+///
+/// # Returns
+///
+/// The number of promotion moves added.
 pub fn append_promotions(promotions: &mut Vec<Move>, from_sq_ind: usize, to_sq_ind: &usize, w_to_move: bool) {
     if w_to_move {
         promotions.push(Move::new(from_sq_ind, *to_sq_ind, Some(WQ)));

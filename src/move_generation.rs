@@ -1,4 +1,17 @@
-// Struct representing the move generator, that generates pseudo-legal moves
+//! Move generation module.
+//!
+//! This module provides functions for generating pseudo-legal moves for a given
+//! chess position. The moves are generated using a combination of bitboards and
+//! precomputed tables.
+//!
+//! The main entry point for move generation is the `gen_pseudo_legal_moves`
+//! function, which generates all pseudo-legal moves for a given position.
+//!
+//! The `gen_pseudo_legal_captures` function generates only the capture moves.
+//!
+//! The `gen_pawn_moves`, `gen_knight_moves`, `gen_bishop_moves`, `gen_rook_moves`,
+//! `gen_queen_moves`, and `gen_king_moves` functions generate moves for specific
+//! piece types.
 
 use crate::move_types::Move;
 use crate::bitboard::{Bitboard, sq_ind_to_bit, WP, BP, WN, BN, WB, BB, WR, BR, WQ, BQ, WK, BK, WOCC, BOCC, OCC};
@@ -8,28 +21,57 @@ use crate::magic_bitboard::{init_pawn_moves, init_knight_moves, init_bishop_move
 
 use crate::eval::PestoEval;
 
+/// Represents the move generator, which generates pseudo-legal moves.
+///
+/// This struct contains precomputed tables and bitboards used for move generation.
 pub struct MoveGen {
+    /// Precomputed tables for pawn captures.
     pub wp_captures: Vec<Vec<usize>>,
+    /// Precomputed tables for pawn captures.
     pub bp_captures: Vec<Vec<usize>>,
+    /// Bitboards for pawn captures.
     pub wp_capture_bitboard: [u64; 64],
+    /// Bitboards for pawn captures.
     pub bp_capture_bitboard: [u64; 64],
+    /// Precomputed tables for pawn promotions.
     wp_promotions: Vec<Vec<usize>>,
+    /// Precomputed tables for pawn promotions.
     bp_promotions: Vec<Vec<usize>>,
+    /// Precomputed tables for knight moves.
     pub n_moves: Vec<Vec<usize>>,
+    /// Precomputed tables for king moves.
     pub k_moves: Vec<Vec<usize>>,
+    /// Bitboards for knight moves.
     pub n_move_bitboard: [u64; 64],
+    /// Bitboards for king moves.
     pub k_move_bitboard: [u64; 64],
+    /// Precomputed tables for pawn moves.
     wp_moves: Vec<Vec<usize>>,
+    /// Precomputed tables for pawn moves.
     bp_moves: Vec<Vec<usize>>,
+    /// Precomputed tables for rook moves.
     r_moves: Vec<Vec<(Vec<usize>, Vec<usize>)>>,
+    /// Precomputed tables for bishop moves.
     b_moves: Vec<Vec<(Vec<usize>, Vec<usize>)>>,
+    /// Bitboards for rook moves.
     r_move_bitboard: Vec<Vec<u64>>,
+    /// Bitboards for bishop moves.
     b_move_bitboard: Vec<Vec<u64>>,
+    /// Magic numbers for bishop moves.
     b_magics: [u64; 64],
+    /// Magic numbers for rook moves.
     r_magics: [u64; 64],
 }
 
 impl MoveGen {
+    /// Creates a new `MoveGen` instance.
+    ///
+    /// This function initializes the precomputed tables and bitboards used for
+    /// move generation.
+    ///
+    /// # Returns
+    ///
+    /// A new `MoveGen` instance.
     pub fn new() -> MoveGen {
         // Initialize the move generator by creating the iterators for Pawn, Knight, and King moves.
         let mut wp_captures: Vec<Vec<usize>> = Vec::new();
@@ -125,6 +167,18 @@ impl MoveGen {
         move_gen
     }
 
+    /// Generates all pseudo-legal moves for a given position.
+    ///
+    /// This function generates all pseudo-legal moves for the given position,
+    /// including captures and non-captures.
+    ///
+    /// # Arguments
+    ///
+    /// * `board` - The current chess position.
+    ///
+    /// # Returns
+    ///
+    /// A tuple containing the capture moves and non-capture moves.
     pub fn gen_pseudo_legal_moves(&self, board: &Bitboard) -> (Vec<Move>, Vec<Move>) {
         // Generate all pseudo-legal moves for the current position, i.e., these moves may move into check.
         // Elsewhere we need to check for legality and perform move ordering.
@@ -182,6 +236,18 @@ impl MoveGen {
 
         (captures, moves)
     }
+
+    /// Generates only the capture moves for a given position.
+    ///
+    /// This function generates only the capture moves for the given position.
+    ///
+    /// # Arguments
+    ///
+    /// * `board` - The current chess position.
+    ///
+    /// # Returns
+    ///
+    /// A vector of capture moves.
     pub fn gen_pseudo_legal_captures(&self, board: &Bitboard) -> Vec<Move> {
         // Same as above, but only generate captures
         let (mut captures, mut promotions, _moves) = self.gen_pawn_moves(board);
@@ -215,6 +281,19 @@ impl MoveGen {
         10 * victim as i32 - attacker as i32
     }
 
+    /// Generates moves for a pawn on a specific square.
+    ///
+    /// This function generates moves for a pawn on the given square, including
+    /// captures and non-captures.
+    ///
+    /// # Arguments
+    ///
+    /// * `board` - The current chess position.
+    /// * `from_sq_ind` - The index of the square the pawn is on (0-63).
+    ///
+    /// # Returns
+    ///
+    /// A tuple containing the capture moves and non-capture moves for the pawn.
     fn gen_pawn_moves(&self, board: &Bitboard) -> (Vec<Move>, Vec<Move>, Vec<Move>) {
         // Generate all possible pawn moves for the current position.
         // Returns a vector of captures and a vector of non-captures.
@@ -289,6 +368,18 @@ impl MoveGen {
         (captures, promotions, moves)
     }
 
+    /// Generates moves for a knight on a specific square.
+    ///
+    /// This function generates moves for a knight on the given square, including
+    /// captures and non-captures.
+    ///
+    /// # Arguments
+    ///
+    /// * `board` - The current chess position.
+    ///
+    /// # Returns
+    ///
+    /// A tuple containing the capture moves and non-capture moves for the knight.
     fn gen_knight_moves(&self, board: &Bitboard) -> (Vec<Move>, Vec<Move>) {
         // Generate all possible knight moves for the current position.
         // Returns a vector of captures and a vector of non-captures.
@@ -320,6 +411,18 @@ impl MoveGen {
         (captures, moves)
     }
 
+    /// Generates moves for a king on a specific square.
+    ///
+    /// This function generates moves for a king on the given square, including
+    /// captures and non-captures.
+    ///
+    /// # Arguments
+    ///
+    /// * `board` - The current chess position.
+    ///
+    /// # Returns
+    ///
+    /// A tuple containing the capture moves and non-capture moves for the king.
     fn gen_king_moves(&self, board: &Bitboard) -> (Vec<Move>, Vec<Move>) {
         // Generate all possible king moves for the current position.
         // For castling, checks whether in check and whether the king moves through check.
@@ -376,6 +479,18 @@ impl MoveGen {
         (captures, moves)
     }
 
+    /// Generates moves for a rook on a specific square.
+    ///
+    /// This function generates moves for a rook on the given square, including
+    /// captures and non-captures.
+    ///
+    /// # Arguments
+    ///
+    /// * `board` - The current chess position.
+    ///
+    /// # Returns
+    ///
+    /// A tuple containing the capture moves and non-capture moves for the rook.
     fn gen_rook_moves(&self, board: &Bitboard) -> (Vec<Move>, Vec<Move>) {
         // Generate all possible rook moves for the current position.
         // Returns a vector of captures and a vector of non-captures.
@@ -460,6 +575,18 @@ impl MoveGen {
         self.r_move_bitboard[from_sq_ind][key]
     }
 
+    /// Generates moves for a bishop on a specific square.
+    ///
+    /// This function generates moves for a bishop on the given square, including
+    /// captures and non-captures.
+    ///
+    /// # Arguments
+    ///
+    /// * `board` - The current chess position.
+    ///
+    /// # Returns
+    ///
+    /// A tuple containing the capture moves and non-capture moves for the bishop.
     fn gen_bishop_moves(&self, board: &Bitboard) -> (Vec<Move>, Vec<Move>) {
         // Generate all possible bishop moves for the current position.
         // Returns a vector of captures and a vector of non-captures.
@@ -516,6 +643,18 @@ impl MoveGen {
         (captures, moves)
     }
 
+    /// Generates moves for a queen on a specific square.
+    ///
+    /// This function generates moves for a queen on the given square, including
+    /// captures and non-captures.
+    ///
+    /// # Arguments
+    ///
+    /// * `board` - The current chess position.
+    ///
+    /// # Returns
+    ///
+    /// A tuple containing the capture moves and non-capture moves for the queen.
     fn gen_queen_moves(&self, board: &Bitboard) -> (Vec<Move>, Vec<Move>) {
         // Generate all possible queen moves for the current position.
         // Returns a vector of captures and a vector of non-captures.
