@@ -1,10 +1,18 @@
-// Magic numbers found so that every blocker configuration can be mapped to a unique index
-// Of course, since only the first blocker in each direction actually blocks, we don't need our
-// magic numbers to distinguish between every possible blocker configuration, but only the first
-// one in each direction. We can also use this fact to allow edges to also contain blockers,
-// but we save these optimizations for a later version.
+//! Magic bitboard constants for efficient move generation.
+//!
+//! This module contains pre-computed constants used for magic bitboard move generation,
+//! a technique that allows for fast sliding piece move generation in chess engines.
+//!
+//! Magic numbers found so that every blocker configuration can be mapped to a unique index.
+//! Of course, since only the first blocker in each direction actually blocks, we don't need our
+//! magic numbers to distinguish between every possible blocker configuration, but only the first
+//! one in each direction. We can also use this fact to allow edges to also contain blockers,
+//! but we save these optimizations for a later version.
 
-// Number of bits in the blockers for each square
+/// Number of bits used in the magic bitboard hash for rooks on each square.
+///
+/// This array specifies how many bits of the magic hash are relevant for each square
+/// when generating rook moves.
 pub const R_BITS: [i32; 64] = [
   12, 11, 11, 11, 11, 11, 11, 12,
   11, 10, 10, 10, 10, 10, 10, 11,
@@ -16,6 +24,10 @@ pub const R_BITS: [i32; 64] = [
   12, 11, 11, 11, 11, 11, 11, 12
 ];
 
+/// Number of bits used in the magic bitboard hash for bishops on each square.
+///
+/// This array specifies how many bits of the magic hash are relevant for each square
+/// when generating bishop moves.
 pub const B_BITS: [i32; 64] = [
   6, 5, 5, 5, 5, 5, 5, 6,
   5, 5, 5, 5, 5, 5, 5, 5,
@@ -27,7 +39,10 @@ pub const B_BITS: [i32; 64] = [
   6, 5, 5, 5, 5, 5, 5, 6
 ];
 
-// Blocker masks for each square
+/// Blocker masks for rook move generation.
+///
+/// These masks represent the squares that can potentially block a rook's movement
+/// from each square on the board, excluding edge squares.
 pub const R_MASKS: [u64; 64] = [
   0x101010101017e,
   0x202020202027c,
@@ -95,6 +110,10 @@ pub const R_MASKS: [u64; 64] = [
   0x7e80808080808000
 ];
 
+/// Blocker masks for bishop move generation.
+///
+/// These masks represent the squares that can potentially block a bishop's movement
+/// from each square on the board, excluding edge squares.
 pub const B_MASKS: [u64; 64] = [
   0x40201008040200,
   0x402010080400,
@@ -162,7 +181,10 @@ pub const B_MASKS: [u64; 64] = [
   0x40201008040200
 ];
 
-// Magic numbers for each square
+/// Magic numbers for rook move generation.
+///
+/// These magic numbers are used to index into a pre-computed table of rook moves.
+/// Each magic number corresponds to a specific square on the chess board.
 pub const R_MAGICS: [u64; 64] = [
   612490855537721344,
   306245187116503042,
@@ -230,6 +252,10 @@ pub const R_MAGICS: [u64; 64] = [
   1157706580421117061
 ];
 
+/// Magic numbers for bishop move generation.
+///
+/// These magic numbers are used to index into a pre-computed table of bishop moves.
+/// Each magic number corresponds to a specific square on the chess board.
 pub const B_MAGICS: [u64; 64] = [
   22540130107654660,
   9224585906554994832,
