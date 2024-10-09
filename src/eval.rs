@@ -13,7 +13,7 @@
 use std::cmp::min;
 use crate::bitboard::{Bitboard, flip_sq_ind_vertically, WP, BP, WK, BK, WN, BN, WR, BR, WQ, BQ, WOCC, BOCC};
 use crate::bits::popcnt;
-use crate::gen_moves::MoveGen;
+use crate::move_generation::MoveGen;
 
 /// Struct representing the Pesto evaluation function
 pub struct PestoEval {

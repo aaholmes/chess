@@ -3,7 +3,8 @@
 //! This module implements the negamax search algorithm for chess position evaluation.
 
 use crate::bitboard::Bitboard;
-use crate::gen_moves::{Move, MoveGen};
+use crate::move_types::Move;
+use crate::move_generation::MoveGen;
 use crate::eval::PestoEval;
 use crate::utils::print_move;
 

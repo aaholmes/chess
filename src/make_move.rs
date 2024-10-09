@@ -3,7 +3,7 @@
 //! This module provides functionality to apply and undo moves on the Bitboard representation of a chess position.
 
 use crate::bitboard::{Bitboard, sq_ind_to_bit, WP, BP, WN, BN, WB, BB, WR, BR, WQ, BQ, WK, BK, WOCC, BOCC, OCC};
-use crate::gen_moves::Move;
+use crate::move_types::Move;
 
 impl Bitboard {
     /// Makes a move on the board, returning a new board with the move applied

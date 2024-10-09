@@ -6,7 +6,7 @@
 use std::collections::HashMap;
 use std::hash::Hash;
 use crate::bitboard::Bitboard;
-use crate::gen_moves::Move;
+use crate::move_types::Move;
 
 /// Represents an entry in the transposition table.
 #[derive(PartialEq)]

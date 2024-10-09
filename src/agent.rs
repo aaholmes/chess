@@ -2,7 +2,8 @@
 
 use crate::bitboard::Bitboard;
 use crate::eval::PestoEval;
-use crate::gen_moves::{Move, MoveGen};
+use crate::move_types::Move;
+use crate::move_generation::MoveGen;
 use crate::search::{aspiration_window_ab_search, mate_search};
 
 /// Trait defining the interface for chess agents.

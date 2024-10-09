@@ -1,6 +1,6 @@
 //! This module defines the Bitboard structure and associated functions for chess board representation.
 
-use crate::gen_moves::MoveGen;
+use crate::move_generation::MoveGen;
 
 /// Piece labels for indexing the bitboard vector
 pub const WP: usize = 0;  /// White Pawn

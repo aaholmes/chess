@@ -4,7 +4,8 @@
 //! including functions for printing bitboards, moves, and performing performance tests.
 
 use crate::bitboard::{Bitboard, coords_to_sq_ind, sq_ind_to_algebraic, sq_ind_to_bit};
-use crate::gen_moves::{Move, MoveGen};
+use crate::move_types::Move;
+use crate::move_generation::MoveGen;
 
 /// Print a u64 as an 8x8 chess board representation
 ///
