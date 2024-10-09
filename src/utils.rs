@@ -13,7 +13,7 @@ use crate::gen_moves::{Move, MoveGen};
 ///
 /// # Arguments
 ///
-/// * [bits](cci:4://file:///Users/adam/chess/engine/src/gen_moves.rs:17:0-61:0) - A u64 representing a bitboard
+/// * `bits` - A u64 representing a bitboard
 pub fn print_bits(bits: u64) {
     println!("  +-----------------+");
     for rank in (0..8).rev() {
@@ -70,7 +70,7 @@ pub fn print_move(the_move: &Move) -> String {
 ///
 /// # Arguments
 ///
-/// * [board](cci:4://file:///Users/adam/chess/engine/README.md:58:0-91:0) - The starting Bitboard position
+/// * `board` - The starting Bitboard position
 /// * `move_gen` - A reference to the MoveGen
 /// * `depth` - The depth to search
 /// * `verbose` - Whether to print verbose output
