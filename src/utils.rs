@@ -1,9 +1,19 @@
-// Utility functions
+//! Utility functions for the chess engine
+//!
+//! This module contains various utility functions used throughout the chess engine,
+//! including functions for printing bitboards, moves, and performing performance tests.
 
 use crate::bitboard::{Bitboard, coords_to_sq_ind, sq_ind_to_algebraic, sq_ind_to_bit};
 use crate::gen_moves::{Move, MoveGen};
 
-// Print u64 as an 8x8 board
+/// Print a u64 as an 8x8 chess board representation
+///
+/// This function takes a 64-bit integer representing a bitboard and prints it
+/// as an 8x8 chess board, where 'X' represents a set bit and '.' represents an unset bit.
+///
+/// # Arguments
+///
+/// * [bits](cci:4://file:///Users/adam/chess/engine/src/gen_moves.rs:17:0-61:0) - A u64 representing a bitboard
 pub fn print_bits(bits: u64) {
     println!("  +-----------------+");
     for rank in (0..8).rev() {
@@ -23,7 +33,18 @@ pub fn print_bits(bits: u64) {
     println!("    a b c d e f g h");
 }
 
-// Print a move in algebraic notation
+/// Convert a Move to a string in algebraic notation
+///
+/// This function takes a Move and returns a String representing the move
+/// in algebraic notation (e.g., "e2e4" or "e7e8=Q" for promotions).
+///
+/// # Arguments
+///
+/// * `the_move` - A reference to a Move
+///
+/// # Returns
+///
+/// A String representing the move in algebraic notation
 pub fn print_move(the_move: &Move) -> String {
     let from = sq_ind_to_algebraic(the_move.from);
     let to = sq_ind_to_algebraic(the_move.to);
@@ -41,9 +62,22 @@ pub fn print_move(the_move: &Move) -> String {
     format!("{}{}{}", from, to, promotion)
 }
 
-// Perft - performance test
-// Count the number of nodes in a tree of depth n
-// For debugging only
+/// Perform a perft (performance test) on a given chess position
+///
+/// This function performs a perft test, which counts the number of leaf nodes
+/// in the game tree at a given depth. It's used for debugging and validating
+/// the move generation.
+///
+/// # Arguments
+///
+/// * [board](cci:4://file:///Users/adam/chess/engine/README.md:58:0-91:0) - The starting Bitboard position
+/// * `move_gen` - A reference to the MoveGen
+/// * `depth` - The depth to search
+/// * `verbose` - Whether to print verbose output
+///
+/// # Returns
+///
+/// The number of leaf nodes at the given depth
 pub fn perft(board: Bitboard, move_gen: &MoveGen, depth: u8, verbose: bool) -> u64 {
     let (mut captures, moves) = move_gen.gen_pseudo_legal_moves(&board);
     captures.extend(moves);

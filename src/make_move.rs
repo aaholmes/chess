@@ -1,9 +1,22 @@
-// Make moves
+//! Module for making moves on the chess board
+//!
+//! This module provides functionality to apply and undo moves on the Bitboard representation of a chess position.
 
 use crate::bitboard::{Bitboard, sq_ind_to_bit, WP, BP, WN, BN, WB, BB, WR, BR, WQ, BQ, WK, BK, WOCC, BOCC, OCC};
 use crate::gen_moves::Move;
 
 impl Bitboard {
+    /// Makes a move on the board, returning a new board with the move applied
+    ///
+    /// This method assumes the move is legal and does not perform any legality checks.
+    ///
+    /// # Arguments
+    ///
+    /// * `the_move` - The Move to be applied to the board
+    ///
+    /// # Returns
+    ///
+    /// A new Bitboard representing the position after the move has been made
     pub fn make_move(&self, the_move: Move) -> Bitboard {
         // Make a move, returning a new board.
         // Assumes the move is legal.
@@ -36,7 +49,6 @@ impl Bitboard {
             new_board.halfmove_clock = 0;
         }
 
-
         if from_piece.unwrap() < 2 {
             // En passant
             if new_board.en_passant.is_some() && the_move.to == new_board.en_passant.unwrap() {
@@ -63,13 +75,13 @@ impl Bitboard {
         new_board.pieces[from_piece.unwrap()] ^= from_bit;
         new_board.pieces[from_piece.unwrap()] ^= to_bit;
 
-        // Promotion
-        if the_move.promotion.is_some() {
+        // Handle promotions
+        if let Some(promotion) = the_move.promotion {
             new_board.pieces[from_piece.unwrap()] ^= to_bit;
-            new_board.pieces[the_move.promotion.unwrap()] ^= to_bit;
+            new_board.pieces[promotion] ^= to_bit;
         }
 
-        // Castling, loss of castling rights
+        // Handle castling
         if from_piece.unwrap() == WK {
             // White king
             if the_move.from == 4 && the_move.to == 6 {
@@ -115,6 +127,7 @@ impl Bitboard {
         new_board.pieces[WOCC] = new_board.pieces[WP] | new_board.pieces[WN] | new_board.pieces[WB] | new_board.pieces[WR] | new_board.pieces[WQ] | new_board.pieces[WK];
         new_board.pieces[BOCC] = new_board.pieces[BP] | new_board.pieces[BN] | new_board.pieces[BB] | new_board.pieces[BR] | new_board.pieces[BQ] | new_board.pieces[BK];
         new_board.pieces[OCC] = new_board.pieces[WOCC] | new_board.pieces[BOCC];
+
         new_board
     }
 }

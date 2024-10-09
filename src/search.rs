@@ -1,23 +1,37 @@
-// Alpha-beta negamax search
-
+//! Alpha-beta negamax search module
+//!
+//! This module implements the negamax search algorithm for chess position evaluation.
 
 use crate::bitboard::Bitboard;
 use crate::gen_moves::{Move, MoveGen};
 use crate::eval::PestoEval;
 use crate::utils::print_move;
 
-
+/// Perform negamax search from the given position
+///
+/// # Arguments
+///
+/// * `board` - A mutable reference to the current board state
+/// * `move_gen` - A reference to the move generator
+/// * `pesto` - A reference to the Pesto evaluation function
+/// * `depth` - The depth to search to
+///
+/// # Returns
+///
+/// A tuple containing:
+/// * The evaluation (in centipawns) of the best move
+/// * The best move to play from the current position
+/// * The number of nodes searched
 pub fn negamax_search(board: &mut Bitboard, move_gen: &MoveGen, pesto: &PestoEval, depth: i32) -> (i32, Move, i32) {
-    // Perform negamax search from the given position
-    // Exhaustive search to the given depth
-    // Returns the eval (in centipawns) of the final position, as well as the first move
-    // to play from the current position
-    // Also returns number of nodes searched
     let mut best_eval: i32 = -1000000;
     let mut best_move: Move = Move::null();
     let mut n: i32 = 0;
+    
+    // Generate and combine captures and regular moves
     let (mut captures, moves) = move_gen.gen_pseudo_legal_moves_with_evals(board, pesto);
     captures.extend(moves);
+    
+    // Iterate through all moves
     for m in captures {
         let mut new_board: Bitboard = board.make_move(m);
         if !new_board.is_legal(move_gen) {
@@ -26,28 +40,44 @@ pub fn negamax_search(board: &mut Bitboard, move_gen: &MoveGen, pesto: &PestoEva
         let (mut eval, nodes) = negamax(&mut new_board, move_gen, pesto, depth - 1);
         eval = -eval;
         n += nodes;
+        
+        // Update best move if a better evaluation is found
         if eval > best_eval {
             best_eval = eval;
             best_move = m;
         }
     }
     (best_eval, best_move, n)
-
 }
 
+/// Recursive helper function for negamax search
+///
+/// # Arguments
+///
+/// * `board` - A mutable reference to the current board state
+/// * `move_gen` - A reference to the move generator
+/// * `pesto` - A reference to the Pesto evaluation function
+/// * `depth` - The current depth in the search tree
+///
+/// # Returns
+///
+/// A tuple containing:
+/// * The evaluation (in centipawns) of the best move
+/// * The number of nodes searched
 fn negamax(board: &mut Bitboard, move_gen: &MoveGen, pesto: &PestoEval, depth: i32) -> (i32, i32) {
-    // Perform negamax search from the given position
-    // Exhaustive search to the given depth
-    // Returns the eval (in centipawns) of the final position
-    // Also returns number of nodes searched
     if depth == 0 {
-        // Leaf node
+        // Leaf node: return the board evaluation
         return (-pesto.eval(board), 1);
     }
+    
     let mut best_eval: i32 = -1000000;
     let mut n: i32 = 0;
+    
+    // Generate and combine captures and regular moves
     let (mut captures, moves) = move_gen.gen_pseudo_legal_moves_with_evals(board, pesto);
     captures.extend(moves);
+    
+    // Iterate through all moves
     for m in captures {
         let mut new_board: Bitboard = board.make_move(m);
         if !new_board.is_legal(move_gen) {
@@ -56,23 +86,43 @@ fn negamax(board: &mut Bitboard, move_gen: &MoveGen, pesto: &PestoEval, depth: i
         let (mut eval, nodes) = negamax(&mut new_board, move_gen, pesto, depth - 1);
         eval = -eval;
         n += nodes;
-        if eval > best_eval {
-            best_eval = eval;
-        }
+        
+        // Update best evaluation
+        best_eval = best_eval.max(eval);
     }
+    
     (best_eval, n)
 }
 
+/// Perform alpha-beta search from the given position
+///
+/// This function performs an exhaustive search to the given depth, using alpha-beta pruning
+/// to optimize the search process.
+///
+/// # Arguments
+///
+/// * `board` - A mutable reference to the current board state
+/// * `move_gen` - A reference to the move generator
+/// * `pesto` - A reference to the Pesto evaluation function
+/// * `depth` - The depth to search to
+/// * `alpha_init` - The initial alpha value for alpha-beta pruning
+/// * `beta_init` - The initial beta value for alpha-beta pruning
+/// * `verbose` - A flag indicating whether to print verbose output
+///
+/// # Returns
+///
+/// A tuple containing:
+/// * The evaluation (in centipawns) of the final position
+/// * The best move to play from the current position
+/// * The number of nodes searched
 pub fn alpha_beta_search(board: &mut Bitboard, move_gen: &MoveGen, pesto: &PestoEval, depth: i32, alpha_init: i32, beta_init: i32, verbose: bool) -> (i32, Move, i32) {
-    // Perform alpha-beta search from the given position
-    // Exhaustive search to the given depth
-    // Returns the eval (in centipawns) of the final position, as well as the first move
-    // to play from the current position
-    // Also returns number of nodes searched
+    // Initialize best move and alpha value
     let mut best_move: Move = Move::null();
     let mut alpha: i32 = alpha_init;
     let beta: i32 = beta_init;
     let mut n: i32 = 0;
+
+    // Check for checkmate and stalemate
     if verbose {
         println!("Checking for checkmate and stalemate");
     }
@@ -81,6 +131,8 @@ pub fn alpha_beta_search(board: &mut Bitboard, move_gen: &MoveGen, pesto: &Pesto
         println!("Checkmate and stalemate checked");
         println!("Checkmate: {} Stalemate: {}", checkmate, stalemate);
     }
+
+    // Handle checkmate and stalemate cases
     if checkmate {
         if verbose {
             println!("AB search: Quiescence: Checkmate!");
@@ -92,8 +144,11 @@ pub fn alpha_beta_search(board: &mut Bitboard, move_gen: &MoveGen, pesto: &Pesto
         }
         return (0, best_move, 1);
     }
+
+    // Generate and combine captures and regular moves
     let (mut captures, moves) = move_gen.gen_pseudo_legal_moves_with_evals(board, pesto);
     captures.extend(moves);
+
     for m in captures {
         if verbose {
             println!("Considering move {} at root of search tree", print_move(&m));
@@ -119,6 +174,26 @@ pub fn alpha_beta_search(board: &mut Bitboard, move_gen: &MoveGen, pesto: &Pesto
     (alpha, best_move, n)
 }
 
+/// Recursive helper function for alpha-beta search
+///
+/// This function performs a recursive alpha-beta search to the given depth, using alpha-beta pruning
+/// to optimize the search process.
+///
+/// # Arguments
+///
+/// * `board` - A mutable reference to the current board state
+/// * `move_gen` - A reference to the move generator
+/// * `pesto` - A reference to the Pesto evaluation function
+/// * `depth` - The current depth in the search tree
+/// * `alpha` - The current alpha value for alpha-beta pruning
+/// * `beta` - The current beta value for alpha-beta pruning
+/// * `verbose` - A flag indicating whether to print verbose output
+///
+/// # Returns
+///
+/// A tuple containing:
+/// * The evaluation (in centipawns) of the final position
+/// * The number of nodes searched
 fn alpha_beta(board: &mut Bitboard, move_gen: &MoveGen, pesto: &PestoEval, depth: i32, mut alpha: i32, beta: i32, verbose: bool) -> (i32, i32) {
     // Private recursive function used for alpha-beta search
     // External functions should call alpha_beta_search instead
@@ -140,6 +215,7 @@ fn alpha_beta(board: &mut Bitboard, move_gen: &MoveGen, pesto: &PestoEval, depth
     // TODO: Here, consider best move from previous search first
     let (mut captures, moves) = move_gen.gen_pseudo_legal_moves_with_evals(board, pesto);
     captures.extend(moves);
+
     for m in captures {
         if verbose {
             println!("Considering move {}", print_move(&m));
@@ -164,6 +240,26 @@ fn alpha_beta(board: &mut Bitboard, move_gen: &MoveGen, pesto: &PestoEval, depth
     (alpha, n)
 }
 
+/// Perform iterative deepening alpha-beta search from the given position
+///
+/// This function performs an iterative deepening search, where the search depth is gradually increased
+/// until the maximum depth is reached. At each iteration, the alpha-beta search algorithm is used to
+/// search for the best move.
+///
+/// # Arguments
+///
+/// * `board` - A mutable reference to the current board state
+/// * `move_gen` - A reference to the move generator
+/// * `pesto` - A reference to the Pesto evaluation function
+/// * `max_depth` - The maximum depth to search to
+/// * `verbose` - A flag indicating whether to print verbose output
+///
+/// # Returns
+///
+/// A tuple containing:
+/// * The evaluation (in centipawns) of the final position
+/// * The best move to play from the current position
+/// * The number of nodes searched
 pub fn iterative_deepening_ab_search(board: &mut Bitboard, move_gen: &MoveGen, pesto: &PestoEval, max_depth: i32, verbose: bool) -> (i32, Move, i32) {
     // Perform iterative deepening alpha-beta search from the given position
     // Searches to the given depth
@@ -174,6 +270,8 @@ pub fn iterative_deepening_ab_search(board: &mut Bitboard, move_gen: &MoveGen, p
     let mut best_move: Move = Move::null();
     let mut n: i32 = 0;
     let mut nodes: i32 = 0;
+
+    // Iterate over increasing depths
     for d in 1..max_depth + 1 {
         let depth = 2 * d; // Only even depths, due to the even/odd effect
         (eval, best_move, nodes) = alpha_beta_search(board, move_gen, pesto, depth, -1000000, 1000000, verbose);
@@ -185,6 +283,26 @@ pub fn iterative_deepening_ab_search(board: &mut Bitboard, move_gen: &MoveGen, p
     (eval, best_move, n)
 }
 
+/// Perform aspiration window alpha-beta search from the given position
+///
+/// This function performs an aspiration window search, where the search is focused on a specific
+/// window of possible scores. The window is initially set to a narrow range, and if the search
+/// finds a move that falls outside this range, the window is expanded and the search is repeated.
+///
+/// # Arguments
+///
+/// * `board` - A mutable reference to the current board state
+/// * `move_gen` - A reference to the move generator
+/// * `pesto` - A reference to the Pesto evaluation function
+/// * `max_depth` - The maximum depth to search to
+/// * `verbose` - A flag indicating whether to print verbose output
+///
+/// # Returns
+///
+/// A tuple containing:
+/// * The evaluation (in centipawns) of the final position
+/// * The best move to play from the current position
+/// * The number of nodes searched
 pub fn aspiration_window_ab_search(board: &mut Bitboard, move_gen: &MoveGen, pesto: &PestoEval, max_depth: i32, verbose: bool) -> (i32, Move, i32) {
     // Perform aspiration window alpha-beta search from the given position
     // Also uses iterative deepening: After searching at a given depth, starts a new search at that depth + 1, but looks at most promising variation first
@@ -241,8 +359,27 @@ pub fn aspiration_window_ab_search(board: &mut Bitboard, move_gen: &MoveGen, pes
     (eval, best_move, n)
 }
 
-// Quiescence search with consistent side to move
-// The idea is to compare apples to apples by only comparing evals of positions where the same side is to move
+/// Perform a quiescence search with consistent side to move
+///
+/// This function performs a quiescence search, which is a selective search of tactically
+/// active positions. It ensures that the evaluation is always from the perspective of the
+/// same side to move, allowing for consistent comparisons.
+///
+/// # Arguments
+///
+/// * `board` - A mutable reference to the current board state
+/// * `move_gen` - A reference to the move generator
+/// * `pesto` - A reference to the Pesto evaluation function
+/// * `alpha` - The lower bound of the search window
+/// * `beta` - The upper bound of the search window
+/// * `eval_after_even_moves` - A flag indicating whether to evaluate after even or odd number of moves
+/// * `verbose` - A flag indicating whether to print verbose output
+///
+/// # Returns
+///
+/// A tuple containing:
+/// * The evaluation (in centipawns) of the final position
+/// * The number of nodes searched
 fn q_search_consistent_side_to_move_for_final_eval(board: &mut Bitboard, move_gen: &MoveGen, pesto: &PestoEval, mut alpha: i32, beta: i32, eval_after_even_moves: bool, verbose: bool) -> (i32, i32) {
     let (checkmate, stalemate) = board.is_checkmate_or_stalemate(move_gen);
     if checkmate {
@@ -329,30 +466,45 @@ fn q_search_consistent_side_to_move_for_final_eval(board: &mut Bitboard, move_ge
     }
 }
 
-// Search for forced wins by performing an iteratively deepening search, where the side to move always gives check
-// Finds checkmates, and will in the future also find won endgames in the tablebases when we implement them
-// Does not find forced checkmates in which the side to move does not give check
-// Does not find forced stalemates or threefold repetitions, since it won't always be clear a priori whether playing for a draw is the best option
-// The plan is to perform a mate search at the beginning of every move, followed by a standard quiescence search
-// Actually eventually we will want every move in the search tree to be a mate search, but for now we will just do it at the beginning of every move
-// Returns the eval and number of nodes searched
-// Eval can be 1000000 for checkmate, -1000000 for checkmate for the other side, or 0 for neither
-// This is an iterative deepening, alpha-beta search, where alpha-beta is just used for the side to move to avoid getting mated,
-// and the iterative deepening stops as soon as a forced mate is found
-// That way, we first find mate in 1, then mate in 2, etc
+/// Perform a mate search from the given position
+///
+/// This function performs an iteratively deepening search for forced checkmates,
+/// where the side to move always gives check. It finds checkmates but does not
+/// find forced checkmates where the side to move does not give check, nor does
+/// it find forced stalemates or threefold repetitions.
+///
+/// # Arguments
+///
+/// * `board` - A reference to the current board state
+/// * `move_gen` - A reference to the move generator
+/// * `max_depth` - The maximum depth to search to
+/// * `verbose` - A flag indicating whether to print verbose output
+///
+/// # Returns
+///
+/// A tuple containing:
+/// * The evaluation: 1000000 for checkmate, -1000000 for checkmate against, or 0 for neither
+/// * The best move to play from the current position
+/// * The number of nodes searched
 pub fn mate_search(board: &Bitboard, move_gen: &MoveGen, max_depth: i32, verbose: bool) -> (i32, Move, i32) {
     let mut eval: i32 = 0;
     let mut best_move: Move = Move::null();
     let mut n: i32 = 0;
     let mut alpha = -1000000;
     let beta = 1000000;
+    
+    // Iterative deepening loop
     for d in 1..max_depth + 1 {
         let depth = 2 * d - 1; // Consider only odd depths, since we are only searching for forced mates
         if verbose {
             println!("Performing mate search at depth {} ply", depth);
         }
+        
+        // Generate and combine captures and regular moves
         let (mut captures, moves) = move_gen.gen_pseudo_legal_moves(board);
         captures.extend(moves);
+        
+        // Iterate through all moves
         for m in captures {
             let mut new_board: Bitboard = board.make_move(m);
             if !new_board.is_legal(move_gen) {
@@ -386,7 +538,25 @@ pub fn mate_search(board: &Bitboard, move_gen: &MoveGen, max_depth: i32, verbose
     (eval, best_move, n)
 }
 
-
+/// Recursive helper function for mate search
+///
+/// This function performs a recursive mate search to the given depth, using alpha-beta pruning
+/// to optimize the search process. It only considers moves that give check.
+///
+/// # Arguments
+///
+/// * `board` - A mutable reference to the current board state
+/// * `move_gen` - A reference to the move generator
+/// * `depth` - The current depth in the search tree
+/// * `alpha` - The current alpha value for alpha-beta pruning
+/// * `beta` - The current beta value for alpha-beta pruning
+/// * `side_to_move` - A boolean indicating which side is to move (true for the initial side)
+///
+/// # Returns
+///
+/// A tuple containing:
+/// * The evaluation: -1000000 for checkmate, 0 for no mate found
+/// * The number of nodes searched
 fn mate_search_recursive(board: &mut Bitboard, move_gen: &MoveGen, depth: i32, mut alpha: i32, beta: i32, side_to_move: bool) -> (i32, i32) {
     // Private recursive function used for mate search
     // External functions should call mate_search instead

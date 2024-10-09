@@ -1,65 +1,122 @@
+//! This module defines the Bitboard structure and associated functions for chess board representation.
+
 use crate::gen_moves::MoveGen;
 
-// Piece labels
-pub const WP: usize = 0;
-pub const BP: usize = 1;
-pub const WN: usize = 2;
-pub const BN: usize = 3;
-pub const WB: usize = 4;
-pub const BB: usize = 5;
-pub const WR: usize = 6;
-pub const BR: usize = 7;
-pub const WQ: usize = 8;
-pub const BQ: usize = 9;
-pub const WK: usize = 10;
-pub const BK: usize = 11;
-pub const WOCC: usize = 12; // White occupied squares
-pub const BOCC: usize = 13; // Black occupied squares
-pub const OCC: usize = 14; // All occupied squares
+/// Piece labels for indexing the bitboard vector
+pub const WP: usize = 0;  /// White Pawn
+pub const BP: usize = 1;  /// Black Pawn
+pub const WN: usize = 2;  /// White Knight
+pub const BN: usize = 3;  /// Black Knight
+pub const WB: usize = 4;  /// White Bishop
+pub const BB: usize = 5;  /// Black Bishop
+pub const WR: usize = 6;  /// White Rook
+pub const BR: usize = 7;  /// Black Rook
+pub const WQ: usize = 8;  /// White Queen
+pub const BQ: usize = 9;  /// Black Queen
+pub const WK: usize = 10; /// White King
+pub const BK: usize = 11; /// Black King
+pub const WOCC: usize = 12; /// White occupied squares
+pub const BOCC: usize = 13; /// Black occupied squares
+pub const OCC: usize = 14;  /// All occupied squares
 
-
-// Define the bitboard data type.
-// We will use a 64-bit unsigned integer to represent the bitboard for each piece.
+/// Represents the chess board using bitboards.
+///
+/// Each piece type and color has its own 64-bit unsigned integer,
+/// where each bit represents a square on the chess board.
 #[derive(Clone, Eq, PartialEq)]
 pub struct Bitboard {
-    pub game_result: Option<i32>, // None = in progress, 1 = white wins, -1 = black wins, 0 = draw
+    /// Game result: None = in progress, Some(1) = white wins, Some(-1) = black wins, Some(0) = draw
+    pub game_result: Option<i32>,
+    /// True if it's White's turn to move
     pub w_to_move: bool,
+    /// White kingside castling rights
     pub w_castle_k: bool,
+    /// White queenside castling rights
     pub w_castle_q: bool,
+    /// Black kingside castling rights
     pub b_castle_k: bool,
+    /// Black queenside castling rights
     pub b_castle_q: bool,
-    pub en_passant: Option<usize>, // index of square where en passant is possible
-    pub halfmove_clock: u8, // number of halfmoves since last capture or pawn advance
-    pub fullmove_clock: u8, // number of fullmoves since start of game
-    pub pieces: Vec<u64>, // 0-11: white pawns, black pawns, white knights, black knights, white bishops, black bishops, white rooks, black rooks, white queens, black queens, white king, black king
-                          // 12: white occupied squares
-                          // 13: black occupied squares
-                          // 14: all occupied squares
+    /// Index of square where en passant is possible
+    pub en_passant: Option<usize>,
+    /// Number of halfmoves since last capture or pawn advance
+    pub halfmove_clock: u8,
+    /// Number of fullmoves since start of game
+    pub fullmove_clock: u8,
+    /// Vector of bitboards for each piece type and occupancy
+    pub pieces: Vec<u64>,
+    /// Current evaluation of the position
     pub eval: i32,
+    /// Current game phase
     pub game_phase: Option<i32>
 }
 
 // Little Endian Rank Mapping
-
 // Least Significant File
 // ind = 8 * rank + file
 
+/// Converts file and rank coordinates to a square index.
+///
+/// # Arguments
+///
+/// * `file` - The file (0-7, where 0 is the a-file)
+/// * `rank` - The rank (0-7, where 0 is the first rank)
+///
+/// # Returns
+///
+/// The square index (0-63)
 pub fn coords_to_sq_ind(file: usize, rank: usize) -> usize {
     8 * rank + file
 }
 
+/// Converts a square index to file and rank coordinates.
+///
+/// # Arguments
+///
+/// * `sq_ind` - The square index (0-63)
+///
+/// # Returns
+///
+/// A tuple (file, rank) where file and rank are 0-7
 pub fn sq_ind_to_coords(sq_ind: usize) -> (usize, usize) {
     (sq_ind % 8, sq_ind / 8)
 }
 
+/// Converts a square index to a bitboard representation.
+///
+/// # Arguments
+///
+/// * `sq_ind` - The square index (0-63)
+///
+/// # Returns
+///
+/// A 64-bit integer with only the bit at the given square index set
 pub fn sq_ind_to_bit(sq_ind: usize) -> u64 {
     1 << sq_ind
 }
 
+/// Converts a bitboard with a single bit set to its square index.
+///
+/// # Arguments
+///
+/// * `bit` - A 64-bit integer with only one bit set
+///
+/// # Returns
+///
+/// The index of the set bit (0-63)
 pub fn bit_to_sq_ind(bit: u64) -> usize {
     bit.trailing_zeros() as usize
 }
 
+/// Converts a square index to algebraic notation.
+///
+/// # Arguments
+///
+/// * `sq_ind` - The square index (0-63)
+///
+/// # Returns
+///
+/// A string representing the square in algebraic notation (e.g., "e4")
 pub fn sq_ind_to_algebraic(sq_ind: usize) -> String {
     let (file, rank) = sq_ind_to_coords(sq_ind);
     let file = (file + 97) as u8 as char;
@@ -67,6 +124,15 @@ pub fn sq_ind_to_algebraic(sq_ind: usize) -> String {
     format!("{}{}", file, rank)
 }
 
+/// Converts algebraic notation to a square index.
+///
+/// # Arguments
+///
+/// * `algebraic` - A string representing a square in algebraic notation (e.g., "e4")
+///
+/// # Returns
+///
+/// The corresponding square index (0-63)
 pub fn algebraic_to_sq_ind(algebraic: &str) -> usize {
     let mut chars = algebraic.chars();
     let file = chars.next().unwrap() as usize - 97;
@@ -74,20 +140,56 @@ pub fn algebraic_to_sq_ind(algebraic: &str) -> usize {
     coords_to_sq_ind(file, rank)
 }
 
+/// Converts algebraic notation to a bitboard representation.
+///
+/// # Arguments
+///
+/// * `algebraic` - A string representing a square in algebraic notation (e.g., "e4")
+///
+/// # Returns
+///
+/// A 64-bit integer with only the bit at the given square set
 pub fn algebraic_to_bit(algebraic: &str) -> u64 {
     let sq_ind = algebraic_to_sq_ind(algebraic);
     sq_ind_to_bit(sq_ind)
 }
 
+/// Converts a bitboard with a single bit set to algebraic notation.
+///
+/// # Arguments
+///
+/// * `bit` - A 64-bit integer with only one bit set
+///
+/// # Returns
+///
+/// A string representing the square in algebraic notation (e.g., "e4")
 pub fn bit_to_algebraic(bit: u64) -> String {
     let sq_ind = bit_to_sq_ind(bit);
     sq_ind_to_algebraic(sq_ind)
 }
 
+/// Flips a square index vertically on the board.
+///
+/// # Arguments
+///
+/// * `sq_ind` - The square index to flip (0-63)
+///
+/// # Returns
+///
+/// The vertically flipped square index (0-63)
 pub fn flip_sq_ind_vertically(sq_ind: usize) -> usize {
     8 * (7 - sq_ind / 8) + sq_ind % 8
 }
 
+/// Flips a bitboard vertically.
+///
+/// # Arguments
+///
+/// * `bit` - The bitboard to flip
+///
+/// # Returns
+///
+/// The vertically flipped bitboard
 pub fn flip_vertically(bit: u64) -> u64 {
     ( (bit << 56)                    ) |
         ( (bit << 40) & (0x00ff000000000000) ) |
@@ -100,6 +202,11 @@ pub fn flip_vertically(bit: u64) -> u64 {
 }
 
 impl Bitboard {
+    /// Creates a new Bitboard with the initial chess position.
+    ///
+    /// # Returns
+    ///
+    /// A new Bitboard struct representing the starting position of a chess game.
     pub fn new() -> Bitboard {
         Bitboard {
             game_result: None,
@@ -133,7 +240,15 @@ impl Bitboard {
         }
     }
 
-    // FEN reader
+    /// Creates a new Bitboard from a FEN (Forsyth–Edwards Notation) string.
+    ///
+    /// # Arguments
+    ///
+    /// * `fen` - A string slice that holds the FEN representation of a chess position.
+    ///
+    /// # Returns
+    ///
+    /// A new Bitboard struct representing the chess position described by the FEN string.
     pub fn new_from_fen(fen: &str) -> Bitboard {
         let parts = fen.split(' ').collect::<Vec<&str>>();
         let mut board = Bitboard::new();
@@ -215,6 +330,7 @@ impl Bitboard {
         board
     }
 
+    /// Prints a visual representation of the chess board to the console.
     pub fn print(&self) {
         println!("  +-----------------+");
         for rank in (0..8).rev() {
@@ -256,8 +372,15 @@ impl Bitboard {
         println!("    a b c d e f g h");
     }
 
+    /// Flips the board vertically, returning a new board.
+    ///
+    /// This method creates a new Bitboard with the position flipped vertically,
+    /// effectively switching the perspectives of White and Black.
+    ///
+    /// # Returns
+    ///
+    /// A new Bitboard struct representing the vertically flipped position.
     pub fn flip_vertically(&self) -> Bitboard {
-        // Flip the board vertically, returning a new board.
         Bitboard {
             game_result: self.game_result,
             w_to_move: !self.w_to_move,
@@ -274,14 +397,32 @@ impl Bitboard {
         }
     }
 
+    /// Gets the piece type at a given square index.
+    ///
+    /// # Arguments
+    ///
+    /// * `sq_ind` - The square index to check (0-63)
+    ///
+    /// # Returns
+    ///
+    /// An Option containing the piece type (0-11) if a piece is present, or None if the square is empty.
     pub fn get_piece(&self, sq_ind: usize) -> Option<usize> {
-        // Get the piece at a given square index.
         let bit = sq_ind_to_bit(sq_ind);
         (0..12).find(|&i| bit & self.pieces[i] != 0)
     }
 
+    /// Determines whether the current position is legal.
+    ///
+    /// A position is considered legal if the side to move cannot capture the opponent's king.
+    ///
+    /// # Arguments
+    ///
+    /// * `move_gen` - A reference to a MoveGen struct for generating potential moves.
+    ///
+    /// # Returns
+    ///
+    /// A boolean indicating whether the current position is legal.
     pub fn is_legal(&self, move_gen: &MoveGen) -> bool {
-        // Determines whether this position is legal, i.e. the side to move cannot capture the king.
         let king_sq_ind: usize;
         if self.w_to_move {
             king_sq_ind = bit_to_sq_ind(self.pieces[BK]);
@@ -299,9 +440,25 @@ impl Bitboard {
         !self.is_square_attacked(king_sq_ind, self.w_to_move, move_gen)
     }
 
+    /// Determines whether the current position is checkmate or stalemate.
+    ///
+    /// A position is considered checkmate if the side to move is in check and has no legal moves.
+    /// A position is considered stalemate if the side to move is not in check but has no legal moves.
+    ///
+    /// # Arguments
+    ///
+    /// * `move_gen` - A reference to a MoveGen struct for generating potential moves.
+    ///
+    /// # Returns
+    ///
+    /// A tuple (bool, bool) where:
+    /// - The first boolean is true if the position is checkmate, false otherwise.
+    /// - The second boolean is true if the position is stalemate, false otherwise.
     pub fn is_checkmate_or_stalemate(&self, move_gen: &MoveGen) -> (bool, bool) {
-        // Determines whether this position is checkmate, i.e. the side to move cannot capture the king and has no legal moves.
+        // Generate all pseudo-legal moves
         let (captures, moves) = move_gen.gen_pseudo_legal_moves(self);
+        
+        // Check if any of the captures are legal
         if !captures.is_empty() {
             for c in captures {
                 let new_board = self.make_move(c);
@@ -310,6 +467,8 @@ impl Bitboard {
                 }
             }
         }
+        
+        // Check if any of the non-capture moves are legal
         if !moves.is_empty() {
             for m in moves {
                 let new_board = self.make_move(m);
@@ -318,17 +477,27 @@ impl Bitboard {
                 }
             }
         }
+        
         // If we get here, there are no legal moves.
+        // Check if the current position is in check
         let is_check = self.is_check(move_gen);
         if is_check {
-            (true, false)
+            (true, false)  // Checkmate
         } else {
-            (false, true)
+            (false, true)  // Stalemate
         }
     }
 
+    /// Checks if the king of the side to move is in check.
+    ///
+    /// # Arguments
+    ///
+    /// * `move_gen` - A reference to a MoveGen struct for generating potential moves.
+    ///
+    /// # Returns
+    ///
+    /// A boolean indicating whether the king of the side to move is in check.
     pub fn is_check(&self, move_gen: &MoveGen) -> bool {
-        // Determines whether this position is check
         let king_sq_ind: usize;
         if self.w_to_move {
             king_sq_ind = bit_to_sq_ind(self.pieces[WK]);
@@ -338,6 +507,17 @@ impl Bitboard {
         self.is_square_attacked(king_sq_ind, !self.w_to_move, move_gen)
     }
 
+    /// Checks if a square is attacked by a given side.
+    ///
+    /// # Arguments
+    ///
+    /// * `sq_ind`- The square index (0-63) to check.
+    /// * `by_white` - If true, check if the square is attacked by white; if false, check if it's attacked by black.
+    /// * `move_gen` - A reference to a MoveGen struct for generating potential moves.
+    ///
+    /// # Returns
+    ///
+    /// A boolean indicating whether the square is attacked by the specified side.
     pub fn is_square_attacked(&self, sq_ind: usize, by_white: bool, move_gen: &MoveGen) -> bool {
         // Find out if the square is attacked by a given side (white if by_white is true, black if by_white is false).
         if by_white {
