@@ -195,7 +195,7 @@ pub fn alpha_beta_search(board: &mut Bitboard, move_gen: &MoveGen, pesto: &Pesto
 /// A tuple containing:
 /// * The evaluation (in centipawns) of the final position
 /// * The number of nodes searched
-fn alpha_beta(board: &mut Bitboard, move_gen: &MoveGen, pesto: &PestoEval, depth: i32, mut alpha: i32, beta: i32, verbose: bool) -> (i32, i32) {
+pub fn alpha_beta(board: &mut Bitboard, move_gen: &MoveGen, pesto: &PestoEval, depth: i32, mut alpha: i32, beta: i32, verbose: bool) -> (i32, i32) {
     // Private recursive function used for alpha-beta search
     // External functions should call alpha_beta_search instead
     // Returns the eval (in centipawns) of the final position
@@ -493,18 +493,18 @@ pub fn mate_search(board: &Bitboard, move_gen: &MoveGen, max_depth: i32, verbose
     let mut n: i32 = 0;
     let mut alpha = -1000000;
     let beta = 1000000;
-    
+
     // Iterative deepening loop
     for d in 1..=max_depth {
         let depth = 2 * d - 1; // Consider only odd depths, since we are only searching for forced mates
         if verbose {
             println!("Performing mate search at depth {} ply", depth);
         }
-        
+
         // Generate and combine captures and regular moves
         let (mut captures, moves) = move_gen.gen_pseudo_legal_moves(board);
         captures.extend(moves);
-        
+
         // Iterate through all moves
         for m in captures {
             let mut new_board: Bitboard = board.make_move(m);
@@ -515,7 +515,7 @@ pub fn mate_search(board: &Bitboard, move_gen: &MoveGen, max_depth: i32, verbose
                 continue;
             }
             let (score, nodes) = mate_search_recursive(&mut new_board, move_gen, depth - 1, -beta, -alpha, false);
-            eval = score;
+            eval = -score;
             n += nodes;
             if eval > alpha {
                 alpha = eval;

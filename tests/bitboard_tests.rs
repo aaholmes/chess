@@ -39,3 +39,21 @@ fn test_is_illegal() {
     let move_gen = MoveGen::new();
     assert!(!illegal_board.is_legal(&move_gen));
 }
+
+#[test]
+fn test_checkmate_detection() {
+    let board = Bitboard::new_from_fen("rnb1kbnr/pppp1ppp/8/4p3/6Pq/5P2/PPPPP2P/RNBQKBNR w KQkq - 1 3");
+    let move_gen = MoveGen::new();
+    let (is_checkmate, is_stalemate) = board.is_checkmate_or_stalemate(&move_gen);
+    assert!(is_checkmate);
+    assert!(!is_stalemate);
+}
+
+#[test]
+fn test_stalemate_detection() {
+    let board = Bitboard::new_from_fen("5k2/5P2/5K2/8/8/8/8/8 b - - 0 1");
+    let move_gen = MoveGen::new();
+    let (is_checkmate, is_stalemate) = board.is_checkmate_or_stalemate(&move_gen);
+    assert!(!is_checkmate);
+    assert!(is_stalemate);
+}
