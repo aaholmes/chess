@@ -169,8 +169,8 @@ const EG_QUEEN_TABLE: [i32; 64] = [
 ///     -15, 36, 12, -54, 8, -28, 24, 14,
 /// ];
 const MG_KING_TABLE: [i32; 64] = [
-    -65, -38, -38, -38, -56, -38, -38, -38,
-    -36, -36, -36, -36, -36, -36, -38, -36,
+    -38, -38, -38, -38, -38, -38, -38, -38,
+    -36, -36, -36, -36, -36, -36, -36, -36,
     -36, -36, -36, -36, -36, -36, -36, -36,
     -17, -20, -12, -27, -30, -25, -14, -36,
     -12, -12, -12, -12, -12, -12, -12, -12,
@@ -250,9 +250,7 @@ impl PestoEval {
     /// # Returns
     ///
     /// A tuple (i32, i32) representing the middlegame and endgame scores
-    pub fn eval(&self, board: &Bitboard) -> i32
-
-    {
+    pub fn eval(&self, board: &Bitboard) -> i32 {
         let mut mg: [i32; 2] = [0, 0];
         let mut eg: [i32; 2] = [0, 0];
         let mut game_phase: i32 = 0;
@@ -269,19 +267,20 @@ impl PestoEval {
         }
 
         // Tapered eval
-        let mg_score: i32;
-        let eg_score: i32;
-        if board.w_to_move {
-            mg_score = mg[1] - mg[0];
-            eg_score = eg[1] - eg[0];
-        } else {
-            mg_score = mg[0] - mg[1];
-            eg_score = eg[0] - eg[1];
-        }
-        let mg_phase: i32 = min(24, game_phase); // Can exceed 24 in case of early promotion
+        let mg_score = mg[0] - mg[1]; // White - Black
+        let eg_score = eg[0] - eg[1]; // White - Black
+
+        let mg_phase: i32 = min(24, game_phase);
         let eg_phase: i32 = 24 - mg_phase;
 
-        (mg_score * mg_phase + eg_score * eg_phase) / 24
+        let score = (mg_score * mg_phase + eg_score * eg_phase) / 24;
+
+        // Return score from the perspective of the side to move
+        if board.w_to_move {
+            score
+        } else {
+            -score
+        }
     }
 
     /// Evaluates and updates the board's evaluation and game phase
@@ -315,25 +314,19 @@ impl PestoEval {
         }
 
         // Tapered eval
-        let mg_score: i32;
-        let eg_score: i32;
-        if board.w_to_move {
-            mg_score = mg[1] - mg[0];
-            eg_score = eg[1] - eg[0];
-        } else {
-            mg_score = mg[0] - mg[1];
-            eg_score = eg[0] - eg[1];
-        }
-        let mg_phase: i32 = min(24, game_phase); // Can exceed 24 in case of early promotion
+        let mg_score = mg[0] - mg[1]; // White - Black
+        let eg_score = eg[0] - eg[1]; // White - Black
+
+        let mg_phase: i32 = min(24, game_phase);
         let eg_phase: i32 = 24 - mg_phase;
 
-        let eval: i32 = (mg_score * mg_phase + eg_score * eg_phase) / 24;
+        let score = (mg_score * mg_phase + eg_score * eg_phase) / 24;
 
-        // Save eval and game phase so we can quickly compute move evals from this position
-        board.eval = eval;
+        // Save eval and game phase
+        board.eval = if board.w_to_move { score } else { -score };
         board.game_phase = Some(game_phase);
 
-        eval
+        board.eval
     }
 
     /// Evaluates a move based on the Pesto evaluation function

@@ -14,7 +14,7 @@ fn test_knight_moves() {
     let board = Bitboard::new_from_fen("K7/8/k7/8/4N3/8/8/8 w - - 0 1");
     let move_gen = MoveGen::new();
     let (captures, moves) = move_gen.gen_pseudo_legal_moves(&board);
-    assert_eq!(captures.len() + moves.len(), 11); // Knight should have 8 possible moves and king should have 3
+    assert_eq!(captures.len() + moves.len(), 11); // Knight should have 8 possible moves and king should have 3 (moving into check is OK for this function)
 }
 
 #[test]

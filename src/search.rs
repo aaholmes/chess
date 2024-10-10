@@ -399,7 +399,7 @@ fn q_search_consistent_side_to_move_for_final_eval(board: &mut Bitboard, move_ge
         // The problem here is that we are currently only comparing the eval at the end of the tactics, but
         // sometimes the player to move might not want to play a capture, so we need to consider the stand pat eval too
         // This side can either play a capture, or evaluate the position, whichever is better
-        let eval = -pesto.eval(board);
+        let eval = pesto.eval(board);
         let captures = move_gen.gen_pseudo_legal_captures(board);
         if captures.is_empty() {
             if verbose {
@@ -495,7 +495,7 @@ pub fn mate_search(board: &Bitboard, move_gen: &MoveGen, max_depth: i32, verbose
     let beta = 1000000;
     
     // Iterative deepening loop
-    for d in 1..max_depth + 1 {
+    for d in 1..=max_depth {
         let depth = 2 * d - 1; // Consider only odd depths, since we are only searching for forced mates
         if verbose {
             println!("Performing mate search at depth {} ply", depth);
@@ -515,7 +515,7 @@ pub fn mate_search(board: &Bitboard, move_gen: &MoveGen, max_depth: i32, verbose
                 continue;
             }
             let (score, nodes) = mate_search_recursive(&mut new_board, move_gen, depth - 1, -beta, -alpha, false);
-            eval = -score;
+            eval = score;
             n += nodes;
             if eval > alpha {
                 alpha = eval;
