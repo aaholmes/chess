@@ -3,6 +3,10 @@ name = "kingfisher"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+name = "kingfisher"
+path = "src/lib.rs"
+
 [dependencies]
 rand = "0.8.5"
 

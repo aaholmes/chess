@@ -3,23 +3,11 @@
 //! This module sets up the chess engine components and runs a sample game
 //! between two simple agents.
 
-mod agent;
-use agent::{Agent, SimpleAgent};
-mod arena;
-use arena::Arena;
-mod bitboard;
-mod bits;
-mod eval;
-use eval::PestoEval;
-mod move_types;
-mod move_generation;
-use move_generation::MoveGen;
-mod magic_bitboard;
-mod magic_constants;
-mod make_move;
-mod search;
-mod transposition;
-mod utils;
+extern crate kingfisher;
+use kingfisher::agent::{Agent, SimpleAgent};
+use kingfisher::arena::Arena;
+use kingfisher::eval::PestoEval;
+use kingfisher::move_generation::MoveGen;
 
 /// The main function that sets up and runs a sample chess game.
 ///

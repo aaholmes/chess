@@ -18,7 +18,7 @@
 /// # Examples
 ///
 /// ```
-/// use crate::bits::bits;
+/// use kingfisher::bits::bits;
 ///
 /// let n = 0b1010;
 /// let set_bits: Vec<usize> = bits(&n).collect();
