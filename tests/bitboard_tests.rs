@@ -35,7 +35,7 @@ fn test_is_legal() {
 #[test]
 fn test_is_illegal() {
     // Illegal position (black king in check)
-    let illegal_board = Bitboard::new_from_fen("r1bq1bnr/pppp1kpp/2n2p2/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 0 4");
+    let illegal_board = Bitboard::new_from_fen("r1bq1bnr/pppp1kpp/2n2p2/4p3/2BPP3/5N2/PPP2PPP/RNBQK2R w KQkq - 0 5");
     let move_gen = MoveGen::new();
     assert!(!illegal_board.is_legal(&move_gen));
 }

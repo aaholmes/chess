@@ -294,36 +294,34 @@ impl MoveGen {
     /// # Returns
     ///
     /// A tuple containing the capture moves and non-capture moves for the pawn.
-    fn gen_pawn_moves(&self, board: &Bitboard) -> (Vec<Move>, Vec<Move>, Vec<Move>) {
-        // Generate all possible pawn moves for the current position.
-        // Returns a vector of captures and a vector of non-captures.
-        // Treats promotions as captures.
-        // Lists promotions in the following order: queen, rook, knight, bishop, since bishop promotions are very rare.
+    pub fn gen_pawn_moves(&self, board: &Bitboard) -> (Vec<Move>, Vec<Move>, Vec<Move>) {
         let mut moves: Vec<Move> = Vec::new();
         let mut captures: Vec<Move> = Vec::new();
         let mut promotions: Vec<Move> = Vec::new();
+
         if board.w_to_move {
             // White to move
             for from_sq_ind in bits(&board.pieces[WP]) {
+                let is_promotion_rank = from_sq_ind > 47 && from_sq_ind < 56;
+
+                // Handle captures and en passant
                 for to_sq_ind in &self.wp_captures[from_sq_ind] {
                     if board.pieces[BOCC] & (1 << to_sq_ind) != 0 || board.en_passant == Some(*to_sq_ind) {
-                        if from_sq_ind > 47 && from_sq_ind < 56 {
+                        if is_promotion_rank {
                             append_promotions(&mut promotions, from_sq_ind, to_sq_ind, board.w_to_move);
                         } else {
                             captures.push(Move::new(from_sq_ind, *to_sq_ind, None));
                         }
                     }
                 }
-                for to_sq_ind in &self.wp_promotions[from_sq_ind] {
-                    if board.get_piece(*to_sq_ind).is_none() {
-                        append_promotions(&mut promotions, from_sq_ind, to_sq_ind, board.w_to_move);
-                    }
-                }
+
+                // Handle regular moves and promotions
                 for to_sq_ind in &self.wp_moves[from_sq_ind] {
                     if board.get_piece(*to_sq_ind).is_none() {
-                        if from_sq_ind > 47 && from_sq_ind < 56 {
-                            append_promotions(&mut captures, from_sq_ind, to_sq_ind, board.w_to_move);
+                        if is_promotion_rank {
+                            append_promotions(&mut promotions, from_sq_ind, to_sq_ind, board.w_to_move);
                         } else if from_sq_ind > 7 && from_sq_ind < 16 {
+                            // Double pawn push
                             if board.pieces[OCC] & (1 << (from_sq_ind + 8)) == 0 {
                                 moves.push(Move::new(from_sq_ind, *to_sq_ind, None));
                             }
@@ -334,27 +332,28 @@ impl MoveGen {
                 }
             }
         } else {
-            // Black to move
+            // Black to move (similar logic, but for black pawns)
             for from_sq_ind in bits(&board.pieces[BP]) {
+                let is_promotion_rank = from_sq_ind > 7 && from_sq_ind < 16;
+
+                // Handle captures and en passant
                 for to_sq_ind in &self.bp_captures[from_sq_ind] {
                     if board.pieces[WOCC] & (1 << to_sq_ind) != 0 || board.en_passant == Some(*to_sq_ind) {
-                        if from_sq_ind > 7 && from_sq_ind < 16 {
+                        if is_promotion_rank {
                             append_promotions(&mut promotions, from_sq_ind, to_sq_ind, board.w_to_move);
                         } else {
                             captures.push(Move::new(from_sq_ind, *to_sq_ind, None));
                         }
                     }
                 }
-                for to_sq_ind in &self.bp_promotions[from_sq_ind] {
-                    if board.get_piece(*to_sq_ind).is_none() {
-                        append_promotions(&mut promotions, from_sq_ind, to_sq_ind, board.w_to_move);
-                    }
-                }
+
+                // Handle regular moves and promotions
                 for to_sq_ind in &self.bp_moves[from_sq_ind] {
                     if board.get_piece(*to_sq_ind).is_none() {
-                        if from_sq_ind > 7 && from_sq_ind < 16 {
-                            append_promotions(&mut captures, from_sq_ind, to_sq_ind, board.w_to_move);
+                        if is_promotion_rank {
+                            append_promotions(&mut promotions, from_sq_ind, to_sq_ind, board.w_to_move);
                         } else if from_sq_ind > 47 && from_sq_ind < 56 {
+                            // Double pawn push
                             if board.pieces[OCC] & (1 << (from_sq_ind - 8)) == 0 {
                                 moves.push(Move::new(from_sq_ind, *to_sq_ind, None));
                             }
@@ -365,6 +364,7 @@ impl MoveGen {
                 }
             }
         }
+
         (captures, promotions, moves)
     }
 
