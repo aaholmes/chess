@@ -22,7 +22,7 @@ fn test_mate_in_two_detection() {
     assert!(score < 900000); // Should not detect mate in 1
     let (score, best_move, _) = mate_search(&board, &move_gen, 2, false);
     assert!(score > 900000); // Should detect mate in 2
-    assert_eq!(best_move.to, 63); // Rh8# (assuming 0-63 board representation)
+    assert_eq!(best_move.to, 63); // Rh8+ (assuming 0-63 board representation)
 }
 
 #[test]
@@ -36,5 +36,5 @@ fn test_mate_in_three_detection() {
     assert!(score < 900000); // Should not detect mate in 2
     let (score, best_move, _) = mate_search(&board, &move_gen, 3, false);
     assert!(score > 900000); // Should detect mate in 3
-    assert_eq!(best_move.to, 63); // Rh8# (assuming 0-63 board representation)
+    assert_eq!(best_move.to, 63); // Rh8+ (assuming 0-63 board representation)
 }
