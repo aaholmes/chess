@@ -108,6 +108,7 @@ fn negamax(board: &mut Bitboard, move_gen: &MoveGen, pesto: &PestoEval, depth: i
 /// * `depth` - The depth to search to
 /// * `alpha_init` - The initial alpha value for alpha-beta pruning
 /// * `beta_init` - The initial beta value for alpha-beta pruning
+/// * `q_search_max_depth` - The maximum depth for the quiescence search
 /// * `verbose` - A flag indicating whether to print verbose output
 ///
 /// # Returns
@@ -116,7 +117,7 @@ fn negamax(board: &mut Bitboard, move_gen: &MoveGen, pesto: &PestoEval, depth: i
 /// * The evaluation (in centipawns) of the final position
 /// * The best move to play from the current position
 /// * The number of nodes searched
-pub fn alpha_beta_search(board: &mut Bitboard, move_gen: &MoveGen, pesto: &PestoEval, depth: i32, alpha_init: i32, beta_init: i32, verbose: bool) -> (i32, Move, i32) {
+pub fn alpha_beta_search(board: &mut Bitboard, move_gen: &MoveGen, pesto: &PestoEval, depth: i32, alpha_init: i32, beta_init: i32, q_search_max_depth: i32, verbose: bool) -> (i32, Move, i32) {
     // Initialize best move and alpha value
     let mut best_move: Move = Move::null();
     let mut alpha: i32 = alpha_init;
@@ -158,7 +159,7 @@ pub fn alpha_beta_search(board: &mut Bitboard, move_gen: &MoveGen, pesto: &Pesto
         if !new_board.is_legal(move_gen) {
             continue;
         }
-        let (mut eval, nodes) = alpha_beta(&mut new_board, move_gen, pesto, depth - 1, -beta, -alpha, verbose);
+        let (mut eval, nodes) = alpha_beta(&mut new_board, move_gen, pesto, depth - 1, -beta, -alpha, q_search_max_depth, verbose);
         eval = -eval;
         n += nodes;
         if eval > alpha {
@@ -188,6 +189,7 @@ pub fn alpha_beta_search(board: &mut Bitboard, move_gen: &MoveGen, pesto: &Pesto
 /// * `depth` - The current depth in the search tree
 /// * `alpha` - The current alpha value for alpha-beta pruning
 /// * `beta` - The current beta value for alpha-beta pruning
+/// * `q_search_max_depth` - The maximum depth for the quiescence search
 /// * `verbose` - A flag indicating whether to print verbose output
 ///
 /// # Returns
@@ -195,7 +197,7 @@ pub fn alpha_beta_search(board: &mut Bitboard, move_gen: &MoveGen, pesto: &Pesto
 /// A tuple containing:
 /// * The evaluation (in centipawns) of the final position
 /// * The number of nodes searched
-pub fn alpha_beta(board: &mut Bitboard, move_gen: &MoveGen, pesto: &PestoEval, depth: i32, mut alpha: i32, beta: i32, verbose: bool) -> (i32, i32) {
+pub fn alpha_beta(board: &mut Bitboard, move_gen: &MoveGen, pesto: &PestoEval, depth: i32, mut alpha: i32, beta: i32, q_search_max_depth: i32, verbose: bool) -> (i32, i32) {
     // Private recursive function used for alpha-beta search
     // External functions should call alpha_beta_search instead
     // Returns the eval (in centipawns) of the final position
@@ -205,9 +207,9 @@ pub fn alpha_beta(board: &mut Bitboard, move_gen: &MoveGen, pesto: &PestoEval, d
     }
     if depth == 0 {
         // Leaf node
-        let (eval, nodes) = q_search_consistent_side_to_move_for_final_eval(board, move_gen, pesto, alpha, beta, true, verbose);
+        let (eval, nodes) = q_search(board, move_gen, pesto, alpha, beta, q_search_max_depth, verbose);
         if verbose {
-            println!("Outcome of Q search consistent side to move: {} {}", eval, nodes);
+            println!("Outcome of Q search: {} {}", eval, nodes);
         }
         return (eval, nodes);
     }
@@ -225,7 +227,7 @@ pub fn alpha_beta(board: &mut Bitboard, move_gen: &MoveGen, pesto: &PestoEval, d
         if !new_board.is_legal(move_gen) {
             continue;
         }
-        let (mut eval, nodes) = alpha_beta(&mut new_board, move_gen, pesto, depth - 1, -beta, -alpha, verbose);
+        let (mut eval, nodes) = alpha_beta(&mut new_board, move_gen, pesto, depth - 1, -beta, -alpha, q_search_max_depth, verbose);
         eval = -eval;
         n += nodes;
         if eval > alpha {
@@ -253,6 +255,7 @@ pub fn alpha_beta(board: &mut Bitboard, move_gen: &MoveGen, pesto: &PestoEval, d
 /// * `move_gen` - A reference to the move generator
 /// * `pesto` - A reference to the Pesto evaluation function
 /// * `max_depth` - The maximum depth to search to
+/// * `q_search_max_depth` - The maximum depth for the quiescence search
 /// * `verbose` - A flag indicating whether to print verbose output
 ///
 /// # Returns
@@ -261,7 +264,7 @@ pub fn alpha_beta(board: &mut Bitboard, move_gen: &MoveGen, pesto: &PestoEval, d
 /// * The evaluation (in centipawns) of the final position
 /// * The best move to play from the current position
 /// * The number of nodes searched
-pub fn iterative_deepening_ab_search(board: &mut Bitboard, move_gen: &MoveGen, pesto: &PestoEval, max_depth: i32, verbose: bool) -> (i32, Move, i32) {
+pub fn iterative_deepening_ab_search(board: &mut Bitboard, move_gen: &MoveGen, pesto: &PestoEval, max_depth: i32, q_search_max_depth: i32, verbose: bool) -> (i32, Move, i32) {
     // Perform iterative deepening alpha-beta search from the given position
     // Searches to the given depth
     // Returns the eval (in centipawns) of the final position, as well as the first move
@@ -275,7 +278,7 @@ pub fn iterative_deepening_ab_search(board: &mut Bitboard, move_gen: &MoveGen, p
     // Iterate over increasing depths
     for d in 1..max_depth + 1 {
         let depth = 2 * d; // Only even depths, due to the even/odd effect
-        (eval, best_move, nodes) = alpha_beta_search(board, move_gen, pesto, depth, -1000000, 1000000, verbose);
+        (eval, best_move, nodes) = alpha_beta_search(board, move_gen, pesto, depth, -1000000, 1000000, q_search_max_depth, verbose);
         n += nodes;
         if verbose {
             println!("At depth {}, searched {} nodes. best eval and move are {} {}", depth, n, eval, print_move(&best_move));
@@ -296,6 +299,7 @@ pub fn iterative_deepening_ab_search(board: &mut Bitboard, move_gen: &MoveGen, p
 /// * `move_gen` - A reference to the move generator
 /// * `pesto` - A reference to the Pesto evaluation function
 /// * `max_depth` - The maximum depth to search to
+/// * `q_search_max_depth` - The maximum depth for the quiescence search
 /// * `verbose` - A flag indicating whether to print verbose output
 ///
 /// # Returns
@@ -304,7 +308,7 @@ pub fn iterative_deepening_ab_search(board: &mut Bitboard, move_gen: &MoveGen, p
 /// * The evaluation (in centipawns) of the final position
 /// * The best move to play from the current position
 /// * The number of nodes searched
-pub fn aspiration_window_ab_search(board: &mut Bitboard, move_gen: &MoveGen, pesto: &PestoEval, max_depth: i32, verbose: bool) -> (i32, Move, i32) {
+pub fn aspiration_window_ab_search(board: &mut Bitboard, move_gen: &MoveGen, pesto: &PestoEval, max_depth: i32, q_search_max_depth: i32, verbose: bool) -> (i32, Move, i32) {
     // Perform aspiration window alpha-beta search from the given position
     // Also uses iterative deepening: After searching at a given depth, starts a new search at that depth + 1, but looks at most promising variation first
     // This is really helpful for alpha-beta pruning
@@ -318,10 +322,10 @@ pub fn aspiration_window_ab_search(board: &mut Bitboard, move_gen: &MoveGen, pes
     // First perform a quiescence search at a depth of 0
     let mut lower_bound: i32 = -1000000;
     let mut upper_bound: i32 = 1000000;
-    let (mut eval, mut n) = q_search_consistent_side_to_move_for_final_eval(board, move_gen, pesto, lower_bound, upper_bound, true, verbose);
+    let (mut eval, mut n) = q_search(board, move_gen, pesto, lower_bound, upper_bound, q_search_max_depth, verbose);
 
     // Now perform an iterative deepening search with aspiration windows
-    for d in 1..max_depth + 1 {
+    for d in 1..= max_depth {
         let depth = 2 * d; // Only even depths, due to the even/odd effect
         let mut lower_window_scale: i32 = 1;
         let mut upper_window_scale: i32 = 1;
@@ -331,7 +335,7 @@ pub fn aspiration_window_ab_search(board: &mut Bitboard, move_gen: &MoveGen, pes
             if verbose {
                 println!("Aspiration window search with window {} {}", lower_bound, upper_bound);
             }
-            (eval, best_move, nodes) = alpha_beta_search(board, move_gen, pesto, depth, lower_bound, upper_bound, verbose);
+            (eval, best_move, nodes) = alpha_beta_search(board, move_gen, pesto, depth, lower_bound, upper_bound, q_search_max_depth, verbose);
             n += nodes;
             if verbose {
                 println!("At depth {}, searched {} nodes. best eval and move are {} {}", depth, n, eval, print_move(&best_move));
@@ -360,6 +364,96 @@ pub fn aspiration_window_ab_search(board: &mut Bitboard, move_gen: &MoveGen, pes
     (eval, best_move, n)
 }
 
+/// Performs a quiescence search to evaluate tactical sequences and avoid the horizon effect.
+///
+/// This function uses the negamax framework and searches captures and promotions until a quiet
+/// position is reached or the maximum depth is hit. It implements stand-pat evaluation and
+/// various pruning techniques to improve efficiency.
+///
+/// # Arguments
+///
+/// * `board` - A mutable reference to the current board state.
+/// * `move_gen` - A reference to the move generator.
+/// * `pesto` - A reference to the position evaluator.
+/// * `alpha` - The lower bound of the search window.
+/// * `beta` - The upper bound of the search window.
+/// * `max_depth` - The (remaining) maximum depth for quiescence search.
+/// * `verbose` - A boolean flag for verbose output.
+///
+/// # Returns
+///
+/// A tuple containing:
+/// - The score of the position after quiescence search (from the perspective of the side to move).
+/// - The number of nodes searched.
+fn q_search(
+    board: &mut Bitboard,
+    move_gen: &MoveGen,
+    pesto: &PestoEval,
+    mut alpha: i32,
+    beta: i32,
+    max_depth: i32,
+    verbose: bool
+) -> (i32, i32) {
+    let mut nodes = 1;
+
+    // Stand-pat evaluation
+    let stand_pat = pesto.eval(board);
+
+    // Beta cutoff
+    if stand_pat >= beta {
+        return (beta, nodes);
+    }
+
+    // Update alpha
+    if stand_pat > alpha {
+        alpha = stand_pat;
+    }
+
+    // Check if we've reached max depth
+    if max_depth == 0 {
+        if verbose {
+            println!("Quiescence: Max depth reached! Eval: {}", stand_pat);
+        }
+        return (alpha, nodes);
+    }
+
+    // Generate captures and promotions
+    let captures = move_gen.gen_pseudo_legal_captures(board);
+
+    if captures.is_empty() {
+        if verbose {
+            println!("Quiescence: No captures left! Eval: {}", stand_pat);
+        }
+        return (stand_pat, nodes);
+    }
+
+    // Search captures
+    for capture in captures {
+        let mut new_board = board.clone();
+        new_board.make_move(capture);
+        if !new_board.is_legal(move_gen) {
+            continue;
+        }
+
+        // Recursive call
+        let (mut score, n) = q_search(&mut new_board, move_gen, pesto, -beta, -alpha, max_depth - 1, verbose);
+        score = -score; // Negamax
+        nodes += n;
+
+        // Beta cutoff
+        if score >= beta {
+            return (beta, nodes);
+        }
+
+        // Update alpha
+        if score > alpha {
+            alpha = score;
+        }
+    }
+
+    (alpha, nodes)
+}
+
 /// Perform a quiescence search with consistent side to move
 ///
 /// This function performs a quiescence search, which is a selective search of tactically
@@ -381,6 +475,9 @@ pub fn aspiration_window_ab_search(board: &mut Bitboard, move_gen: &MoveGen, pes
 /// A tuple containing:
 /// * The evaluation (in centipawns) of the final position
 /// * The number of nodes searched
+///
+/// # Notes
+/// Interesting idea, but not used currently because it is too slow
 fn q_search_consistent_side_to_move_for_final_eval(board: &mut Bitboard, move_gen: &MoveGen, pesto: &PestoEval, mut alpha: i32, beta: i32, eval_after_even_moves: bool, verbose: bool) -> (i32, i32) {
     let (checkmate, stalemate) = board.is_checkmate_or_stalemate(move_gen);
     if checkmate {
@@ -599,34 +696,3 @@ fn mate_search_recursive(board: &mut Bitboard, move_gen: &MoveGen, depth: i32, m
     }
     (alpha, n)
 }
-
-// // Quiescence search
-// pub fn q_search(board: &Bitboard, move_gen: &MoveGen, pesto: &PestoEval, mut alpha: i32, mut beta: i32) -> (i32, i32) {
-//     // board.print();
-//     // println!("eval: {}", eval);
-//     let mut nodes: i32 = 1;
-//     let mut captures = move_gen.gen_pseudo_legal_captures(board);
-//     for c in captures {
-//         let mut new_board = board.make_move(c.0, c.1, c.2);
-//         if !new_board.is_legal(move_gen) {
-//             continue;
-//         }
-//         let (mut score, nn) = q_search(&new_board, move_gen, pesto, -beta, -alpha);
-//         score = -score;
-//         nodes += nn;
-//         if score > alpha {
-//             alpha = score;
-//         }
-//         if alpha >= beta {
-//             break;
-//         }
-//     }
-//     // println!("alpha, beta: {} {}", alpha, beta);
-//     (alpha, nodes)
-// }
-
-
-// Another approach to quiescence search:
-// Continue until side to move has no tactical moves available. Since either player could be to move at that point,
-// keep track of best variation with self to move at the end as well as best variation with opponent to move at the end
-// If they yield different first moves, then

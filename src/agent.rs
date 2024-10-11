@@ -26,6 +26,8 @@ pub struct SimpleAgent<'a> {
     pub mate_search_depth: i32,
     /// The depth for alpha-beta search.
     pub ab_search_depth: i32,
+    /// The maximum depth for the quiescence search.
+    pub q_search_max_depth: i32,
     /// Whether to print verbose output during search.
     pub verbose: bool,
     /// Reference to the move generator.
@@ -48,10 +50,11 @@ impl SimpleAgent<'_> {
     /// # Returns
     ///
     /// A new `SimpleAgent` instance.
-    pub fn new<'a>(mate_search_depth: i32, ab_search_depth: i32, verbose: bool, move_gen: &'a MoveGen, pesto: &'a PestoEval) -> SimpleAgent<'a> {
+    pub fn new<'a>(mate_search_depth: i32, ab_search_depth: i32, q_search_max_depth: i32, verbose: bool, move_gen: &'a MoveGen, pesto: &'a PestoEval) -> SimpleAgent<'a> {
         SimpleAgent {
             mate_search_depth,
             ab_search_depth,
+            q_search_max_depth,
             verbose,
             move_gen,
             pesto
@@ -69,7 +72,7 @@ impl Agent for SimpleAgent<'_> {
         }
 
         // If no mate found, perform aspiration window search
-        let (eval, m, n) = aspiration_window_ab_search(board, self.move_gen, self.pesto, self.ab_search_depth, self.verbose);
+        let (eval, m, n) = aspiration_window_ab_search(board, self.move_gen, self.pesto, self.ab_search_depth, self.q_search_max_depth, self.verbose);
         println!("Mate search searched {} nodes, aspiration window search searched another {} nodes ({} total)! Eval: {}", nodes, n, nodes + n, eval);
         m
     }

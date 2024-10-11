@@ -21,10 +21,10 @@ fn main() {
     let pesto = PestoEval::new();
 
     // Create a simple agent for White
-    let white = SimpleAgent::new(5, 2, false, &move_gen, &pesto);
+    let white = SimpleAgent::new(3, 2, 4, false, &move_gen, &pesto);
 
     // Create a simple agent for Black
-    let black = SimpleAgent::new(5, 2, false, &move_gen, &pesto);
+    let black = SimpleAgent::new(3, 2, 4, false, &move_gen, &pesto);
 
     // Create an arena for the game with a maximum of 10 moves
     let mut arena = Arena::new(&white, &black, 10);
