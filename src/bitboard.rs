@@ -446,7 +446,6 @@ impl Bitboard {
     ///
     /// A boolean indicating whether the current position is legal.
     pub fn is_legal(&self, move_gen: &MoveGen) -> bool {
-        self.print();
         let king_sq_ind: usize;
         if self.w_to_move {
             king_sq_ind = bit_to_sq_ind(self.pieces[BLACK][KING]);

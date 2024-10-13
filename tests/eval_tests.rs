@@ -24,6 +24,15 @@ fn test_positional_evaluation() {
     let evaluator = PestoEval::new();
     let initial_score = evaluator.eval(&initial_board);
     let developed_score = evaluator.eval(&developed_board);
-    println!("Initial score: {} Developed score: {}", initial_score, developed_score);
     assert!(developed_score > initial_score); // Developed position should be better for White
+}
+
+#[test]
+fn test_eval_flipped_for_black() {
+    let board_w_to_move = Bitboard::new_from_fen("rnbqkbnr/1ppppppp/p7/8/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 1");
+    let board_b_to_move = Bitboard::new_from_fen("rnbqkbnr/1ppppppp/p7/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1");
+    let evaluator = PestoEval::new();
+    let score_w_to_move = evaluator.eval(&board_w_to_move);
+    let score_b_to_move = evaluator.eval(&board_b_to_move);
+    assert!(score_b_to_move == -score_w_to_move); // Score should be from the perspective of the side to move
 }
