@@ -5,7 +5,7 @@
 
 use crate::bitboard::{coords_to_sq_ind, sq_ind_to_algebraic, sq_ind_to_bit};
 use crate::move_types::Move;
-use crate::piece_types::PieceType;
+use crate::piece_types::{KNIGHT, BISHOP, ROOK, QUEEN};
 
 /// Print a u64 as an 8x8 chess board representation
 ///
@@ -53,10 +53,10 @@ pub fn print_move(the_move: &Move) -> String {
     if the_move.promotion.is_some() {
         promotion = String::from("=");
         match the_move.promotion.unwrap() {
-            KNIGHT => promotion.push('N'),
-            BISHOP => promotion.push('B'),
-            ROOK => promotion.push('R'),
-            QUEEN => promotion.push('Q'),
+            n if n == KNIGHT => promotion.push('N'),
+            n if n == BISHOP => promotion.push('B'),
+            n if n == ROOK => promotion.push('R'),
+            n if n == QUEEN => promotion.push('Q'),
             _ => panic!("Invalid promotion piece")
         }
     }

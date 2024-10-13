@@ -25,9 +25,6 @@ use crate::move_types::Move;
 use crate::magic_constants::{R_BITS, B_BITS, R_MASKS, B_MASKS};
 use crate::piece_types::{KNIGHT, BISHOP, ROOK, QUEEN};
 
-use crate::eval::PestoEval;
-use crate::piece_types::PieceType;
-
 const NOT_A_FILE: u64 = 0xfefefefefefefefe;
 const NOT_H_FILE: u64 = 0x7f7f7f7f7f7f7f7f;
 const NOT_AB_FILE: u64 = 0xfcfcfcfcfcfcfcfc;

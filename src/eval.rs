@@ -10,7 +10,7 @@ use std::cmp::min;
 use crate::bitboard::{Bitboard, flip_sq_ind_vertically};
 use crate::bits::popcnt;
 use crate::move_generation::MoveGen;
-use crate::piece_types::{PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING, WHITE, BLACK};
+use crate::piece_types::{PAWN, KNIGHT, ROOK, QUEEN, KING, WHITE, BLACK};
 use crate::eval_constants::{MG_VALUE, MG_PESTO_TABLE, EG_VALUE, EG_PESTO_TABLE, GAMEPHASE_INC};
 
 /// Struct representing the Pesto evaluation function

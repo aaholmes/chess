@@ -4,7 +4,7 @@
 //! between two simple agents.
 
 extern crate kingfisher;
-use kingfisher::agent::{Agent, SimpleAgent};
+use kingfisher::agent::SimpleAgent;
 use kingfisher::arena::Arena;
 use kingfisher::eval::PestoEval;
 use kingfisher::move_generation::MoveGen;

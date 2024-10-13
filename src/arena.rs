@@ -1,7 +1,7 @@
 //! This module provides an Arena for staging chess engine matches.
 
 use crate::agent::Agent;
-use crate::bitboard::{Bitboard, sq_ind_to_algebraic};
+use crate::bitboard::{Bitboard};
 use crate::utils::print_move;
 
 /// Struct representing an arena for chess engine matches.

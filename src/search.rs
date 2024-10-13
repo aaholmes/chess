@@ -273,7 +273,7 @@ pub fn iterative_deepening_ab_search(board: &mut Bitboard, move_gen: &MoveGen, p
     let mut eval: i32 = 0;
     let mut best_move: Move = Move::null();
     let mut n: i32 = 0;
-    let mut nodes: i32 = 0;
+    let mut nodes: i32;
 
     // Iterate over increasing depths
     for d in 1..max_depth + 1 {
@@ -317,7 +317,7 @@ pub fn aspiration_window_ab_search(board: &mut Bitboard, move_gen: &MoveGen, pes
 
     let mut target_eval: i32 = board.eval;
     let mut best_move: Move = Move::null();
-    let mut nodes: i32 = 0;
+    let mut nodes: i32;
 
     // First perform a quiescence search at a depth of 0
     let mut lower_bound: i32 = -1000000;

@@ -4,7 +4,7 @@
 
 use crate::bitboard::{Bitboard, sq_ind_to_bit};
 use crate::move_types::Move;
-use crate::piece_types::{PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING, WHITE, BLACK};
+use crate::piece_types::{PAWN, ROOK, KING, WHITE, BLACK};
 
 impl Bitboard {
     /// Makes a move on the board, returning a new board with the move applied

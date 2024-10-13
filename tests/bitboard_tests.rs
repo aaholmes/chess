@@ -1,7 +1,7 @@
 use kingfisher::bitboard::Bitboard;
 use kingfisher::move_generation::MoveGen;
 use kingfisher::move_types::Move;
-use kingfisher::piece_types::{PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING, WHITE, BLACK};
+use kingfisher::piece_types::{PAWN, KNIGHT, ROOK, KING, WHITE, BLACK};
 
 #[test]
 fn test_initial_position() {
@@ -15,7 +15,7 @@ fn test_initial_position() {
 
 #[test]
 fn test_get_piece_bitboard() {
-    let mut board = Bitboard::new(); // Assume this creates a standard starting position
+    let board = Bitboard::new(); // Assume this creates a standard starting position
 
     // Test white pawns
     assert_eq!(board.get_piece_bitboard(WHITE, PAWN), 0x000000000000FF00);
