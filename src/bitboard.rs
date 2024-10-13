@@ -1,23 +1,8 @@
 //! This module defines the Bitboard structure and associated functions for chess board representation.
 
+use std::collections::HashMap;
 use crate::move_generation::MoveGen;
-
-/// Piece labels for indexing the bitboard vector
-pub const WP: usize = 0;  /// White Pawn
-pub const BP: usize = 1;  /// Black Pawn
-pub const WN: usize = 2;  /// White Knight
-pub const BN: usize = 3;  /// Black Knight
-pub const WB: usize = 4;  /// White Bishop
-pub const BB: usize = 5;  /// Black Bishop
-pub const WR: usize = 6;  /// White Rook
-pub const BR: usize = 7;  /// Black Rook
-pub const WQ: usize = 8;  /// White Queen
-pub const BQ: usize = 9;  /// Black Queen
-pub const WK: usize = 10; /// White King
-pub const BK: usize = 11; /// Black King
-pub const WOCC: usize = 12; /// White occupied squares
-pub const BOCC: usize = 13; /// Black occupied squares
-pub const OCC: usize = 14;  /// All occupied squares
+use crate::piece_types::{PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING, WHITE, BLACK};
 
 /// Represents the chess board using bitboards.
 ///
@@ -43,12 +28,16 @@ pub struct Bitboard {
     pub halfmove_clock: u8,
     /// Number of fullmoves since start of game
     pub fullmove_clock: u8,
-    /// Vector of bitboards for each piece type and occupancy
-    pub pieces: Vec<u64>,
+    /// Bitboards for each piece type and occupancy
+    pub pieces: [[u64; 6]; 2],  // [Color as usize][PieceType as usize]
+    /// Bitboards of total occupancies for each color
+    pub pieces_occ: [u64; 2],
     /// Current evaluation of the position
     pub eval: i32,
     /// Current game phase
-    pub game_phase: Option<i32>
+    pub game_phase: Option<i32>,
+    /// Position history, for checking for repetitions
+    pub position_history: HashMap<u64, u8>,
 }
 
 // Little Endian Rank Mapping
@@ -208,7 +197,7 @@ impl Bitboard {
     ///
     /// A new Bitboard struct representing the starting position of a chess game.
     pub fn new() -> Bitboard {
-        Bitboard {
+        let mut bitboard = Bitboard {
             game_result: None,
             w_to_move: true,
             w_castle_k: true,
@@ -218,26 +207,29 @@ impl Bitboard {
             en_passant: None,
             halfmove_clock: 0,
             fullmove_clock: 1,
-            pieces: [
-                0x000000000000FF00,
-                0x00FF000000000000,
-                0x0000000000000042,
-                0x4200000000000000,
-                0x0000000000000024,
-                0x2400000000000000,
-                0x0000000000000081,
-                0x8100000000000000,
-                0x0000000000000008,
-                0x0800000000000000,
-                0x0000000000000010,
-                0x1000000000000000,
-                0x000000000000FFFF,
-                0xFFFF000000000000,
-                0xFFFF00000000FFFF
-            ].try_into().unwrap(),
+            pieces: [[0; 6]; 2],  // Initialize all bitboards to 0
+            pieces_occ: [0; 2],
             eval: 0,
-            game_phase: None
-        }
+            game_phase: None,
+            position_history: Default::default(),
+        };
+
+        // Set up pieces in the starting position
+        bitboard.pieces[WHITE][PAWN] = 0x000000000000FF00;
+        bitboard.pieces[BLACK][PAWN] = 0x00FF000000000000;
+        bitboard.pieces[WHITE][KNIGHT] = 0x0000000000000042;
+        bitboard.pieces[BLACK][KNIGHT] = 0x4200000000000000;
+        bitboard.pieces[WHITE][BISHOP] = 0x0000000000000024;
+        bitboard.pieces[BLACK][BISHOP] = 0x2400000000000000;
+        bitboard.pieces[WHITE][ROOK] = 0x0000000000000081;
+        bitboard.pieces[BLACK][ROOK] = 0x8100000000000000;
+        bitboard.pieces[WHITE][QUEEN] = 0x0000000000000008;
+        bitboard.pieces[BLACK][QUEEN] = 0x0800000000000000;
+        bitboard.pieces[WHITE][KING] = 0x0000000000000010;
+        bitboard.pieces[BLACK][KING] = 0x1000000000000000;
+        bitboard.pieces_occ[WHITE] = 0x000000000000FFFF;
+        bitboard.pieces_occ[BLACK] = 0xFFFF000000000000;
+        bitboard
     }
 
     /// Creates a new Bitboard from a FEN (Forsyth–Edwards Notation) string.
@@ -252,7 +244,8 @@ impl Bitboard {
     pub fn new_from_fen(fen: &str) -> Bitboard {
         let parts = fen.split(' ').collect::<Vec<&str>>();
         let mut board = Bitboard::new();
-        board.pieces = [0; 15].try_into().unwrap();
+        board.pieces = [[0; 6]; 2];
+        board.pieces_occ = [0; 2];
         board.w_castle_k = false;
         board.w_castle_q = false;
         board.b_castle_k = false;
@@ -269,18 +262,18 @@ impl Bitboard {
                 let sq_ind = coords_to_sq_ind(file, rank);
                 let bit = sq_ind_to_bit(sq_ind);
                 match c {
-                    'P' => board.pieces[WP] ^= bit,
-                    'p' => board.pieces[BP] ^= bit,
-                    'N' => board.pieces[WN] ^= bit,
-                    'n' => board.pieces[BN] ^= bit,
-                    'B' => board.pieces[WB] ^= bit,
-                    'b' => board.pieces[BB] ^= bit,
-                    'R' => board.pieces[WR] ^= bit,
-                    'r' => board.pieces[BR] ^= bit,
-                    'Q' => board.pieces[WQ] ^= bit,
-                    'q' => board.pieces[BQ] ^= bit,
-                    'K' => board.pieces[WK] ^= bit,
-                    'k' => board.pieces[BK] ^= bit,
+                    'P' => board.pieces[WHITE][PAWN] ^= bit,
+                    'p' => board.pieces[BLACK][PAWN] ^= bit,
+                    'N' => board.pieces[WHITE][KNIGHT] ^= bit,
+                    'n' => board.pieces[BLACK][KNIGHT] ^= bit,
+                    'B' => board.pieces[WHITE][BISHOP] ^= bit,
+                    'b' => board.pieces[BLACK][BISHOP] ^= bit,
+                    'R' => board.pieces[WHITE][ROOK] ^= bit,
+                    'r' => board.pieces[BLACK][ROOK] ^= bit,
+                    'Q' => board.pieces[WHITE][QUEEN] ^= bit,
+                    'q' => board.pieces[BLACK][QUEEN] ^= bit,
+                    'K' => board.pieces[WHITE][KING] ^= bit,
+                    'k' => board.pieces[BLACK][KING] ^= bit,
                     _ => panic!("Invalid FEN")
                 }
                 file += 1;
@@ -324,9 +317,12 @@ impl Bitboard {
                 board.fullmove_clock = parts[5].parse::<u8>().unwrap();
             }
         }
-        board.pieces[WOCC] = board.pieces[WP] | board.pieces[WN] | board.pieces[WB] | board.pieces[WR] | board.pieces[WQ] | board.pieces[WK];
-        board.pieces[BOCC] = board.pieces[BP] | board.pieces[BN] | board.pieces[BB] | board.pieces[BR] | board.pieces[BQ] | board.pieces[BK];
-        board.pieces[OCC] = board.pieces[WOCC] | board.pieces[BOCC];
+        for color in 0..2 {
+            board.pieces_occ[color] = board.pieces[color][PAWN];
+            for piece in 1..6 {
+                board.pieces_occ[color] |= board.pieces[color][piece];
+            }
+        }
         board
     }
 
@@ -338,30 +334,30 @@ impl Bitboard {
             for file in 0..8 {
                 let sq_ind = coords_to_sq_ind(file, rank);
                 let bit = sq_ind_to_bit(sq_ind);
-                if bit & self.pieces[WK] != 0 {
-                    print!("K ");
-                } else if bit & self.pieces[WQ] != 0 {
-                    print!("Q ");
-                } else if bit & self.pieces[WR] != 0 {
-                    print!("R ");
-                } else if bit & self.pieces[WB] != 0 {
-                    print!("B ");
-                } else if bit & self.pieces[WN] != 0 {
-                    print!("N ");
-                } else if bit & self.pieces[WP] != 0 {
+                if bit & self.pieces[WHITE][PAWN] != 0 {
                     print!("P ");
-                } else if bit & self.pieces[BK] != 0 {
-                    print!("k ");
-                } else if bit & self.pieces[BQ] != 0 {
-                    print!("q ");
-                } else if bit & self.pieces[BR] != 0 {
-                    print!("r ");
-                } else if bit & self.pieces[BB] != 0 {
-                    print!("b ");
-                } else if bit & self.pieces[BN] != 0 {
-                    print!("n ");
-                } else if bit & self.pieces[BP] != 0 {
+                } else if bit & self.pieces[BLACK][PAWN] != 0 {
                     print!("p ");
+                } else if bit & self.pieces[WHITE][KNIGHT] != 0 {
+                    print!("N ");
+                } else if bit & self.pieces[BLACK][KNIGHT] != 0 {
+                    print!("n ");
+                } else if bit & self.pieces[WHITE][BISHOP] != 0 {
+                    print!("B ");
+                } else if bit & self.pieces[BLACK][BISHOP] != 0 {
+                    print!("b ");
+                } else if bit & self.pieces[WHITE][ROOK] != 0 {
+                    print!("R ");
+                } else if bit & self.pieces[BLACK][ROOK] != 0 {
+                    print!("r ");
+                } else if bit & self.pieces[WHITE][QUEEN] != 0 {
+                    print!("Q ");
+                } else if bit & self.pieces[BLACK][QUEEN] != 0 {
+                    print!("q ");
+                } else if bit & self.pieces[WHITE][KING] != 0 {
+                    print!("K ");
+                } else if bit & self.pieces[BLACK][KING] != 0 {
+                    print!("k ");
                 } else {
                     print!(". ");
                 }
@@ -372,31 +368,6 @@ impl Bitboard {
         println!("    a b c d e f g h");
     }
 
-    /// Flips the board vertically, returning a new board.
-    ///
-    /// This method creates a new Bitboard with the position flipped vertically,
-    /// effectively switching the perspectives of White and Black.
-    ///
-    /// # Returns
-    ///
-    /// A new Bitboard struct representing the vertically flipped position.
-    pub fn flip_vertically(&self) -> Bitboard {
-        Bitboard {
-            game_result: self.game_result,
-            w_to_move: !self.w_to_move,
-            w_castle_k: self.b_castle_k,
-            w_castle_q: self.b_castle_q,
-            b_castle_k: self.w_castle_k,
-            b_castle_q: self.w_castle_q,
-            en_passant: { if self.en_passant.is_none() { None } else { Some(flip_sq_ind_vertically(self.en_passant.unwrap())) } },
-            halfmove_clock: self.halfmove_clock,
-            fullmove_clock: self.fullmove_clock,
-            pieces: self.pieces.iter().map(|&x| flip_vertically(x)).collect(),
-            eval: -self.eval,
-            game_phase: self.game_phase
-        }
-    }
-
     /// Gets the piece type at a given square index.
     ///
     /// # Arguments
@@ -405,10 +376,62 @@ impl Bitboard {
     ///
     /// # Returns
     ///
-    /// An Option containing the piece type (0-11) if a piece is present, or None if the square is empty.
-    pub fn get_piece(&self, sq_ind: usize) -> Option<usize> {
+    /// An Option containing the piece type if a piece is present, or None if the square is empty.
+    pub fn get_piece(&self, sq_ind: usize) -> Option<(usize, usize)> {
         let bit = sq_ind_to_bit(sq_ind);
-        (0..12).find(|&i| bit & self.pieces[i] != 0)
+        if bit & self.pieces[WHITE][PAWN] != 0 {
+            Some((WHITE, PAWN))
+        } else if bit & self.pieces[BLACK][PAWN] != 0 {
+            Some((BLACK, PAWN))
+        } else if bit & self.pieces[WHITE][KNIGHT] != 0 {
+            Some((WHITE, KNIGHT))
+        } else if bit & self.pieces[BLACK][KNIGHT] != 0 {
+            Some((BLACK, KNIGHT))
+        } else if bit & self.pieces[WHITE][BISHOP] != 0 {
+            Some((WHITE, BISHOP))
+        } else if bit & self.pieces[BLACK][BISHOP] != 0 {
+            Some((BLACK, BISHOP))
+        } else if bit & self.pieces[WHITE][ROOK] != 0 {
+            Some((WHITE, ROOK))
+        } else if bit & self.pieces[BLACK][ROOK] != 0 {
+            Some((BLACK, ROOK))
+        } else if bit & self.pieces[WHITE][QUEEN] != 0 {
+            Some((WHITE, QUEEN))
+        } else if bit & self.pieces[BLACK][QUEEN] != 0 {
+            Some((BLACK, QUEEN))
+        } else if bit & self.pieces[WHITE][KING] != 0 {
+            Some((WHITE, KING))
+        } else if bit & self.pieces[BLACK][KING] != 0 {
+            Some((BLACK, KING))
+        } else {
+            None
+        }
+    }
+
+    /// Returns the bitboard for a specific piece type and color.
+    ///
+    /// # Arguments
+    ///
+    /// * `color` - The color of the piece (White or Black)
+    /// * `piece_type` - The type of the piece (Pawn, Knight, Bishop, Rook, Queen, or King)
+    ///
+    /// # Returns
+    ///
+    /// A 64-bit unsigned integer representing the bitboard for the specified piece type and color.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use kingfisher::bitboard::Bitboard;
+    /// use kingfisher::piece_types::{PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING, WHITE, BLACK};
+    /// let board = Bitboard::new(); // Assume this creates a standard starting position
+    /// let white_pawns = board.get_piece_bitboard(WHITE, PAWN);
+    /// let black_pawns = board.get_piece_bitboard(BLACK, PAWN);
+    /// assert_eq!(white_pawns, 0x000000000000FF00); // All white pawns on their starting squares
+    /// assert_eq!(black_pawns, 0x00FF000000000000); // All black pawns on their starting squares
+    /// ```
+    pub fn get_piece_bitboard(&self, color: usize, piece_type: usize) -> u64 {
+        self.pieces[color][piece_type]
     }
 
     /// Determines whether the current position is legal.
@@ -423,15 +446,16 @@ impl Bitboard {
     ///
     /// A boolean indicating whether the current position is legal.
     pub fn is_legal(&self, move_gen: &MoveGen) -> bool {
+        self.print();
         let king_sq_ind: usize;
         if self.w_to_move {
-            king_sq_ind = bit_to_sq_ind(self.pieces[BK]);
+            king_sq_ind = bit_to_sq_ind(self.pieces[BLACK][KING]);
             if king_sq_ind == 64 {
                 println!("No black king");
                 self.print();
             }
         } else {
-            king_sq_ind = bit_to_sq_ind(self.pieces[WK]);
+            king_sq_ind = bit_to_sq_ind(self.pieces[WHITE][KING]);
             if king_sq_ind == 64 {
                 println!("No white king");
                 self.print();
@@ -457,7 +481,7 @@ impl Bitboard {
     pub fn is_checkmate_or_stalemate(&self, move_gen: &MoveGen) -> (bool, bool) {
         // Generate all pseudo-legal moves
         let (captures, moves) = move_gen.gen_pseudo_legal_moves(self);
-        
+
         // Check if any of the captures are legal
         if !captures.is_empty() {
             for c in captures {
@@ -477,7 +501,7 @@ impl Bitboard {
                 }
             }
         }
-        
+
         // If we get here, there are no legal moves.
         // Check if the current position is in check
         let is_check = self.is_check(move_gen);
@@ -500,9 +524,9 @@ impl Bitboard {
     pub fn is_check(&self, move_gen: &MoveGen) -> bool {
         let king_sq_ind: usize;
         if self.w_to_move {
-            king_sq_ind = bit_to_sq_ind(self.pieces[WK]);
+            king_sq_ind = bit_to_sq_ind(self.pieces[WHITE][KING]);
         } else {
-            king_sq_ind = bit_to_sq_ind(self.pieces[BK]);
+            king_sq_ind = bit_to_sq_ind(self.pieces[BLACK][KING]);
         }
         self.is_square_attacked(king_sq_ind, !self.w_to_move, move_gen)
     }
@@ -522,49 +546,73 @@ impl Bitboard {
         // Find out if the square is attacked by a given side (white if by_white is true, black if by_white is false).
         if by_white {
             // Can the king reach an enemy bishop or queen by a bishop move?
-            if (move_gen.gen_bishop_potential_captures(self, sq_ind) & (self.pieces[WB] | self.pieces[WQ])) != 0 {
+            if (move_gen.gen_bishop_potential_captures(self, sq_ind) & (self.pieces[WHITE][BISHOP] | self.pieces[WHITE][QUEEN])) != 0 {
                 return true;
             }
             // Can the king reach an enemy rook or queen by a rook move?
-            if (move_gen.gen_rook_potential_captures(self, sq_ind) & (self.pieces[WR] | self.pieces[WQ])) != 0 {
+            if (move_gen.gen_rook_potential_captures(self, sq_ind) & (self.pieces[WHITE][ROOK] | self.pieces[WHITE][QUEEN])) != 0 {
                 return true;
             }
             // Can the king reach an enemy knight by a knight move?
-            if (move_gen.n_move_bitboard[sq_ind] & self.pieces[WN]) != 0 {
+            if (move_gen.n_move_bitboard[sq_ind] & self.pieces[WHITE][KNIGHT]) != 0 {
                 return true;
             }
             // Can the king reach an enemy pawn by a pawn move?
-            if (move_gen.bp_capture_bitboard[sq_ind] & self.pieces[WP]) != 0 {
+            if (move_gen.bp_capture_bitboard[sq_ind] & self.pieces[WHITE][PAWN]) != 0 {
                 return true;
             }
             // Can the king reach an enemy king by a king move?
-            if (move_gen.k_move_bitboard[sq_ind] & self.pieces[WK]) != 0 {
+            if (move_gen.k_move_bitboard[sq_ind] & self.pieces[WHITE][KING]) != 0 {
                 return true;
             }
             false
         } else {
             // Can the king reach an enemy bishop or queen by a bishop move?
-            if (move_gen.gen_bishop_potential_captures(self, sq_ind) & (self.pieces[BB] | self.pieces[BQ])) != 0 {
+            if (move_gen.gen_bishop_potential_captures(self, sq_ind) & (self.pieces[BLACK][BISHOP] | self.pieces[BLACK][QUEEN])) != 0 {
                 return true;
             }
             // Can the king reach an enemy rook or queen by a rook move?
-            if (move_gen.gen_rook_potential_captures(self, sq_ind) & (self.pieces[BR] | self.pieces[BQ])) != 0 {
+            if (move_gen.gen_rook_potential_captures(self, sq_ind) & (self.pieces[BLACK][ROOK] | self.pieces[BLACK][QUEEN])) != 0 {
                 return true;
             }
             // Can the king reach an enemy knight by a knight move?
-            if (move_gen.n_move_bitboard[sq_ind] & self.pieces[BN]) != 0 {
+            if (move_gen.n_move_bitboard[sq_ind] & self.pieces[BLACK][KNIGHT]) != 0 {
                 return true;
             }
             // Can the king reach an enemy pawn by a pawn move?
-            if (move_gen.wp_capture_bitboard[sq_ind] & self.pieces[BP]) != 0 {
+            if (move_gen.wp_capture_bitboard[sq_ind] & self.pieces[BLACK][PAWN]) != 0 {
                 return true;
             }
             // Can the king reach an enemy king by a king move?
-            if (move_gen.k_move_bitboard[sq_ind] & self.pieces[BK]) != 0 {
+            if (move_gen.k_move_bitboard[sq_ind] & self.pieces[BLACK][KING]) != 0 {
                 return true;
             }
             false
         }
+    }
+
+    /// Checks if the current position has occurred three times, resulting in a draw by repetition.
+    ///
+    /// This method considers a position to be repeated if:
+    /// - The piece positions are identical
+    /// - The side to move is the same
+    /// - The castling rights are the same
+    /// - The en passant possibilities are the same
+    ///
+    /// # Returns
+    ///
+    /// `true` if the current position has occurred three times, `false` otherwise.
+    ///
+    /// # Note
+    ///
+    /// This method relies on the Zobrist hash of the position, which includes all
+    /// relevant aspects of the chess position.
+    pub fn is_draw_by_repetition(&self) -> bool {
+        // Compute hash of current position
+        let hash = self.compute_zobrist_hash();
+
+        // Check if there are 3 or more repetitions of the same hash
+        *self.position_history.get(&hash).unwrap() >= 3
     }
 
 }

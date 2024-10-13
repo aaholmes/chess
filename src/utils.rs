@@ -3,9 +3,9 @@
 //! This module contains various utility functions used throughout the chess engine,
 //! including functions for printing bitboards, moves, and performing performance tests.
 
-use crate::bitboard::{Bitboard, coords_to_sq_ind, sq_ind_to_algebraic, sq_ind_to_bit};
+use crate::bitboard::{coords_to_sq_ind, sq_ind_to_algebraic, sq_ind_to_bit};
 use crate::move_types::Move;
-use crate::move_generation::MoveGen;
+use crate::piece_types::PieceType;
 
 /// Print a u64 as an 8x8 chess board representation
 ///
@@ -52,11 +52,11 @@ pub fn print_move(the_move: &Move) -> String {
     let mut promotion = String::from("");
     if the_move.promotion.is_some() {
         promotion = String::from("=");
-        match the_move.promotion.unwrap() / 2 {
-            1 => promotion.push('N'),
-            2 => promotion.push('B'),
-            3 => promotion.push('R'),
-            4 => promotion.push('Q'),
+        match the_move.promotion.unwrap() {
+            KNIGHT => promotion.push('N'),
+            BISHOP => promotion.push('B'),
+            ROOK => promotion.push('R'),
+            QUEEN => promotion.push('Q'),
             _ => panic!("Invalid promotion piece")
         }
     }

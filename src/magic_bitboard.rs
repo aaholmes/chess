@@ -19,12 +19,14 @@
 // Note also that the pesto eval has 25 game modes, ranging from opening to endgame, so our non-capture move ordering should be different for each game mode.
 
 
-use crate::bitboard::{Bitboard, sq_ind_to_bit, WP, BP, WN, BN, WB, BB, WR, BR, WQ, BQ, WK, BK, WOCC, BOCC, OCC};
+use crate::bitboard::sq_ind_to_bit;
 use crate::bits::bits;
 use crate::move_types::Move;
-use crate::magic_constants::{R_MAGICS, B_MAGICS, R_BITS, B_BITS, R_MASKS, B_MASKS};
+use crate::magic_constants::{R_BITS, B_BITS, R_MASKS, B_MASKS};
+use crate::piece_types::{KNIGHT, BISHOP, ROOK, QUEEN};
 
 use crate::eval::PestoEval;
+use crate::piece_types::PieceType;
 
 const NOT_A_FILE: u64 = 0xfefefefefefefefe;
 const NOT_H_FILE: u64 = 0x7f7f7f7f7f7f7f7f;
@@ -527,14 +529,14 @@ pub fn bishop_attacks(sq: usize, block: u64) -> (Vec<usize>, Vec<usize>) {
 /// The number of promotion moves added.
 pub fn append_promotions(promotions: &mut Vec<Move>, from_sq_ind: usize, to_sq_ind: &usize, w_to_move: bool) {
     if w_to_move {
-        promotions.push(Move::new(from_sq_ind, *to_sq_ind, Some(WQ)));
-        promotions.push(Move::new(from_sq_ind, *to_sq_ind, Some(WR)));
-        promotions.push(Move::new(from_sq_ind, *to_sq_ind, Some(WN)));
-        promotions.push(Move::new(from_sq_ind, *to_sq_ind, Some(WB)));
+        promotions.push(Move::new(from_sq_ind, *to_sq_ind, Some(QUEEN)));
+        promotions.push(Move::new(from_sq_ind, *to_sq_ind, Some(ROOK)));
+        promotions.push(Move::new(from_sq_ind, *to_sq_ind, Some(KNIGHT)));
+        promotions.push(Move::new(from_sq_ind, *to_sq_ind, Some(BISHOP)));
     } else {
-        promotions.push(Move::new(from_sq_ind, *to_sq_ind, Some(BQ)));
-        promotions.push(Move::new(from_sq_ind, *to_sq_ind, Some(BR)));
-        promotions.push(Move::new(from_sq_ind, *to_sq_ind, Some(BN)));
-        promotions.push(Move::new(from_sq_ind, *to_sq_ind, Some(BB)));
+        promotions.push(Move::new(from_sq_ind, *to_sq_ind, Some(QUEEN)));
+        promotions.push(Move::new(from_sq_ind, *to_sq_ind, Some(ROOK)));
+        promotions.push(Move::new(from_sq_ind, *to_sq_ind, Some(KNIGHT)));
+        promotions.push(Move::new(from_sq_ind, *to_sq_ind, Some(BISHOP)));
     }
 }

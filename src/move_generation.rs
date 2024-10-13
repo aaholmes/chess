@@ -14,12 +14,13 @@
 //! piece types.
 
 use crate::move_types::Move;
-use crate::bitboard::{Bitboard, sq_ind_to_bit, WP, BP, WN, BN, WB, BB, WR, BR, WQ, BQ, WK, BK, WOCC, BOCC, OCC};
+use crate::bitboard::{Bitboard, sq_ind_to_bit};
 use crate::bits::bits;
 use crate::magic_constants::{R_MAGICS, B_MAGICS, R_BITS, B_BITS, R_MASKS, B_MASKS};
 use crate::magic_bitboard::{init_pawn_moves, init_knight_moves, init_bishop_moves, init_rook_moves, init_king_moves, init_pawn_captures_promotions, append_promotions};
 
 use crate::eval::PestoEval;
+use crate::piece_types::{PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING, WHITE, BLACK};
 
 /// Represents the move generator, which generates pseudo-legal moves.
 ///
@@ -276,8 +277,8 @@ impl MoveGen {
         if board.get_piece(to_sq_ind).is_none() {
             return 0;
         }
-        let victim = board.get_piece(to_sq_ind).unwrap() / 2;
-        let attacker = board.get_piece(from_sq_ind).unwrap() / 2;
+        let victim = board.get_piece(to_sq_ind).unwrap().1;
+        let attacker = board.get_piece(from_sq_ind).unwrap().1;
         10 * victim as i32 - attacker as i32
     }
 
@@ -301,12 +302,12 @@ impl MoveGen {
 
         if board.w_to_move {
             // White to move
-            for from_sq_ind in bits(&board.pieces[WP]) {
+            for from_sq_ind in bits(&board.pieces[WHITE][PAWN]) {
                 let is_promotion_rank = from_sq_ind > 47 && from_sq_ind < 56;
 
                 // Handle captures and en passant
                 for to_sq_ind in &self.wp_captures[from_sq_ind] {
-                    if board.pieces[BOCC] & (1 << to_sq_ind) != 0 || board.en_passant == Some(*to_sq_ind) {
+                    if board.pieces_occ[BLACK] & (1u64 << to_sq_ind) != 0 || board.en_passant == Some(*to_sq_ind) {
                         if is_promotion_rank {
                             append_promotions(&mut promotions, from_sq_ind, to_sq_ind, board.w_to_move);
                         } else {
@@ -322,7 +323,7 @@ impl MoveGen {
                             append_promotions(&mut promotions, from_sq_ind, to_sq_ind, board.w_to_move);
                         } else if from_sq_ind > 7 && from_sq_ind < 16 {
                             // Double pawn push
-                            if board.pieces[OCC] & (1 << (from_sq_ind + 8)) == 0 {
+                            if (board.pieces_occ[BLACK] + board.pieces_occ[WHITE]) & (1u64 << (from_sq_ind + 8)) == 0 {
                                 moves.push(Move::new(from_sq_ind, *to_sq_ind, None));
                             }
                         } else {
@@ -333,12 +334,12 @@ impl MoveGen {
             }
         } else {
             // Black to move (similar logic, but for black pawns)
-            for from_sq_ind in bits(&board.pieces[BP]) {
+            for from_sq_ind in bits(&board.pieces[BLACK][PAWN]) {
                 let is_promotion_rank = from_sq_ind > 7 && from_sq_ind < 16;
 
                 // Handle captures and en passant
                 for to_sq_ind in &self.bp_captures[from_sq_ind] {
-                    if board.pieces[WOCC] & (1 << to_sq_ind) != 0 || board.en_passant == Some(*to_sq_ind) {
+                    if board.pieces_occ[WHITE] & (1u64 << to_sq_ind) != 0 || board.en_passant == Some(*to_sq_ind) {
                         if is_promotion_rank {
                             append_promotions(&mut promotions, from_sq_ind, to_sq_ind, board.w_to_move);
                         } else {
@@ -354,7 +355,7 @@ impl MoveGen {
                             append_promotions(&mut promotions, from_sq_ind, to_sq_ind, board.w_to_move);
                         } else if from_sq_ind > 47 && from_sq_ind < 56 {
                             // Double pawn push
-                            if board.pieces[OCC] & (1 << (from_sq_ind - 8)) == 0 {
+                            if (board.pieces_occ[WHITE] + board.pieces_occ[BLACK]) & (1u64 << (from_sq_ind - 8)) == 0 {
                                 moves.push(Move::new(from_sq_ind, *to_sq_ind, None));
                             }
                         } else {
@@ -387,22 +388,22 @@ impl MoveGen {
         let mut captures: Vec<Move> = Vec::with_capacity(16);
         if board.w_to_move {
             // White to move
-            for from_sq_ind in bits(&board.pieces[WN]) {
+            for from_sq_ind in bits(&board.pieces[WHITE][KNIGHT]) {
                 for to_sq_ind in &self.n_moves[from_sq_ind] {
-                    if board.pieces[BOCC] & (1 << to_sq_ind) != 0 {
+                    if board.pieces_occ[BLACK] & (1u64 << to_sq_ind) != 0 {
                         captures.push(Move::new(from_sq_ind, *to_sq_ind, None));
-                    } else if board.pieces[WOCC] & (1 << to_sq_ind) == 0 {
+                    } else if board.pieces_occ[WHITE] & (1u64 << to_sq_ind) == 0 {
                         moves.push(Move::new(from_sq_ind, *to_sq_ind, None));
                     }
                 }
             }
         } else {
             // Black to move
-            for from_sq_ind in bits(&board.pieces[BN]) {
+            for from_sq_ind in bits(&board.pieces[BLACK][KNIGHT]) {
                 for to_sq_ind in &self.n_moves[from_sq_ind] {
-                    if board.pieces[WOCC] & (1 << to_sq_ind) != 0 {
+                    if board.pieces_occ[WHITE] & (1u64 << to_sq_ind) != 0 {
                         captures.push(Move::new(from_sq_ind, *to_sq_ind, None));
-                    } else if board.pieces[BOCC] & (1 << to_sq_ind) == 0 {
+                    } else if board.pieces_occ[BLACK] & (1u64 << to_sq_ind) == 0 {
                         moves.push(Move::new(from_sq_ind, *to_sq_ind, None));
                     }
                 }
@@ -433,21 +434,29 @@ impl MoveGen {
             // White to move
             if board.w_castle_k {
                 // Make sure a rook is there because it could have been captured
-                if board.pieces[WR] & (1 << 7) != 0 && board.pieces[OCC] & ((1 << 5) | (1 << 6)) == 0 && !board.is_square_attacked(4, false, self) && !board.is_square_attacked(5, false, self) && !board.is_square_attacked(6, false, self) {
+                if board.pieces[WHITE][ROOK] & (1u64 << 7) != 0 &&
+                    (board.pieces_occ[WHITE] | board.pieces_occ[BLACK]) & ((1u64 << 5) | (1u64 << 6)) == 0 &&
+                    !board.is_square_attacked(4, false, self) &&
+                    !board.is_square_attacked(5, false, self) &&
+                    !board.is_square_attacked(6, false, self) {
                     moves.push(Move::new(4, 6, None));
                 }
             }
             if board.w_castle_q {
                 // Make sure a rook is there because it could have been captured
-                if board.pieces[WR] & (1 << 0) != 0 && board.pieces[OCC] & ((1 << 1) | (1 << 2) | (1 << 3)) == 0 && !board.is_square_attacked(4, false, self) && !board.is_square_attacked(3, false, self) && !board.is_square_attacked(2, false, self) {
+                if board.pieces[WHITE][ROOK] & (1u64 << 0) != 0 &&
+                    (board.pieces_occ[WHITE] | board.pieces_occ[BLACK]) & ((1u64 << 1) | (1u64 << 2) | (1u64 << 3)) == 0 &&
+                    !board.is_square_attacked(4, false, self) &&
+                    !board.is_square_attacked(3, false, self) &&
+                    !board.is_square_attacked(2, false, self) {
                     moves.push(Move::new(4, 2, None));
                 }
             }
-            for from_sq_ind in bits(&board.pieces[WK]) {
+            for from_sq_ind in bits(&board.pieces[WHITE][KING]) {
                 for to_sq_ind in &self.k_moves[from_sq_ind] {
-                    if board.pieces[BOCC] & (1 << to_sq_ind) != 0 {
+                    if board.pieces_occ[BLACK] & (1u64 << to_sq_ind) != 0 {
                         captures.push(Move::new(from_sq_ind, *to_sq_ind, None));
-                    } else if board.pieces[WOCC] & (1 << to_sq_ind) == 0 {
+                    } else if board.pieces_occ[WHITE] & (1u64 << to_sq_ind) == 0 {
                         moves.push(Move::new(from_sq_ind, *to_sq_ind, None));
                     }
                 }
@@ -456,21 +465,29 @@ impl MoveGen {
             // Black to move
             if board.b_castle_k {
                 // Make sure a rook is there because it could have been captured
-                if board.pieces[BR] & (1 << 63) != 0 && board.pieces[OCC] & ((1 << 61) | (1 << 62)) == 0 && !board.is_square_attacked(60, true, self) && !board.is_square_attacked(61, true, self) && !board.is_square_attacked(62, true, self) {
+                if board.pieces[BLACK][ROOK] & (1u64 << 63) != 0 &&
+                    (board.pieces_occ[WHITE] | board.pieces_occ[BLACK]) & ((1u64 << 61) | (1u64 << 62)) == 0 &&
+                    !board.is_square_attacked(60, true, self) &&
+                    !board.is_square_attacked(61, true, self) &&
+                    !board.is_square_attacked(62, true, self) {
                     moves.push(Move::new(60, 62, None));
                 }
             }
             if board.b_castle_q {
                 // Make sure a rook is there because it could have been captured
-                if board.pieces[BR] & (1 << 56) != 0 && board.pieces[OCC] & ((1 << 57) | (1 << 58) | (1 << 59)) == 0 && !board.is_square_attacked(60, true, self) && !board.is_square_attacked(59, true, self) && !board.is_square_attacked(58, true, self) {
+                if board.pieces[BLACK][ROOK] & (1u64 << 56) != 0 &&
+                    (board.pieces_occ[BLACK] | board.pieces_occ[WHITE]) & ((1u64 << 57) | (1u64 << 58) | (1u64 << 59)) == 0 &&
+                    !board.is_square_attacked(60, true, self) &&
+                    !board.is_square_attacked(59, true, self) &&
+                    !board.is_square_attacked(58, true, self) {
                     moves.push(Move::new(60, 58, None));
                 }
             }
-            for from_sq_ind in bits(&board.pieces[BK]) {
+            for from_sq_ind in bits(&board.pieces[BLACK][KING]) {
                 for to_sq_ind in &self.k_moves[from_sq_ind] {
-                    if board.pieces[WOCC] & (1 << to_sq_ind) != 0 {
+                    if board.pieces_occ[WHITE] & (1u64 << to_sq_ind) != 0 {
                         captures.push(Move::new(from_sq_ind, *to_sq_ind, None));
-                    } else if board.pieces[BOCC] & (1 << to_sq_ind) == 0 {
+                    } else if board.pieces_occ[BLACK] & (1u64 << to_sq_ind) == 0 {
                         moves.push(Move::new(from_sq_ind, *to_sq_ind, None));
                     }
                 }
@@ -501,44 +518,44 @@ impl MoveGen {
         let mut key: usize;
         if board.w_to_move {
             // White to move
-            for from_sq_ind in bits(&board.pieces[WR]) {
+            for from_sq_ind in bits(&board.pieces[WHITE][ROOK]) {
                 // Mask blockers
-                blockers = board.pieces[OCC] & R_MASKS[from_sq_ind];
+                blockers = (board.pieces_occ[BLACK] | board.pieces_occ[WHITE]) & R_MASKS[from_sq_ind];
 
                 // Generate the key using a multiplication and right shift
                 key = ((blockers.wrapping_mul(self.r_magics[from_sq_ind])) >> (64 - R_BITS[from_sq_ind])) as usize;
 
                 // Return the preinitialized attack set bitboard from the table
                 for to_sq_ind in &self.r_moves[from_sq_ind][key].0 {
-                    if board.pieces[BOCC] & (1 << to_sq_ind) != 0 {
+                    if board.pieces_occ[BLACK] & (1u64 << to_sq_ind) != 0 {
                         captures.push(Move::new(from_sq_ind, *to_sq_ind, None));
                     }
                 }
                 for to_sq_ind in &self.r_moves[from_sq_ind][key].1 {
                     // Have to make sure we're not capturing our own piece, since pieces on the edge are not included in blockers
-                    if board.pieces[WOCC] & (1 << to_sq_ind) == 0 {
+                    if board.pieces_occ[WHITE] & (1u64 << to_sq_ind) == 0 {
                         moves.push(Move::new(from_sq_ind, *to_sq_ind, None));
                     }
                 }
             }
         } else {
             // Black to move
-            for from_sq_ind in bits(&board.pieces[BR]) {
+            for from_sq_ind in bits(&board.pieces[BLACK][ROOK]) {
                 // Mask blockers
-                blockers = board.pieces[OCC] & R_MASKS[from_sq_ind];
+                blockers = (board.pieces_occ[BLACK] | board.pieces_occ[WHITE]) & R_MASKS[from_sq_ind];
 
                 // Generate the key using a multiplication and right shift
                 key = ((blockers.wrapping_mul(self.r_magics[from_sq_ind])) >> (64 - R_BITS[from_sq_ind])) as usize;
 
                 // Return the preinitialized attack set bitboard from the table
                 for to_sq_ind in &self.r_moves[from_sq_ind][key].0 {
-                    if board.pieces[WOCC] & (1 << to_sq_ind) != 0 {
+                    if board.pieces_occ[WHITE] & (1u64 << to_sq_ind) != 0 {
                         captures.push(Move::new(from_sq_ind, *to_sq_ind, None));
                     }
                 }
                 for to_sq_ind in &self.r_moves[from_sq_ind][key].1 {
                     // Have to make sure we're not capturing our own piece, since pieces on the edge are not included in blockers
-                    if board.pieces[BOCC] & (1 << to_sq_ind) == 0 {
+                    if board.pieces_occ[BLACK] & (1u64 << to_sq_ind) == 0 {
                         moves.push(Move::new(from_sq_ind, *to_sq_ind, None));
                     }
                 }
@@ -552,7 +569,7 @@ impl MoveGen {
         // Used to determine whether a king is in check.
 
         // Mask blockers
-        let blockers: u64 = board.pieces[OCC] & B_MASKS[from_sq_ind];
+        let blockers: u64 = (board.pieces_occ[BLACK] | board.pieces_occ[WHITE]) & B_MASKS[from_sq_ind];
 
         // Generate the key using a multiplication and right shift
         let key: usize = ((blockers.wrapping_mul(self.b_magics[from_sq_ind])) >> (64 - B_BITS[from_sq_ind])) as usize;
@@ -566,7 +583,7 @@ impl MoveGen {
         // Used to determine whether a king is in check.
 
         // Mask blockers
-        let blockers: u64 = board.pieces[OCC] & R_MASKS[from_sq_ind];
+        let blockers: u64 = (board.pieces_occ[BLACK] | board.pieces_occ[WHITE]) & R_MASKS[from_sq_ind];
 
         // Generate the key using a multiplication and right shift
         let key: usize = ((blockers.wrapping_mul(self.r_magics[from_sq_ind])) >> (64 - R_BITS[from_sq_ind])) as usize;
@@ -597,44 +614,44 @@ impl MoveGen {
         let mut key: usize;
         if board.w_to_move {
             // White to move
-            for from_sq_ind in bits(&board.pieces[WB]) {
+            for from_sq_ind in bits(&board.pieces[WHITE][BISHOP]) {
                 // Mask blockers
-                blockers = board.pieces[OCC] & B_MASKS[from_sq_ind];
+                blockers = (board.pieces_occ[BLACK] | board.pieces_occ[WHITE]) & B_MASKS[from_sq_ind];
 
                 // Generate the key using a multiplication and right shift
                 key = ((blockers.wrapping_mul(self.b_magics[from_sq_ind])) >> (64 - B_BITS[from_sq_ind])) as usize;
 
                 // Return the preinitialized attack set bitboard from the table
                 for to_sq_ind in &self.b_moves[from_sq_ind][key].0 {
-                    if board.pieces[BOCC] & (1 << to_sq_ind) != 0 {
+                    if board.pieces_occ[BLACK] & (1u64 << to_sq_ind) != 0 {
                         captures.push(Move::new(from_sq_ind, *to_sq_ind, None));
                     }
                 }
                 for to_sq_ind in &self.b_moves[from_sq_ind][key].1 {
                     // Have to make sure we're not capturing our own piece, since pieces on the edge are not included in blockers
-                    if board.pieces[WOCC] & (1 << to_sq_ind) == 0 {
+                    if board.pieces_occ[WHITE] & (1u64 << to_sq_ind) == 0 {
                         moves.push(Move::new(from_sq_ind, *to_sq_ind, None));
                     }
                 }
             }
         } else {
             // Black to move
-            for from_sq_ind in bits(&board.pieces[BB]) {
+            for from_sq_ind in bits(&board.pieces[BLACK][BISHOP]) {
                 // Mask blockers
-                blockers = board.pieces[OCC] & B_MASKS[from_sq_ind];
+                blockers = (board.pieces_occ[BLACK] | board.pieces_occ[WHITE]) & B_MASKS[from_sq_ind];
 
                 // Generate the key using a multiplication and right shift
                 key = ((blockers.wrapping_mul(self.b_magics[from_sq_ind])) >> (64 - B_BITS[from_sq_ind])) as usize;
 
                 // Return the preinitialized attack set bitboard from the table
                 for to_sq_ind in &self.b_moves[from_sq_ind][key].0 {
-                    if board.pieces[WOCC] & (1 << to_sq_ind) != 0 {
+                    if board.pieces_occ[WHITE] & (1u64 << to_sq_ind) != 0 {
                         captures.push(Move::new(from_sq_ind, *to_sq_ind, None));
                     }
                 }
                 for to_sq_ind in &self.b_moves[from_sq_ind][key].1 {
                     // Have to make sure we're not capturing our own piece, since pieces on the edge are not included in blockers
-                    if board.pieces[BOCC] & (1 << to_sq_ind) == 0 {
+                    if board.pieces_occ[BLACK] & (1u64 << to_sq_ind) == 0 {
                         moves.push(Move::new(from_sq_ind, *to_sq_ind, None));
                     }
                 }
@@ -665,80 +682,80 @@ impl MoveGen {
         let mut key: usize;
         if board.w_to_move {
             // White to move
-            for from_sq_ind in bits(&board.pieces[WQ]) {
+            for from_sq_ind in bits(&board.pieces[WHITE][QUEEN]) {
                 // Mask blockers
-                blockers = board.pieces[OCC] & R_MASKS[from_sq_ind];
+                blockers = (board.pieces_occ[BLACK] | board.pieces_occ[WHITE]) & R_MASKS[from_sq_ind];
 
                 // Generate the key using a multiplication and right shift
                 key = ((blockers.wrapping_mul(self.r_magics[from_sq_ind])) >> (64 - R_BITS[from_sq_ind])) as usize;
 
                 // Return the preinitialized attack set bitboard from the table
                 for to_sq_ind in &self.r_moves[from_sq_ind][key].0 {
-                    if board.pieces[BOCC] & (1 << to_sq_ind) != 0 {
+                    if board.pieces_occ[BLACK] & (1u64 << to_sq_ind) != 0 {
                         captures.push(Move::new(from_sq_ind, *to_sq_ind, None));
                     }
                 }
                 for to_sq_ind in &self.r_moves[from_sq_ind][key].1 {
                     // Have to make sure we're not capturing our own piece, since pieces on the edge are not included in blockers
-                    if board.pieces[WOCC] & (1 << to_sq_ind) == 0 {
+                    if board.pieces_occ[WHITE] & (1u64 << to_sq_ind) == 0 {
                         moves.push(Move::new(from_sq_ind, *to_sq_ind, None));
                     }
                 }
                 // Mask blockers
-                blockers = board.pieces[OCC] & B_MASKS[from_sq_ind];
+                blockers = (board.pieces_occ[BLACK] | board.pieces_occ[WHITE]) & B_MASKS[from_sq_ind];
 
                 // Generate the key using a multiplication and right shift
                 key = ((blockers.wrapping_mul(self.b_magics[from_sq_ind])) >> (64 - B_BITS[from_sq_ind])) as usize;
 
                 // Return the preinitialized attack set bitboard from the table
                 for to_sq_ind in &self.b_moves[from_sq_ind][key].0 {
-                    if board.pieces[BOCC] & (1 << to_sq_ind) != 0 {
+                    if board.pieces_occ[BLACK] & (1u64 << to_sq_ind) != 0 {
                         captures.push(Move::new(from_sq_ind, *to_sq_ind, None));
                     }
                 }
                 for to_sq_ind in &self.b_moves[from_sq_ind][key].1 {
                     // Have to make sure we're not capturing our own piece, since pieces on the edge are not included in blockers
-                    if board.pieces[WOCC] & (1 << to_sq_ind) == 0 {
+                    if board.pieces_occ[WHITE] & (1u64 << to_sq_ind) == 0 {
                         moves.push(Move::new(from_sq_ind, *to_sq_ind, None));
                     }
                 }
             }
         } else {
             // Black to move
-            for from_sq_ind in bits(&board.pieces[BQ]) {
+            for from_sq_ind in bits(&board.pieces[BLACK][QUEEN]) {
                 // Mask blockers
-                blockers = board.pieces[OCC] & R_MASKS[from_sq_ind];
+                blockers = (board.pieces_occ[BLACK] | board.pieces_occ[WHITE]) & R_MASKS[from_sq_ind];
 
                 // Generate the key using a multiplication and right shift
                 key = ((blockers.wrapping_mul(self.r_magics[from_sq_ind])) >> (64 - R_BITS[from_sq_ind])) as usize;
 
                 // Return the preinitialized attack set bitboard from the table
                 for to_sq_ind in &self.r_moves[from_sq_ind][key].0 {
-                    if board.pieces[WOCC] & (1 << to_sq_ind) != 0 {
+                    if board.pieces_occ[WHITE] & (1u64 << to_sq_ind) != 0 {
                         captures.push(Move::new(from_sq_ind, *to_sq_ind, None));
                     }
                 }
                 for to_sq_ind in &self.r_moves[from_sq_ind][key].1 {
                     // Have to make sure we're not capturing our own piece, since pieces on the edge are not included in blockers
-                    if board.pieces[BOCC] & (1 << to_sq_ind) == 0 {
+                    if board.pieces_occ[BLACK] & (1u64 << to_sq_ind) == 0 {
                         moves.push(Move::new(from_sq_ind, *to_sq_ind, None));
                     }
                 }
                 // Mask blockers
-                blockers = board.pieces[OCC] & B_MASKS[from_sq_ind];
+                blockers = (board.pieces_occ[BLACK] | board.pieces_occ[WHITE]) & B_MASKS[from_sq_ind];
 
                 // Generate the key using a multiplication and right shift
                 key = ((blockers.wrapping_mul(self.b_magics[from_sq_ind])) >> (64 - B_BITS[from_sq_ind])) as usize;
 
                 // Return the preinitialized attack set bitboard from the table
                 for to_sq_ind in &self.b_moves[from_sq_ind][key].0 {
-                    if board.pieces[WOCC] & (1 << to_sq_ind) != 0 {
+                    if board.pieces_occ[WHITE] & (1u64 << to_sq_ind) != 0 {
                         captures.push(Move::new(from_sq_ind, *to_sq_ind, None));
                     }
                 }
                 for to_sq_ind in &self.b_moves[from_sq_ind][key].1 {
                     // Have to make sure we're not capturing our own piece, since pieces on the edge are not included in blockers
-                    if board.pieces[BOCC] & (1 << to_sq_ind) == 0 {
+                    if board.pieces_occ[BLACK] & (1u64 << to_sq_ind) == 0 {
                         moves.push(Move::new(from_sq_ind, *to_sq_ind, None));
                     }
                 }
