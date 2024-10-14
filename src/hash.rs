@@ -62,7 +62,7 @@ impl ZobristKeys {
         for color in [WHITE, BLACK] {
             for piece_type in [PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING] {
                 for square in 0..SQUARES {
-                    keys.piece_keys[color as usize][piece_type as usize][square] = rng.gen();
+                    keys.piece_keys[color][piece_type][square] = rng.gen();
                 }
             }
         }
@@ -106,7 +106,7 @@ impl Bitboard {
             for piece_type in [PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING] {
                 let piece_bitboard = self.get_piece_bitboard(color, piece_type);
                 for square in bits(&piece_bitboard) {
-                    hash ^= ZOBRIST_KEYS.piece_keys[color as usize][piece_type as usize][square];
+                    hash ^= ZOBRIST_KEYS.piece_keys[color][piece_type][square];
                 }
             }
         }

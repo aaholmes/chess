@@ -37,7 +37,7 @@ impl Bitboard {
         if to_piece.is_some() {
             // Capture: Remove the captured piece before moving.
             let (color, piece) = to_piece.unwrap();
-            new_board.pieces[color as usize][piece as usize] ^= to_bit;
+            new_board.pieces[color][piece] ^= to_bit;
             new_board.halfmove_clock = 0;
         }
 
@@ -65,13 +65,13 @@ impl Bitboard {
 
         // Finally, move the piece.
         let (color, piece) = from_piece.unwrap();
-        new_board.pieces[color as usize][piece as usize] ^= from_bit;
-        new_board.pieces[color as usize][piece as usize] ^= to_bit;
+        new_board.pieces[color][piece] ^= from_bit;
+        new_board.pieces[color][piece] ^= to_bit;
 
         // Handle promotions
         if let Some(promotion) = the_move.promotion {
-            new_board.pieces[color as usize][piece as usize] ^= to_bit;
-            new_board.pieces[color as usize][promotion as usize] ^= to_bit;
+            new_board.pieces[color][piece] ^= to_bit;
+            new_board.pieces[color][promotion] ^= to_bit;
         }
 
         // Handle castling
