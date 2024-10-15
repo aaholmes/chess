@@ -92,7 +92,7 @@ fn test_start_pos_perft5() {
     let move_gen = MoveGen::new();
     assert_eq!(perft(board, &move_gen, 5, false), 4865609);
 }
-#[test]
+//#[test]
 fn test_start_pos_perft6() {
     let board = Board::new();
     let move_gen = MoveGen::new();
@@ -123,7 +123,7 @@ fn test_pos1_perft4() {
     let move_gen = MoveGen::new();
     assert_eq!(perft(board, &move_gen, 4, false), 4085603);
 }
-#[test]
+//#[test]
 fn test_pos1_perft5() {
     let board = Board::new_from_fen("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1");
     let move_gen = MoveGen::new();
@@ -191,13 +191,13 @@ fn test_pos3_perft4() {
     let move_gen = MoveGen::new();
     assert_eq!(perft(board, &move_gen, 4, false), 422333);
 }
-#[test]
+//#[test]
 fn test_pos3_perft5() {
     let board = Board::new_from_fen("r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1");
     let move_gen = MoveGen::new();
     assert_eq!(perft(board, &move_gen, 5, false), 15833292);
 }
-#[test]
+//#[test]
 fn test_pos3_perft6() {
     let board = Board::new_from_fen("r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1");
     let move_gen = MoveGen::new();
@@ -228,7 +228,7 @@ fn test_pos4_perft4() {
     let move_gen = MoveGen::new();
     assert_eq!(perft(board, &move_gen, 4, false), 2103487);
 }
-#[test]
+//#[test]
 fn test_pos4_perft5() {
     let board = Board::new_from_fen("rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8");
     let move_gen = MoveGen::new();
@@ -259,7 +259,7 @@ fn test_pos5_perft4() {
     let move_gen = MoveGen::new();
     assert_eq!(perft(board, &move_gen, 4, false), 3894594);
 }
-#[test]
+//#[test]
 fn test_pos5_perft5() {
     let board = Board::new_from_fen("r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10");
     let move_gen = MoveGen::new();

@@ -270,7 +270,7 @@ impl MoveGen {
     captures
     }
 
-    fn mvv_lva(&self, board: &Board, from_sq_ind: usize, to_sq_ind: usize) -> i32 {
+    pub fn mvv_lva(&self, board: &Board, from_sq_ind: usize, to_sq_ind: usize) -> i32 {
         // Return the MVV-LVA score for a capture move.
         // To enable sorting by MVV, then by LVA, we return the score as 10 * victim - attacker,
         // where value is 012345 for kpnbrq
