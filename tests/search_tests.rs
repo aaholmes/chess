@@ -1,5 +1,5 @@
 use kingfisher::boardstack::BoardStack;
-use kingfisher::search::mate_search;
+use kingfisher::search::{mate_search, negamax_search};
 use kingfisher::move_generation::MoveGen;
 use kingfisher::search::{alpha_beta_search, iterative_deepening_ab_search};
 use kingfisher::eval::PestoEval;
@@ -82,4 +82,21 @@ fn test_search_stability() {
     // The scores and best moves should be the same across multiple runs
     assert_eq!(score1, score2);
     assert_eq!(best_move1, best_move2);
+}
+
+// Count the number of nodes visited in the negamax search and the alpha-beeta search, for a depth of up to 4 ply.
+// This is used to determine the effectiveness of the alpha-beta search.
+#[test]
+fn test_pruning() {
+    let mut board = BoardStack::new();
+    let move_gen = MoveGen::new();
+    let pesto = PestoEval::new();
+    for depth in 1..6 {
+        let (negamax_eval, negamax_move, negamax_nodes) = negamax_search(&mut board, &move_gen, &pesto, depth);
+        let (alpha_beta_eval, alpha_beta_move, alpha_beta_nodes) = alpha_beta_search(&mut board, &move_gen, &pesto, depth, -1000000, 1000000, 0, false);
+        assert!(negamax_eval == alpha_beta_eval, "Evals don't match for depth {}, negamax eval: {}, alpha-beta eval: {}", depth, negamax_eval, alpha_beta_eval);
+        assert!(negamax_move == alpha_beta_move, "Moves don't match for depth {}, negamax move: {}, alpha-beta move: {}", depth, negamax_move.print_algebraic(), alpha_beta_move.print_algebraic());
+        println!("Move, eval = {}, {}", &negamax_move.print_algebraic(), negamax_eval);
+        println!("Depth: {}, Negamax nodes: {}, Alpha-beta nodes: {}", depth, negamax_nodes, alpha_beta_nodes);
+    }
 }

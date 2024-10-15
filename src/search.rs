@@ -72,7 +72,7 @@ pub fn negamax_search(board: &mut BoardStack, move_gen: &MoveGen, pesto: &PestoE
 fn negamax(board: &mut BoardStack, move_gen: &MoveGen, pesto: &PestoEval, depth: i32) -> (i32, i32) {
     if depth == 0 {
         // Leaf node: return the board evaluation
-        return (-pesto.eval(&board.current_state()), 1);
+        return (pesto.eval(&board.current_state()), 1);
     }
     
     let mut best_eval: i32 = -1000000;
