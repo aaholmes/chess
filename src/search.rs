@@ -334,7 +334,7 @@ pub fn alpha_beta(board: &mut BoardStack, move_gen: &MoveGen, pesto: &PestoEval,
 /// * `board` - A mutable reference to the current board state
 /// * `move_gen` - A reference to the move generator
 /// * `pesto` - A reference to the Pesto evaluation function
-/// * `max_depth` - The maximum depth to search to (in full moves, not plies)
+/// * `max_depth` - The maximum depth to search to
 /// * `q_search_max_depth` - The maximum depth for the quiescence search
 /// * `verbose` - A flag indicating whether to print verbose output
 ///
@@ -350,11 +350,13 @@ pub fn iterative_deepening_ab_search(board: &mut BoardStack, move_gen: &MoveGen,
     // Returns the eval (in centipawns) of the final position, as well as the first move
     // to play from the current position
     // Also returns number of nodes searched
+
     let mut tt = TranspositionTable::new();
     let mut eval: i32 = 0;
     let mut best_move: Move = Move::null();
     let mut n: i32 = 0;
     let mut nodes: i32;
+
 
     // Check the transposition table to see if this node has already been searched at the target depth
     if let Some(entry) = tt.probe(&board.current_state(), max_depth) {
@@ -362,8 +364,12 @@ pub fn iterative_deepening_ab_search(board: &mut BoardStack, move_gen: &MoveGen,
     }
 
     // Iterate over increasing depths
-    for d in 1..max_depth + 1 {
-        let depth = 2 * d; // Only even depths, due to the even/odd effect
+    for depth in 1..max_depth + 1 {
+        // Skip the last odd depth if max_depth is even, since due to the even/odd effect of
+        // alpha-beta search, it is approximately half as expensive as the even depth itself
+        if depth == max_depth - 1 && depth % 2 == 1 {
+            continue;
+        }
         (eval, best_move, nodes) = alpha_beta_search(board, move_gen, pesto, &mut tt, depth, -1000000, 1000000, q_search_max_depth, verbose);
         n += nodes;
         if verbose {
