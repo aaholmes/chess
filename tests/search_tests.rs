@@ -39,23 +39,34 @@ fn test_mate_in_three_detection() {
 }
 
 #[test]
-fn test_alpha_beta_pruning() {
+fn test_alpha_beta_pruning_effectiveness() {
     let mut board = BoardStack::new_from_fen("r1bqkbnr/ppp2ppp/2np4/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 0 4");
     let move_gen = MoveGen::new();
     let pesto = PestoEval::new();
 
     let depth = 4;
-    let (score1, best_move1, nodes1) = alpha_beta_search(&mut board, &move_gen, &pesto, depth, -1000000, 1000000, 0, false);
+    let INFINITY = 1000000;
+    let (score_full, _, nodes_full) = alpha_beta_search(&mut board, &move_gen, &pesto, depth, -INFINITY, INFINITY, 0, true);
 
-    // Now search with a narrow window that should cause more pruning
-    let (score2, best_move2, nodes2) = alpha_beta_search(&mut board, &move_gen, &pesto, depth, score1 - 50, score1 + 50, 0, false);
+    // Now search with a narrow window
+    let (score_narrow, _, nodes_narrow) = alpha_beta_search(&mut board, &move_gen, &pesto, depth, score_full - 50, score_full + 50, 0, true);
 
-    println!("Wide window - Score: {}, Best move: {}, Nodes: {}", score1, best_move1, nodes1);
-    println!("Narrow window - Score: {}, Best move: {}, Nodes: {}", score2, best_move2, nodes2);
+    println!("Full window - Score: {}, Nodes: {}", score_full, nodes_full);
+    println!("Narrow window - Score: {}, Nodes: {}", score_narrow, nodes_narrow);
 
-    // The scores should be the same, but nodes2 should be significantly less than nodes1
-    assert_eq!(score1, score2, "Scores don't match");
-    assert!(nodes2 < 2 * nodes1 / 3, "Not enough pruning. Nodes1: {}, Nodes2: {}", nodes1, nodes2);
+    assert_eq!(score_full, score_narrow, "Scores don't match");
+    assert!(nodes_narrow < nodes_full * 2 / 3, "Not enough pruning. Full: {}, Narrow: {}", nodes_full, nodes_narrow);
+
+    // Test for black
+    board = BoardStack::new_from_fen("r1bqkbnr/ppp2ppp/2np4/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R b KQkq - 0 4");
+    let (score_full_black, _, nodes_full_black) = alpha_beta_search(&mut board, &move_gen, &pesto, depth, -INFINITY, INFINITY, 0, false);
+    let (score_narrow_black, _, nodes_narrow_black) = alpha_beta_search(&mut board, &move_gen, &pesto, depth, score_full_black - 50, score_full_black + 50, 0, false);
+
+    println!("Full window (Black) - Score: {}, Nodes: {}", score_full_black, nodes_full_black);
+    println!("Narrow window (Black) - Score: {}, Nodes: {}", score_narrow_black, nodes_narrow_black);
+
+    assert_eq!(score_full_black, score_narrow_black, "Scores don't match for Black");
+    assert!(nodes_narrow_black < nodes_full_black * 2 / 3, "Not enough pruning for Black. Full: {}, Narrow: {}", nodes_full_black, nodes_narrow_black);
 }
 
 #[test]
