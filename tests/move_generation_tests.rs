@@ -1,6 +1,8 @@
 use kingfisher::board::Board;
+use kingfisher::boardstack::BoardStack;
 use kingfisher::eval::PestoEval;
 use kingfisher::move_generation::MoveGen;
+use kingfisher::move_types::Move;
 
 #[test]
 fn test_initial_move_count() {
@@ -99,4 +101,40 @@ fn test_non_capture_ordering_black() {
                 "Non-captures not properly ordered at index {}. {} vs {}",
                 i, pesto.move_eval(&board, &move_gen, non_captures[i-1].from, non_captures[i-1].to), pesto.move_eval(&board, &move_gen, non_captures[i].from, non_captures[i].to));
     }
+}
+
+#[test]
+fn test_pawn_fork_ordering() {
+    let mut boardstack = BoardStack::new();
+    let move_gen = MoveGen::new();
+    let pesto = PestoEval::new();
+
+    // Set up a position where a pawn fork is available
+    let moves = [
+        "e2e4", "e7e5",
+        "b1c3", "g8f6",
+        "f1c4", "f6e4",
+        "c3e4"
+    ];
+
+    for mv_str in moves.iter() {
+        let mv = Move::from_uci(mv_str).unwrap();
+        boardstack.make_move(mv);
+    }
+
+    let board = boardstack.current_state();
+
+    let (captures, non_captures) = move_gen.gen_pseudo_legal_moves_with_evals(&board, &pesto);
+
+    board.print();
+
+    println!("Captures:");
+    for (i, m) in captures.iter().enumerate() {
+        println!("{}. {} ({})", i+1, m, move_gen.mvv_lva(&board, m.from, m.to));
+    }
+    println!("Non-captures:");
+    for (i, m) in non_captures.iter().enumerate() {
+        println!("{}. {} ({})", i+1, m, pesto.move_eval(&board, &move_gen, m.from, m.to));
+    }
+    assert!(pesto.move_eval(&board, &move_gen, non_captures[0].from, non_captures[0].to) == 600);
 }

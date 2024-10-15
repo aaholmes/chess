@@ -148,7 +148,6 @@ impl PestoEval {
         // We don't include captures here, since we will use MVV-LVA for that instead
         // We also don't include promotions, since we will also treat those separately
         // However, we rank pawn and knight forks above other non-captures
-        // Note that our implementation doesn't detect a fork of two queens, since that is very rare
         // This yields the following move order:
         // captures in MVV-LVA order, promotions, pawn and knight forks, other moves in pesto order
         // Note that this is relative to the side to move
@@ -156,86 +155,82 @@ impl PestoEval {
         let piece = board.get_piece(from_sq_ind).unwrap();
 
         // Pawn forks
-        if board.w_to_move {
-            if piece == (WHITE, PAWN) {
-                if move_gen.wp_capture_bitboard[to_sq_ind] & board.pieces[BLACK][KING] != 0 && move_gen.wp_capture_bitboard[to_sq_ind] & board.pieces[BLACK][QUEEN] != 0 {
-                    // Fork king and queen
-                    return 1000;
-                } else if move_gen.wp_capture_bitboard[to_sq_ind] & board.pieces[BLACK][KING] != 0 && move_gen.wp_capture_bitboard[to_sq_ind] & board.pieces[BLACK][ROOK] != 0 {
-                    // Fork king and rook
-                    return 900;
-                } else if popcnt(move_gen.wp_capture_bitboard[to_sq_ind] & board.pieces[BLACK][QUEEN]) == 2 {
-                    // Fork two queens
-                    return 850;
-                } else if move_gen.wp_capture_bitboard[to_sq_ind] & board.pieces[BLACK][QUEEN] != 0 && move_gen.wp_capture_bitboard[to_sq_ind] & board.pieces[BLACK][ROOK] != 0 {
-                    // Fork queen and rook
-                    return 800;
-                } else if popcnt(move_gen.wp_capture_bitboard[to_sq_ind] & board.pieces[BLACK][ROOK]) == 2 {
-                    // Fork two rooks
-                    return 700;
-                } else if popcnt(move_gen.wp_capture_bitboard[to_sq_ind] & board.pieces_occ[BLACK] & !board.pieces[BLACK][PAWN]) == 2 {
-                    // Fork two non-pawn pieces
-                    return 600;
-                }
-            } else if piece == (BLACK, PAWN) {
-                if move_gen.bp_capture_bitboard[to_sq_ind] & board.pieces[WHITE][KING] != 0 && move_gen.bp_capture_bitboard[to_sq_ind] & board.pieces[WHITE][QUEEN] != 0 {
-                    // Fork king and queen
-                    return 1000;
-                } else if move_gen.bp_capture_bitboard[to_sq_ind] & board.pieces[WHITE][KING] != 0 && move_gen.bp_capture_bitboard[to_sq_ind] & board.pieces[WHITE][ROOK] != 0 {
-                    // Fork king and rook
-                    return 900;
-                } else if popcnt(move_gen.bp_capture_bitboard[to_sq_ind] & board.pieces[WHITE][QUEEN]) == 2 {
-                    // Fork two queens
-                    return 850;
-                } else if move_gen.bp_capture_bitboard[to_sq_ind] & board.pieces[WHITE][QUEEN] != 0 && move_gen.bp_capture_bitboard[to_sq_ind] & board.pieces[WHITE][ROOK] != 0 {
-                    // Fork queen and rook
-                    return 800;
-                } else if popcnt(move_gen.bp_capture_bitboard[to_sq_ind] & board.pieces[WHITE][ROOK]) == 2 {
-                    // Fork two rooks
-                    return 700;
-                } else if popcnt(move_gen.bp_capture_bitboard[to_sq_ind] & board.pieces_occ[WHITE] & !board.pieces[WHITE][PAWN]) == 2 {
-                    // Fork two non-pawn pieces
-                    return 600;
-                }
+        if piece == (WHITE, PAWN) {
+            if move_gen.wp_capture_bitboard[to_sq_ind] & board.pieces[BLACK][KING] != 0 && move_gen.wp_capture_bitboard[to_sq_ind] & board.pieces[BLACK][QUEEN] != 0 {
+                // Fork king and queen
+                return 1000;
+            } else if move_gen.wp_capture_bitboard[to_sq_ind] & board.pieces[BLACK][KING] != 0 && move_gen.wp_capture_bitboard[to_sq_ind] & board.pieces[BLACK][ROOK] != 0 {
+                // Fork king and rook
+                return 900;
+            } else if popcnt(move_gen.wp_capture_bitboard[to_sq_ind] & board.pieces[BLACK][QUEEN]) == 2 {
+                // Fork two queens
+                return 850;
+            } else if move_gen.wp_capture_bitboard[to_sq_ind] & board.pieces[BLACK][QUEEN] != 0 && move_gen.wp_capture_bitboard[to_sq_ind] & board.pieces[BLACK][ROOK] != 0 {
+                // Fork queen and rook
+                return 800;
+            } else if popcnt(move_gen.wp_capture_bitboard[to_sq_ind] & board.pieces[BLACK][ROOK]) == 2 {
+                // Fork two rooks
+                return 700;
+            } else if popcnt(move_gen.wp_capture_bitboard[to_sq_ind] & board.pieces_occ[BLACK] & !board.pieces[BLACK][PAWN]) == 2 {
+                // Fork two non-pawn pieces
+                return 600;
+            }
+        } else if piece == (BLACK, PAWN) {
+            if move_gen.bp_capture_bitboard[to_sq_ind] & board.pieces[WHITE][KING] != 0 && move_gen.bp_capture_bitboard[to_sq_ind] & board.pieces[WHITE][QUEEN] != 0 {
+                // Fork king and queen
+                return 1000;
+            } else if move_gen.bp_capture_bitboard[to_sq_ind] & board.pieces[WHITE][KING] != 0 && move_gen.bp_capture_bitboard[to_sq_ind] & board.pieces[WHITE][ROOK] != 0 {
+                // Fork king and rook
+                return 900;
+            } else if popcnt(move_gen.bp_capture_bitboard[to_sq_ind] & board.pieces[WHITE][QUEEN]) == 2 {
+                // Fork two queens
+                return 850;
+            } else if move_gen.bp_capture_bitboard[to_sq_ind] & board.pieces[WHITE][QUEEN] != 0 && move_gen.bp_capture_bitboard[to_sq_ind] & board.pieces[WHITE][ROOK] != 0 {
+                // Fork queen and rook
+                return 800;
+            } else if popcnt(move_gen.bp_capture_bitboard[to_sq_ind] & board.pieces[WHITE][ROOK]) == 2 {
+                // Fork two rooks
+                return 700;
+            } else if popcnt(move_gen.bp_capture_bitboard[to_sq_ind] & board.pieces_occ[WHITE] & !board.pieces[WHITE][PAWN]) == 2 {
+                // Fork two non-pawn pieces
+                return 600;
             }
         }
 
         // Knight forks
-        if board.w_to_move {
-            if piece == (WHITE, KNIGHT) {
-                if move_gen.n_move_bitboard[to_sq_ind] & board.pieces[BLACK][KING] != 0 && move_gen.n_move_bitboard[to_sq_ind] & board.pieces[BLACK][QUEEN] != 0 {
-                    // Fork king and queen
-                    return 975;
-                } else if move_gen.n_move_bitboard[to_sq_ind] & board.pieces[BLACK][KING] != 0 && move_gen.n_move_bitboard[to_sq_ind] & board.pieces[BLACK][ROOK] != 0 {
-                    // Fork king and rook
-                    return 875;
-                } else if popcnt(move_gen.n_move_bitboard[to_sq_ind] & board.pieces[BLACK][QUEEN]) == 2 {
-                    // Fork two queens
-                    return 825;
-                } else if move_gen.n_move_bitboard[to_sq_ind] & board.pieces[BLACK][QUEEN] != 0 && move_gen.n_move_bitboard[to_sq_ind] & board.pieces[BLACK][ROOK] != 0 {
-                    // Fork queen and rook
-                    return 775;
-                } else if popcnt(move_gen.n_move_bitboard[to_sq_ind] & board.pieces[BLACK][ROOK]) == 2 {
-                    // Fork two rooks
-                    return 675;
-                }
-            } else if piece == (BLACK, KNIGHT) {
-                if move_gen.n_move_bitboard[to_sq_ind] & board.pieces[WHITE][KING] != 0 && move_gen.n_move_bitboard[to_sq_ind] & board.pieces[WHITE][QUEEN] != 0 {
-                    // Fork king and queen
-                    return 975;
-                } else if move_gen.n_move_bitboard[to_sq_ind] & board.pieces[WHITE][KING] != 0 && move_gen.n_move_bitboard[to_sq_ind] & board.pieces[WHITE][ROOK] != 0 {
-                    // Fork king and rook
-                    return 875;
-                } else if popcnt(move_gen.n_move_bitboard[to_sq_ind] & board.pieces[WHITE][QUEEN]) == 2 {
-                    // Fork two queens
-                    return 825;
-                } else if move_gen.n_move_bitboard[to_sq_ind] & board.pieces[WHITE][QUEEN] != 0 && move_gen.n_move_bitboard[to_sq_ind] & board.pieces[WHITE][ROOK] != 0 {
-                    // Fork queen and rook
-                    return 775;
-                } else if popcnt(move_gen.n_move_bitboard[to_sq_ind] & board.pieces[WHITE][ROOK]) == 2 {
-                    // Fork two rooks
-                    return 675;
-                }
+        if piece == (WHITE, KNIGHT) {
+            if move_gen.n_move_bitboard[to_sq_ind] & board.pieces[BLACK][KING] != 0 && move_gen.n_move_bitboard[to_sq_ind] & board.pieces[BLACK][QUEEN] != 0 {
+                // Fork king and queen
+                return 975;
+            } else if move_gen.n_move_bitboard[to_sq_ind] & board.pieces[BLACK][KING] != 0 && move_gen.n_move_bitboard[to_sq_ind] & board.pieces[BLACK][ROOK] != 0 {
+                // Fork king and rook
+                return 875;
+            } else if popcnt(move_gen.n_move_bitboard[to_sq_ind] & board.pieces[BLACK][QUEEN]) == 2 {
+                // Fork two queens
+                return 825;
+            } else if move_gen.n_move_bitboard[to_sq_ind] & board.pieces[BLACK][QUEEN] != 0 && move_gen.n_move_bitboard[to_sq_ind] & board.pieces[BLACK][ROOK] != 0 {
+                // Fork queen and rook
+                return 775;
+            } else if popcnt(move_gen.n_move_bitboard[to_sq_ind] & board.pieces[BLACK][ROOK]) == 2 {
+                // Fork two rooks
+                return 675;
+            }
+        } else if piece == (BLACK, KNIGHT) {
+            if move_gen.n_move_bitboard[to_sq_ind] & board.pieces[WHITE][KING] != 0 && move_gen.n_move_bitboard[to_sq_ind] & board.pieces[WHITE][QUEEN] != 0 {
+                // Fork king and queen
+                return 975;
+            } else if move_gen.n_move_bitboard[to_sq_ind] & board.pieces[WHITE][KING] != 0 && move_gen.n_move_bitboard[to_sq_ind] & board.pieces[WHITE][ROOK] != 0 {
+                // Fork king and rook
+                return 875;
+            } else if popcnt(move_gen.n_move_bitboard[to_sq_ind] & board.pieces[WHITE][QUEEN]) == 2 {
+                // Fork two queens
+                return 825;
+            } else if move_gen.n_move_bitboard[to_sq_ind] & board.pieces[WHITE][QUEEN] != 0 && move_gen.n_move_bitboard[to_sq_ind] & board.pieces[WHITE][ROOK] != 0 {
+                // Fork queen and rook
+                return 775;
+            } else if popcnt(move_gen.n_move_bitboard[to_sq_ind] & board.pieces[WHITE][ROOK]) == 2 {
+                // Fork two rooks
+                return 675;
             }
         }
 
