@@ -76,8 +76,8 @@ fn test_search_stability() {
     let move_gen = MoveGen::new();
     let pesto = PestoEval::new();
 
-    let max_depth = 3;
-    let q_search_max_depth = 6;
+    let max_depth = 6;
+    let q_search_max_depth = 99;
     let (score1, best_move1, _) = iterative_deepening_ab_search(&mut board, &move_gen, &pesto, max_depth, q_search_max_depth, false);
     let (score2, best_move2, _) = iterative_deepening_ab_search(&mut board, &move_gen, &pesto, max_depth, q_search_max_depth, false);
 
