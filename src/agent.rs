@@ -4,7 +4,7 @@ use crate::boardstack::BoardStack;
 use crate::eval::PestoEval;
 use crate::move_types::Move;
 use crate::move_generation::MoveGen;
-use crate::search::{aspiration_window_ab_search, mate_search};
+use crate::search::{aspiration_window_ab_search, iterative_deepening_ab_search, mate_search};
 
 /// Trait defining the interface for chess agents.
 pub trait Agent {
@@ -72,8 +72,11 @@ impl Agent for SimpleAgent<'_> {
         }
 
         // If no mate found, perform aspiration window search
-        let (eval, m, n) = aspiration_window_ab_search(board, self.move_gen, self.pesto, self.ab_search_depth, self.q_search_max_depth, self.verbose);
-        println!("Mate search searched {} nodes, aspiration window search searched another {} nodes ({} total)! Eval: {}", nodes, n, nodes + n, eval);
+        //let (eval, m, n) = aspiration_window_ab_search(board, self.move_gen, self.pesto, self.ab_search_depth, self.q_search_max_depth, self.verbose);
+        //println!("Mate search searched {} nodes, aspiration window search searched another {} nodes ({} total)! Eval: {}", nodes, n, nodes + n, eval);
+        // If no mate found, perform iterative deepening search
+        let (eval, m, n) = iterative_deepening_ab_search(board, self.move_gen, self.pesto, self.ab_search_depth, self.q_search_max_depth, self.verbose);
+        println!("Mate search searched {} nodes, iterative deepening search searched another {} nodes ({} total)! Eval: {}", nodes, n, nodes + n, eval);
         m
     }
 }
