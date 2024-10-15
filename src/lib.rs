@@ -15,4 +15,5 @@ pub mod move_types;
 pub mod piece_types;
 pub mod search;
 pub mod transposition;
+pub mod uci;
 pub mod utils;

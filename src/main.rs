@@ -8,12 +8,13 @@ use kingfisher::agent::SimpleAgent;
 use kingfisher::arena::Arena;
 use kingfisher::eval::PestoEval;
 use kingfisher::move_generation::MoveGen;
+use kingfisher::uci::UCIEngine;
 
 /// The main function that sets up and runs a sample chess game.
 ///
 /// This function initializes the necessary components of the chess engine,
 /// creates two simple agents, and runs a game between them in an arena.
-fn main() {
+fn run_simple_game() {
     // Initialize the move generator
     let move_gen = MoveGen::new();
 
@@ -34,4 +35,9 @@ fn main() {
 
     // Print the final board state
     arena.boardstack.current_state().print();
+}
+
+fn main() {
+    let mut engine = UCIEngine::new();
+    engine.run();
 }
