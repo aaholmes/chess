@@ -267,7 +267,7 @@ impl MoveGen {
         // Here let's sort captures by MVV-LVA
         captures.sort_unstable_by_key(|m| -self.mvv_lva(board, m.from, m.to));
 
-    captures
+        captures
     }
 
     pub fn mvv_lva(&self, board: &Board, from_sq_ind: usize, to_sq_ind: usize) -> i32 {
