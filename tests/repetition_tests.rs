@@ -1,11 +1,11 @@
 #[cfg(test)]
 mod tests {
-    use kingfisher::bitboard::Bitboard;
+    use kingfisher::boardstack::BoardStack;
     use kingfisher::move_types::Move;
 
     #[test]
     fn test_threefold_repetition() {
-        let mut board = Bitboard::new(); // Assume this creates a standard starting position
+        let mut board = BoardStack::new(); // Assume this creates a standard starting position
 
         // Make some moves that will lead to a threefold repetition
         let moves = [
@@ -19,7 +19,12 @@ mod tests {
 
         for mv_str in moves.iter() {
             let mv = Move::from_uci(mv_str).unwrap();
-            board = board.make_move(mv);
+            board.make_move(mv);
+        }
+
+        // Print out the position history
+        for (hash, count) in board.position_history.iter() {
+            println!("{}: {}", hash, count);
         }
 
         assert!(!board.is_draw_by_repetition(), "Should not be a draw yet");
@@ -34,7 +39,7 @@ mod tests {
 
         for mv_str in repeating_moves.iter() {
             let mv = Move::from_uci(mv_str).unwrap();
-            board = board.make_move(mv);
+            board.make_move(mv);
         }
 
         assert!(board.is_draw_by_repetition(), "Should be a draw by repetition");
@@ -42,7 +47,7 @@ mod tests {
 
     #[test]
     fn test_repetition_with_different_castling_rights() {
-        let mut board = Bitboard::new();
+        let mut board = BoardStack::new();
 
         // Set up a position where castling rights change
         let moves = [
@@ -66,7 +71,12 @@ mod tests {
 
         for mv_str in moves.iter() {
             let mv = Move::from_uci(mv_str).unwrap();
-            board = board.make_move(mv);
+            board.make_move(mv);
+        }
+
+        // Print out the position history
+        for (hash, count) in board.position_history.iter() {
+            println!("{}: {}", hash, count);
         }
 
         assert!(!board.is_draw_by_repetition(), "Should not be a draw due to different castling rights");
@@ -79,7 +89,7 @@ mod tests {
 
         for mv_str in repeating_moves.iter() {
             let mv = Move::from_uci(mv_str).unwrap();
-            board = board.make_move(mv);
+            board.make_move(mv);
         }
 
         assert!(board.is_draw_by_repetition(), "Should be a draw by repetition");
@@ -87,7 +97,7 @@ mod tests {
 
     #[test]
     fn test_repetition_with_different_en_passant() {
-        let mut board = Bitboard::new();
+        let mut board = BoardStack::new();
 
         // Set up a position where en passant changes
         let moves = [
@@ -101,7 +111,7 @@ mod tests {
 
         for mv_str in moves.iter() {
             let mv = Move::from_uci(mv_str).unwrap();
-            board = board.make_move(mv);
+            board.make_move(mv);
         }
 
         assert!(!board.is_draw_by_repetition(), "Should not be a draw due to different en passant");
@@ -113,7 +123,7 @@ mod tests {
 
         for mv_str in repeating_moves.iter() {
             let mv = Move::from_uci(mv_str).unwrap();
-            board = board.make_move(mv);
+            board.make_move(mv);
         }
 
         assert!(board.is_draw_by_repetition(), "Should be a draw by repetition");

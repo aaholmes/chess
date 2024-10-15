@@ -1,6 +1,6 @@
 //! This module specifies various agents, which can use any combination of search and eval routines.
 
-use crate::bitboard::Bitboard;
+use crate::boardstack::BoardStack;
 use crate::eval::PestoEval;
 use crate::move_types::Move;
 use crate::move_generation::MoveGen;
@@ -17,7 +17,7 @@ pub trait Agent {
     /// # Returns
     ///
     /// The best `Move` as determined by the agent.
-    fn get_move(&self, board: &mut Bitboard) -> Move;
+    fn get_move(&self, board: &mut BoardStack) -> Move;
 }
 
 /// A simple agent that uses mate search followed by aspiration window quiescence search.
@@ -63,7 +63,7 @@ impl SimpleAgent<'_> {
 }
 
 impl Agent for SimpleAgent<'_> {
-    fn get_move(&self, board: &mut Bitboard) -> Move {
+    fn get_move(&self, board: &mut BoardStack) -> Move {
         // First, perform mate search
         let (eval, m, nodes) = mate_search(board, self.move_gen, self.mate_search_depth, self.verbose);
         if eval == 1000000 {

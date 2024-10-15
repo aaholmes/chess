@@ -1,235 +1,72 @@
 //! This module defines the Bitboard structure and associated functions for chess board representation.
 
-use std::collections::HashMap;
+use crate::board_utils::{algebraic_to_sq_ind, bit_to_sq_ind, coords_to_sq_ind, sq_ind_to_bit};
 use crate::move_generation::MoveGen;
+use crate::move_types::CastlingRights;
 use crate::piece_types::{PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING, WHITE, BLACK};
 
 /// Represents the chess board using bitboards.
 ///
 /// Each piece type and color has its own 64-bit unsigned integer,
 /// where each bit represents a square on the chess board.
-#[derive(Clone, Eq, PartialEq)]
-pub struct Bitboard {
-    /// Game result: None = in progress, Some(1) = white wins, Some(-1) = black wins, Some(0) = draw
-    pub game_result: Option<i32>,
-    /// True if it's White's turn to move
+#[derive(Clone)]
+pub struct Board {
+    pub(crate) pieces: [[u64; 6]; 2],  // [Color as usize][PieceType as usize]
+    pub(crate) pieces_occ: [u64; 2],   // Total occupancy for each color
     pub w_to_move: bool,
-    /// White kingside castling rights
-    pub w_castle_k: bool,
-    /// White queenside castling rights
-    pub w_castle_q: bool,
-    /// Black kingside castling rights
-    pub b_castle_k: bool,
-    /// Black queenside castling rights
-    pub b_castle_q: bool,
-    /// Index of square where en passant is possible
-    pub en_passant: Option<usize>,
-    /// Number of halfmoves since last capture or pawn advance
-    pub halfmove_clock: u8,
-    /// Number of fullmoves since start of game
-    pub fullmove_clock: u8,
-    /// Bitboards for each piece type and occupancy
-    pub pieces: [[u64; 6]; 2],  // [Color as usize][PieceType as usize]
-    /// Bitboards of total occupancies for each color
-    pub pieces_occ: [u64; 2],
-    /// Current evaluation of the position
-    pub eval: i32,
-    /// Current game phase
-    pub game_phase: Option<i32>,
-    /// Position history, for checking for repetitions
-    pub position_history: HashMap<u64, u8>,
+    pub(crate) en_passant: Option<u8>,
+    pub castling_rights: CastlingRights,
+    pub(crate) halfmove_clock: u8,
+    pub(crate) fullmove_number: u8,
+    pub(crate) zobrist_hash: u64,
+    pub(crate) eval: i32,
+    pub game_phase: i32,
 }
 
-// Little Endian Rank Mapping
-// Least Significant File
-// ind = 8 * rank + file
-
-/// Converts file and rank coordinates to a square index.
-///
-/// # Arguments
-///
-/// * `file` - The file (0-7, where 0 is the a-file)
-/// * `rank` - The rank (0-7, where 0 is the first rank)
-///
-/// # Returns
-///
-/// The square index (0-63)
-pub fn coords_to_sq_ind(file: usize, rank: usize) -> usize {
-    8 * rank + file
-}
-
-/// Converts a square index to file and rank coordinates.
-///
-/// # Arguments
-///
-/// * `sq_ind` - The square index (0-63)
-///
-/// # Returns
-///
-/// A tuple (file, rank) where file and rank are 0-7
-pub fn sq_ind_to_coords(sq_ind: usize) -> (usize, usize) {
-    (sq_ind % 8, sq_ind / 8)
-}
-
-/// Converts a square index to a bitboard representation.
-///
-/// # Arguments
-///
-/// * `sq_ind` - The square index (0-63)
-///
-/// # Returns
-///
-/// A 64-bit integer with only the bit at the given square index set
-pub fn sq_ind_to_bit(sq_ind: usize) -> u64 {
-    1 << sq_ind
-}
-
-/// Converts a bitboard with a single bit set to its square index.
-///
-/// # Arguments
-///
-/// * `bit` - A 64-bit integer with only one bit set
-///
-/// # Returns
-///
-/// The index of the set bit (0-63)
-pub fn bit_to_sq_ind(bit: u64) -> usize {
-    bit.trailing_zeros() as usize
-}
-
-/// Converts a square index to algebraic notation.
-///
-/// # Arguments
-///
-/// * `sq_ind` - The square index (0-63)
-///
-/// # Returns
-///
-/// A string representing the square in algebraic notation (e.g., "e4")
-pub fn sq_ind_to_algebraic(sq_ind: usize) -> String {
-    let (file, rank) = sq_ind_to_coords(sq_ind);
-    let file = (file + 97) as u8 as char;
-    let rank = (rank + 49) as u8 as char;
-    format!("{}{}", file, rank)
-}
-
-/// Converts algebraic notation to a square index.
-///
-/// # Arguments
-///
-/// * `algebraic` - A string representing a square in algebraic notation (e.g., "e4")
-///
-/// # Returns
-///
-/// The corresponding square index (0-63)
-pub fn algebraic_to_sq_ind(algebraic: &str) -> usize {
-    let mut chars = algebraic.chars();
-    let file = chars.next().unwrap() as usize - 97;
-    let rank = chars.next().unwrap() as usize - 49;
-    coords_to_sq_ind(file, rank)
-}
-
-/// Converts algebraic notation to a bitboard representation.
-///
-/// # Arguments
-///
-/// * `algebraic` - A string representing a square in algebraic notation (e.g., "e4")
-///
-/// # Returns
-///
-/// A 64-bit integer with only the bit at the given square set
-pub fn algebraic_to_bit(algebraic: &str) -> u64 {
-    let sq_ind = algebraic_to_sq_ind(algebraic);
-    sq_ind_to_bit(sq_ind)
-}
-
-/// Converts a bitboard with a single bit set to algebraic notation.
-///
-/// # Arguments
-///
-/// * `bit` - A 64-bit integer with only one bit set
-///
-/// # Returns
-///
-/// A string representing the square in algebraic notation (e.g., "e4")
-pub fn bit_to_algebraic(bit: u64) -> String {
-    let sq_ind = bit_to_sq_ind(bit);
-    sq_ind_to_algebraic(sq_ind)
-}
-
-/// Flips a square index vertically on the board.
-///
-/// # Arguments
-///
-/// * `sq_ind` - The square index to flip (0-63)
-///
-/// # Returns
-///
-/// The vertically flipped square index (0-63)
-pub fn flip_sq_ind_vertically(sq_ind: usize) -> usize {
-    8 * (7 - sq_ind / 8) + sq_ind % 8
-}
-
-/// Flips a bitboard vertically.
-///
-/// # Arguments
-///
-/// * `bit` - The bitboard to flip
-///
-/// # Returns
-///
-/// The vertically flipped bitboard
-pub fn flip_vertically(bit: u64) -> u64 {
-    ( (bit << 56)                    ) |
-        ( (bit << 40) & (0x00ff000000000000) ) |
-        ( (bit << 24) & (0x0000ff0000000000) ) |
-        ( (bit <<  8) & (0x000000ff00000000) ) |
-        ( (bit >>  8) & (0x00000000ff000000) ) |
-        ( (bit >> 24) & (0x0000000000ff0000) ) |
-        ( (bit >> 40) & (0x000000000000ff00) ) |
-        ( (bit >> 56) )
-}
-
-impl Bitboard {
-    /// Creates a new Bitboard with the initial chess position.
-    ///
-    /// # Returns
-    ///
-    /// A new Bitboard struct representing the starting position of a chess game.
-    pub fn new() -> Bitboard {
-        let mut bitboard = Bitboard {
-            game_result: None,
-            w_to_move: true,
-            w_castle_k: true,
-            w_castle_q: true,
-            b_castle_k: true,
-            b_castle_q: true,
-            en_passant: None,
-            halfmove_clock: 0,
-            fullmove_clock: 1,
-            pieces: [[0; 6]; 2],  // Initialize all bitboards to 0
+impl Board {
+    pub fn new() -> Board {
+        let mut board = Board {
+            pieces: [[0; 6]; 2],
             pieces_occ: [0; 2],
+            w_to_move: true,
+            en_passant: None,
+            castling_rights: CastlingRights::default(),
+            halfmove_clock: 0,
+            fullmove_number: 1,
+            zobrist_hash: 0,
             eval: 0,
-            game_phase: None,
-            position_history: Default::default(),
+            game_phase: 24,
         };
+        board.init_position();
+        board.zobrist_hash = board.compute_zobrist_hash();
+        board
+    }
 
+    fn init_position(&mut self) {
         // Set up pieces in the starting position
-        bitboard.pieces[WHITE][PAWN] = 0x000000000000FF00;
-        bitboard.pieces[BLACK][PAWN] = 0x00FF000000000000;
-        bitboard.pieces[WHITE][KNIGHT] = 0x0000000000000042;
-        bitboard.pieces[BLACK][KNIGHT] = 0x4200000000000000;
-        bitboard.pieces[WHITE][BISHOP] = 0x0000000000000024;
-        bitboard.pieces[BLACK][BISHOP] = 0x2400000000000000;
-        bitboard.pieces[WHITE][ROOK] = 0x0000000000000081;
-        bitboard.pieces[BLACK][ROOK] = 0x8100000000000000;
-        bitboard.pieces[WHITE][QUEEN] = 0x0000000000000008;
-        bitboard.pieces[BLACK][QUEEN] = 0x0800000000000000;
-        bitboard.pieces[WHITE][KING] = 0x0000000000000010;
-        bitboard.pieces[BLACK][KING] = 0x1000000000000000;
-        bitboard.pieces_occ[WHITE] = 0x000000000000FFFF;
-        bitboard.pieces_occ[BLACK] = 0xFFFF000000000000;
-        bitboard
+        self.pieces[WHITE][PAWN] = 0x000000000000FF00;
+        self.pieces[BLACK][PAWN] = 0x00FF000000000000;
+        self.pieces[WHITE][KNIGHT] = 0x0000000000000042;
+        self.pieces[BLACK][KNIGHT] = 0x4200000000000000;
+        self.pieces[WHITE][BISHOP] = 0x0000000000000024;
+        self.pieces[BLACK][BISHOP] = 0x2400000000000000;
+        self.pieces[WHITE][ROOK] = 0x0000000000000081;
+        self.pieces[BLACK][ROOK] = 0x8100000000000000;
+        self.pieces[WHITE][QUEEN] = 0x0000000000000008;
+        self.pieces[BLACK][QUEEN] = 0x0800000000000000;
+        self.pieces[WHITE][KING] = 0x0000000000000010;
+        self.pieces[BLACK][KING] = 0x1000000000000000;
+        self.pieces_occ[WHITE] = 0x000000000000FFFF;
+        self.pieces_occ[BLACK] = 0xFFFF000000000000;
+
+        // Update occupancy bitboards
+        self.update_occupancy();
+    }
+
+    pub(crate) fn update_occupancy(&mut self) {
+        for color in [WHITE, BLACK] {
+            self.pieces_occ[color] = self.pieces[color].iter().fold(0, |acc, &x| acc | x);
+        }
     }
 
     /// Creates a new Bitboard from a FEN (Forsyth–Edwards Notation) string.
@@ -241,15 +78,15 @@ impl Bitboard {
     /// # Returns
     ///
     /// A new Bitboard struct representing the chess position described by the FEN string.
-    pub fn new_from_fen(fen: &str) -> Bitboard {
+    pub fn new_from_fen(fen: &str) -> Board {
         let parts = fen.split(' ').collect::<Vec<&str>>();
-        let mut board = Bitboard::new();
+        let mut board = Board::new();
         board.pieces = [[0; 6]; 2];
         board.pieces_occ = [0; 2];
-        board.w_castle_k = false;
-        board.w_castle_q = false;
-        board.b_castle_k = false;
-        board.b_castle_q = false;
+        board.castling_rights.white_kingside = false;
+        board.castling_rights.white_queenside = false;
+        board.castling_rights.black_kingside = false;
+        board.castling_rights.black_queenside = false;
         let mut rank = 7;
         let mut file = 0;
         for c in parts[0].chars() {
@@ -289,10 +126,10 @@ impl Bitboard {
             _ => {
                 for c in parts[2].chars() {
                     match c {
-                        'K' => board.w_castle_k = true,
-                        'Q' => board.w_castle_q = true,
-                        'k' => board.b_castle_k = true,
-                        'q' => board.b_castle_q = true,
+                        'K' => board.castling_rights.white_kingside = true,
+                        'Q' => board.castling_rights.white_queenside = true,
+                        'k' => board.castling_rights.black_kingside = true,
+                        'q' => board.castling_rights.black_queenside = true,
                         _ => panic!("Invalid FEN")
                     }
                 }
@@ -302,7 +139,7 @@ impl Bitboard {
             "-" => (),
             _ => {
                 let sq_ind = algebraic_to_sq_ind(parts[3]);
-                board.en_passant = Some(sq_ind);
+                board.en_passant = Some(sq_ind as u8);
             }
         }
         match parts[4] {
@@ -314,7 +151,7 @@ impl Bitboard {
         match parts[5] {
             "1" => (),
             _ => {
-                board.fullmove_clock = parts[5].parse::<u8>().unwrap();
+                board.fullmove_number = parts[5].parse::<u8>().unwrap();
             }
         }
         for color in 0..2 {
@@ -422,9 +259,9 @@ impl Bitboard {
     /// # Examples
     ///
     /// ```
-    /// use kingfisher::bitboard::Bitboard;
+    /// use kingfisher::board::Board;
     /// use kingfisher::piece_types::{PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING, WHITE, BLACK};
-    /// let board = Bitboard::new(); // Assume this creates a standard starting position
+    /// let board = Board::new(); // Assume this creates a standard starting position
     /// let white_pawns = board.get_piece_bitboard(WHITE, PAWN);
     /// let black_pawns = board.get_piece_bitboard(BLACK, PAWN);
     /// assert_eq!(white_pawns, 0x000000000000FF00); // All white pawns on their starting squares
@@ -484,7 +321,7 @@ impl Bitboard {
         // Check if any of the captures are legal
         if !captures.is_empty() {
             for c in captures {
-                let new_board = self.make_move(c);
+                let new_board = self.apply_move_to_board(c);
                 if new_board.is_legal(move_gen) {
                     return (false, false);
                 }
@@ -494,7 +331,7 @@ impl Bitboard {
         // Check if any of the non-capture moves are legal
         if !moves.is_empty() {
             for m in moves {
-                let new_board = self.make_move(m);
+                let new_board = self.apply_move_to_board(m);
                 if new_board.is_legal(move_gen) {
                     return (false, false);
                 }
@@ -589,29 +426,4 @@ impl Bitboard {
             false
         }
     }
-
-    /// Checks if the current position has occurred three times, resulting in a draw by repetition.
-    ///
-    /// This method considers a position to be repeated if:
-    /// - The piece positions are identical
-    /// - The side to move is the same
-    /// - The castling rights are the same
-    /// - The en passant possibilities are the same
-    ///
-    /// # Returns
-    ///
-    /// `true` if the current position has occurred three times, `false` otherwise.
-    ///
-    /// # Note
-    ///
-    /// This method relies on the Zobrist hash of the position, which includes all
-    /// relevant aspects of the chess position.
-    pub fn is_draw_by_repetition(&self) -> bool {
-        // Compute hash of current position
-        let hash = self.compute_zobrist_hash();
-
-        // Check if there are 3 or more repetitions of the same hash
-        *self.position_history.get(&hash).unwrap() >= 3
-    }
-
 }

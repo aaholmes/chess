@@ -1,21 +1,22 @@
-use kingfisher::bitboard::Bitboard;
+use kingfisher::board::Board;
+use kingfisher::boardstack::BoardStack;
 use kingfisher::move_generation::MoveGen;
 use kingfisher::move_types::Move;
 use kingfisher::piece_types::{PAWN, KNIGHT, ROOK, KING, WHITE, BLACK};
 
 #[test]
 fn test_initial_position() {
-    let board = Bitboard::new();
+    let board = Board::new();
     assert_eq!(board.get_piece(0), Some((WHITE, ROOK))); // White Rook
     assert_eq!(board.get_piece(4), Some((WHITE, KING))); // White King
     assert_eq!(board.get_piece(63), Some((BLACK, ROOK))); // Black Rook
     assert!(board.w_to_move);
-    assert!(board.w_castle_k && board.w_castle_q && board.b_castle_k && board.b_castle_q);
+    assert!(board.castling_rights.white_kingside &&board.castling_rights.white_queenside && board.castling_rights.black_kingside && board.castling_rights.black_queenside);
 }
 
 #[test]
 fn test_get_piece_bitboard() {
-    let board = Bitboard::new(); // Assume this creates a standard starting position
+    let board = Board::new(); // Assume this creates a standard starting position
 
     // Test white pawns
     assert_eq!(board.get_piece_bitboard(WHITE, PAWN), 0x000000000000FF00);
@@ -37,7 +38,7 @@ fn test_get_piece_bitboard() {
 
     // Make a move and test again
     let e2e4 = Move::from_uci("e2e4").unwrap();
-    let new_board = board.make_move(e2e4);
+    let new_board = board.apply_move_to_board(e2e4);
 
     // White pawns should have changed
     assert_eq!(new_board.get_piece_bitboard(WHITE, PAWN), 0x000000001000EF00);
@@ -45,21 +46,22 @@ fn test_get_piece_bitboard() {
 
 #[test]
 fn test_make_move() {
-    let mut board = Bitboard::new();
+    let mut board = BoardStack::new();
     let move_gen = MoveGen::new();
-    let moves = move_gen.gen_pseudo_legal_moves(&board);
+    let moves = move_gen.gen_pseudo_legal_moves(&board.current_state());
     let e4_move = moves.1.iter().find(|&m| m.from == 12 && m.to == 28).unwrap();
 
-    board = board.make_move(*e4_move);
-    assert_eq!(board.get_piece(28), Some((WHITE, PAWN))); // White Pawn on e4
-    assert_eq!(board.get_piece(12), None); // e2 is empty
-    assert!(!board.w_to_move);
+    board.make_move(*e4_move);
+    board.current_state().print();
+    assert_eq!(board.current_state().get_piece(28), Some((WHITE, PAWN))); // White Pawn on e4
+    assert_eq!(board.current_state().get_piece(12), None); // e2 is empty
+    assert!(!board.current_state().w_to_move);
 }
 
 #[test]
 fn test_is_legal() {
     // Legal position
-    let board = Bitboard::new_from_fen("r1bqkbnr/ppp2ppp/2np4/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 0 4");
+    let board = Board::new_from_fen("r1bqkbnr/ppp2ppp/2np4/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 0 4");
     let move_gen = MoveGen::new();
     assert!(board.is_legal(&move_gen));
 }
@@ -67,14 +69,14 @@ fn test_is_legal() {
 #[test]
 fn test_is_illegal() {
     // Illegal position (black king in check)
-    let illegal_board = Bitboard::new_from_fen("r1bq1bnr/pppp1kpp/2n2p2/4p3/2BPP3/5N2/PPP2PPP/RNBQK2R w KQkq - 0 5");
+    let illegal_board = Board::new_from_fen("r1bq1bnr/pppp1kpp/2n2p2/4p3/2BPP3/5N2/PPP2PPP/RNBQK2R w KQkq - 0 5");
     let move_gen = MoveGen::new();
     assert!(!illegal_board.is_legal(&move_gen));
 }
 
 #[test]
 fn test_checkmate_detection() {
-    let board = Bitboard::new_from_fen("rnb1kbnr/pppp1ppp/8/4p3/6Pq/5P2/PPPPP2P/RNBQKBNR w KQkq - 1 3");
+    let board = Board::new_from_fen("rnb1kbnr/pppp1ppp/8/4p3/6Pq/5P2/PPPPP2P/RNBQKBNR w KQkq - 1 3");
     let move_gen = MoveGen::new();
     let (is_checkmate, is_stalemate) = board.is_checkmate_or_stalemate(&move_gen);
     assert!(is_checkmate);
@@ -83,7 +85,7 @@ fn test_checkmate_detection() {
 
 #[test]
 fn test_stalemate_detection() {
-    let board = Bitboard::new_from_fen("5k2/5P2/5K2/8/8/8/8/8 b - - 0 1");
+    let board = Board::new_from_fen("5k2/5P2/5K2/8/8/8/8/8 b - - 0 1");
     board.print();
     let move_gen = MoveGen::new();
     let (is_checkmate, is_stalemate) = board.is_checkmate_or_stalemate(&move_gen);

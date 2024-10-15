@@ -3,6 +3,8 @@
 //! This module provides the core `Move` type used throughout the chess engine
 //! to represent and manipulate chess moves.
 
+use std::fmt;
+use crate::board_utils::sq_ind_to_algebraic;
 use crate::piece_types::{KNIGHT, BISHOP, ROOK, QUEEN};
 
 /// Represents a chess move.
@@ -18,6 +20,25 @@ pub struct Move {
     /// The type of piece to promote to, if this move results in a promotion.
     /// `None` if the move does not result in a promotion.
     pub promotion: Option<usize>
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct CastlingRights {
+    pub white_kingside: bool,
+    pub white_queenside: bool,
+    pub black_kingside: bool,
+    pub black_queenside: bool,
+}
+
+impl CastlingRights {
+    pub(crate) fn default() -> CastlingRights {
+        CastlingRights {
+            white_kingside: true,
+            white_queenside: true,
+            black_kingside: true,
+            black_queenside: true,
+        }
+    }
 }
 
 impl Move {
@@ -112,6 +133,30 @@ impl Move {
             to: 0,
             promotion: None
         }
+    }
+
+    /// Change the way a move is printed so that it uses algebraic notation
+    pub fn print_algebraic(&self) -> String {
+        let from = sq_ind_to_algebraic(self.from);
+        let to = sq_ind_to_algebraic(self.to);
+        let mut promotion = String::from("");
+        if self.promotion.is_some() {
+            promotion = String::from("=");
+            match self.promotion.unwrap() {
+                n if n == KNIGHT => promotion.push('N'),
+                n if n == BISHOP => promotion.push('B'),
+                n if n == ROOK => promotion.push('R'),
+                n if n == QUEEN => promotion.push('Q'),
+                _ => panic!("Invalid promotion piece")
+            }
+        }
+        format!("{}{}{}", from, to, promotion)
+    }
+}
+
+impl fmt::Display for Move {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.print_algebraic())
     }
 }
 

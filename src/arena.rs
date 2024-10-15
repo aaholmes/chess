@@ -1,7 +1,7 @@
 //! This module provides an Arena for staging chess engine matches.
 
 use crate::agent::Agent;
-use crate::bitboard::{Bitboard};
+use crate::boardstack::BoardStack;
 use crate::utils::print_move;
 
 /// Struct representing an arena for chess engine matches.
@@ -13,7 +13,7 @@ pub struct Arena<'a> {
     /// The maximum number of moves allowed in the game.
     max_moves: i32,
     /// The current state of the chess board.
-    pub board: Bitboard
+    pub boardstack: BoardStack
 }
 
 impl Arena<'_> {
@@ -33,7 +33,7 @@ impl Arena<'_> {
             white_player,
             black_player,
             max_moves,
-            board: Bitboard::new()
+            boardstack: BoardStack::new()
         }
     }
 
@@ -43,7 +43,7 @@ impl Arena<'_> {
     /// number of moves is reached. It prints the game state after each move.
     pub fn play_game(&mut self) {
         println!("Playing game (max {} moves)", self.max_moves);
-        self.board.print();
+        self.boardstack.current_state().print();
 
         for i in 0..self.max_moves {
             println!("Move {}", i);
@@ -55,12 +55,12 @@ impl Arena<'_> {
             };
 
             // Get and make the move for the current player
-            let m = current_player.get_move(&mut self.board);
+            let m = current_player.get_move(&mut self.boardstack);
             println!("{} to move: {}", color, print_move(&m));
-            self.board = self.board.make_move(m);
+            self.boardstack.make_move(m);
 
             // Print the updated board state
-            self.board.print();
+            self.boardstack.current_state().print();
 
             // TODO: Add game termination conditions (checkmate, stalemate, etc.)
         }

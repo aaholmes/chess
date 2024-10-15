@@ -3,7 +3,7 @@
 //! This module contains various utility functions used throughout the chess engine,
 //! including functions for printing bitboards, moves, and performing performance tests.
 
-use crate::bitboard::{coords_to_sq_ind, sq_ind_to_algebraic, sq_ind_to_bit};
+use crate::board_utils::{coords_to_sq_ind, sq_ind_to_algebraic, sq_ind_to_bit};
 use crate::move_types::Move;
 use crate::piece_types::{KNIGHT, BISHOP, ROOK, QUEEN};
 

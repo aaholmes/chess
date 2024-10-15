@@ -1,6 +1,8 @@
 pub mod agent;
 pub mod arena;
-pub mod bitboard;
+pub mod board;
+pub mod board_utils;
+pub mod boardstack;
 pub mod bits;
 pub mod eval;
 mod eval_constants;

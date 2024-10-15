@@ -19,7 +19,7 @@
 // Note also that the pesto eval has 25 game modes, ranging from opening to endgame, so our non-capture move ordering should be different for each game mode.
 
 
-use crate::bitboard::sq_ind_to_bit;
+use crate::board_utils::sq_ind_to_bit;
 use crate::bits::bits;
 use crate::move_types::Move;
 use crate::magic_constants::{R_BITS, B_BITS, R_MASKS, B_MASKS};

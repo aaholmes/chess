@@ -7,8 +7,9 @@
 //! and counting pieces and pawns in front of the king.
 
 use std::cmp::min;
-use crate::bitboard::{Bitboard, flip_sq_ind_vertically};
+use crate::board_utils::flip_sq_ind_vertically;
 use crate::bits::popcnt;
+use crate::board::Board;
 use crate::move_generation::MoveGen;
 use crate::piece_types::{PAWN, KNIGHT, ROOK, QUEEN, KING, WHITE, BLACK};
 use crate::eval_constants::{MG_VALUE, MG_PESTO_TABLE, EG_VALUE, EG_PESTO_TABLE, GAMEPHASE_INC};
@@ -54,7 +55,7 @@ impl PestoEval {
     /// # Returns
     ///
     /// (eval, game_phase)
-    fn eval_plus_game_phase(&self, board: &Bitboard) -> (i32, i32) {
+    fn eval_plus_game_phase(&self, board: &Board) -> (i32, i32) {
 
         let mut mg: [i32; 2] = [0, 0];
         let mut eg: [i32; 2] = [0, 0];
@@ -100,7 +101,7 @@ impl PestoEval {
     /// # Returns
     ///
     /// A tuple (i32, i32) representing the middlegame and endgame scores
-    pub fn eval(&self, board: &Bitboard) -> i32 {
+    pub fn eval(&self, board: &Board) -> i32 {
         let (eval, _) = self.eval_plus_game_phase(board);
         eval
     }
@@ -118,13 +119,13 @@ impl PestoEval {
     /// # Returns
     ///
     /// An i32 representing the evaluation of the position in centipawns, relative to the side to move
-    pub fn eval_update_board(&self, board: &mut Bitboard) -> i32 {
+    pub fn eval_update_board(&self, board: &mut Board) -> i32 {
         // Evaluate and save the eval and game phase so we can quickly compute move evals from this position
         let (score, game_phase) = self.eval_plus_game_phase(board);
 
         // Save eval and game phase
         board.eval = if board.w_to_move { score } else { -score };
-        board.game_phase = Some(game_phase);
+        board.game_phase = game_phase;
 
         board.eval
     }
@@ -141,7 +142,7 @@ impl PestoEval {
     /// # Returns
     ///
     /// An i32 representing the evaluation of the move in centipawns
-    pub fn move_eval(&self, board: &Bitboard, move_gen: &MoveGen, from_sq_ind: usize, to_sq_ind: usize) -> i32 {
+    pub fn move_eval(&self, board: &Board, move_gen: &MoveGen, from_sq_ind: usize, to_sq_ind: usize) -> i32 {
         // Evaluate the move (in centipawns) according to the Pesto evaluation function
         // Since Pesto only depends on piece square tables, we can just use the change in value of the moved piece
         // We don't include captures here, since we will use MVV-LVA for that instead
@@ -238,12 +239,8 @@ impl PestoEval {
             }
         }
 
-        if board.game_phase.is_none() {
-            panic!("Game phase not set");
-        }
-
-        let mut mg_score: i32 = self.mg_table[piece.0 as usize][piece.1 as usize][to_sq_ind] - self.mg_table[piece.0 as usize][piece.1 as usize][from_sq_ind];
-        let eg_score: i32 = self.eg_table[piece.0 as usize][piece.1 as usize][to_sq_ind] - self.eg_table[piece.0 as usize][piece.1 as usize][from_sq_ind];
+        let mut mg_score: i32 = self.mg_table[piece.0][piece.1][to_sq_ind] - self.mg_table[piece.0][piece.1][from_sq_ind];
+        let eg_score: i32 = self.eg_table[piece.0][piece.1][to_sq_ind] - self.eg_table[piece.0][piece.1][from_sq_ind];
 
         // Castling
         if piece == (WHITE, KING) && from_sq_ind == 4 {
@@ -260,7 +257,7 @@ impl PestoEval {
             }
         }
 
-        let mg_phase: i32 = min(24, board.game_phase.unwrap()); // Can exceed 24 in case of early promotion
+        let mg_phase: i32 = min(24, board.game_phase); // Can exceed 24 in case of early promotion
         let eg_phase: i32 = 24 - mg_phase;
 
         (mg_score * mg_phase + eg_score * eg_phase) / 24

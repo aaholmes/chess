@@ -14,8 +14,9 @@
 //! piece types.
 
 use crate::move_types::Move;
-use crate::bitboard::{Bitboard, sq_ind_to_bit};
+use crate::board_utils::sq_ind_to_bit;
 use crate::bits::bits;
+use crate::board::Board;
 use crate::magic_constants::{R_MAGICS, B_MAGICS, R_BITS, B_BITS, R_MASKS, B_MASKS};
 use crate::magic_bitboard::{init_pawn_moves, init_knight_moves, init_bishop_moves, init_rook_moves, init_king_moves, init_pawn_captures_promotions, append_promotions};
 
@@ -180,7 +181,7 @@ impl MoveGen {
     /// # Returns
     ///
     /// A tuple containing the capture moves and non-capture moves.
-    pub fn gen_pseudo_legal_moves(&self, board: &Bitboard) -> (Vec<Move>, Vec<Move>) {
+    pub fn gen_pseudo_legal_moves(&self, board: &Board) -> (Vec<Move>, Vec<Move>) {
         // Generate all pseudo-legal moves for the current position, i.e., these moves may move into check.
         // Elsewhere we need to check for legality and perform move ordering.
         // Returns a vector of captures and a vector of non-captures.
@@ -205,7 +206,7 @@ impl MoveGen {
         (captures, moves)
     }
 
-    pub fn gen_pseudo_legal_moves_with_evals(&self, board: &mut Bitboard, pesto: &PestoEval) -> (Vec<Move>, Vec<Move>) {
+    pub fn gen_pseudo_legal_moves_with_evals(&self, board: &Board, pesto: &PestoEval) -> (Vec<Move>, Vec<Move>) {
         // Generate all pseudo-legal moves for the current position, i.e., these moves may move into check.
         // Elsewhere we need to check for legality and perform move ordering.
         // Returns a vector of captures and a vector of non-captures.
@@ -232,7 +233,6 @@ impl MoveGen {
         captures.sort_unstable_by_key(|m| -self.mvv_lva(board, m.from, m.to));
 
         // Also sort moves by pesto eval change
-        pesto.eval_update_board(board);
         moves.sort_unstable_by_key(|m| -pesto.move_eval(board, self, m.from, m.to));
 
         (captures, moves)
@@ -249,7 +249,7 @@ impl MoveGen {
     /// # Returns
     ///
     /// A vector of capture moves.
-    pub fn gen_pseudo_legal_captures(&self, board: &Bitboard) -> Vec<Move> {
+    pub fn gen_pseudo_legal_captures(&self, board: &Board) -> Vec<Move> {
         // Same as above, but only generate captures
         let (mut captures, mut promotions, _moves) = self.gen_pawn_moves(board);
         let (mut captures_knights, _moves_knights) = self.gen_knight_moves(board);
@@ -270,7 +270,7 @@ impl MoveGen {
     captures
     }
 
-    fn mvv_lva(&self, board: &Bitboard, from_sq_ind: usize, to_sq_ind: usize) -> i32 {
+    fn mvv_lva(&self, board: &Board, from_sq_ind: usize, to_sq_ind: usize) -> i32 {
         // Return the MVV-LVA score for a capture move.
         // To enable sorting by MVV, then by LVA, we return the score as 10 * victim - attacker,
         // where value is 012345 for kpnbrq
@@ -295,7 +295,7 @@ impl MoveGen {
     /// # Returns
     ///
     /// A tuple containing the capture moves and non-capture moves for the pawn.
-    pub fn gen_pawn_moves(&self, board: &Bitboard) -> (Vec<Move>, Vec<Move>, Vec<Move>) {
+    pub fn gen_pawn_moves(&self, board: &Board) -> (Vec<Move>, Vec<Move>, Vec<Move>) {
         let mut moves: Vec<Move> = Vec::new();
         let mut captures: Vec<Move> = Vec::new();
         let mut promotions: Vec<Move> = Vec::new();
@@ -307,7 +307,7 @@ impl MoveGen {
 
                 // Handle captures and en passant
                 for to_sq_ind in &self.wp_captures[from_sq_ind] {
-                    if board.pieces_occ[BLACK] & (1u64 << to_sq_ind) != 0 || board.en_passant == Some(*to_sq_ind) {
+                    if board.pieces_occ[BLACK] & (1u64 << to_sq_ind) != 0 || board.en_passant == Some(*to_sq_ind as u8) {
                         if is_promotion_rank {
                             append_promotions(&mut promotions, from_sq_ind, to_sq_ind, board.w_to_move);
                         } else {
@@ -339,7 +339,7 @@ impl MoveGen {
 
                 // Handle captures and en passant
                 for to_sq_ind in &self.bp_captures[from_sq_ind] {
-                    if board.pieces_occ[WHITE] & (1u64 << to_sq_ind) != 0 || board.en_passant == Some(*to_sq_ind) {
+                    if board.pieces_occ[WHITE] & (1u64 << to_sq_ind) != 0 || board.en_passant == Some(*to_sq_ind as u8) {
                         if is_promotion_rank {
                             append_promotions(&mut promotions, from_sq_ind, to_sq_ind, board.w_to_move);
                         } else {
@@ -381,7 +381,7 @@ impl MoveGen {
     /// # Returns
     ///
     /// A tuple containing the capture moves and non-capture moves for the knight.
-    fn gen_knight_moves(&self, board: &Bitboard) -> (Vec<Move>, Vec<Move>) {
+    fn gen_knight_moves(&self, board: &Board) -> (Vec<Move>, Vec<Move>) {
         // Generate all possible knight moves for the current position.
         // Returns a vector of captures and a vector of non-captures.
         let mut moves: Vec<Move> = Vec::with_capacity(16);
@@ -424,7 +424,7 @@ impl MoveGen {
     /// # Returns
     ///
     /// A tuple containing the capture moves and non-capture moves for the king.
-    fn gen_king_moves(&self, board: &Bitboard) -> (Vec<Move>, Vec<Move>) {
+    fn gen_king_moves(&self, board: &Board) -> (Vec<Move>, Vec<Move>) {
         // Generate all possible king moves for the current position.
         // For castling, checks whether in check and whether the king moves through check.
         // Returns a vector of captures and a vector of non-captures.
@@ -432,7 +432,7 @@ impl MoveGen {
         let mut captures: Vec<Move> = Vec::with_capacity(8);
         if board.w_to_move {
             // White to move
-            if board.w_castle_k {
+            if board.castling_rights.white_kingside {
                 // Make sure a rook is there because it could have been captured
                 if board.pieces[WHITE][ROOK] & (1u64 << 7) != 0 &&
                     (board.pieces_occ[WHITE] | board.pieces_occ[BLACK]) & ((1u64 << 5) | (1u64 << 6)) == 0 &&
@@ -442,7 +442,7 @@ impl MoveGen {
                     moves.push(Move::new(4, 6, None));
                 }
             }
-            if board.w_castle_q {
+            if board.castling_rights.white_queenside {
                 // Make sure a rook is there because it could have been captured
                 if board.pieces[WHITE][ROOK] & (1u64 << 0) != 0 &&
                     (board.pieces_occ[WHITE] | board.pieces_occ[BLACK]) & ((1u64 << 1) | (1u64 << 2) | (1u64 << 3)) == 0 &&
@@ -463,7 +463,7 @@ impl MoveGen {
             }
         } else {
             // Black to move
-            if board.b_castle_k {
+            if board.castling_rights.black_kingside {
                 // Make sure a rook is there because it could have been captured
                 if board.pieces[BLACK][ROOK] & (1u64 << 63) != 0 &&
                     (board.pieces_occ[WHITE] | board.pieces_occ[BLACK]) & ((1u64 << 61) | (1u64 << 62)) == 0 &&
@@ -473,7 +473,7 @@ impl MoveGen {
                     moves.push(Move::new(60, 62, None));
                 }
             }
-            if board.b_castle_q {
+            if board.castling_rights.black_queenside {
                 // Make sure a rook is there because it could have been captured
                 if board.pieces[BLACK][ROOK] & (1u64 << 56) != 0 &&
                     (board.pieces_occ[BLACK] | board.pieces_occ[WHITE]) & ((1u64 << 57) | (1u64 << 58) | (1u64 << 59)) == 0 &&
@@ -508,7 +508,7 @@ impl MoveGen {
     /// # Returns
     ///
     /// A tuple containing the capture moves and non-capture moves for the rook.
-    fn gen_rook_moves(&self, board: &Bitboard) -> (Vec<Move>, Vec<Move>) {
+    fn gen_rook_moves(&self, board: &Board) -> (Vec<Move>, Vec<Move>) {
         // Generate all possible rook moves for the current position.
         // Returns a vector of captures and a vector of non-captures.
         // Uses magic bitboards.
@@ -564,7 +564,7 @@ impl MoveGen {
         (captures, moves)
     }
 
-    pub fn gen_bishop_potential_captures(&self, board: &Bitboard, from_sq_ind: usize) -> u64 {
+    pub fn gen_bishop_potential_captures(&self, board: &Board, from_sq_ind: usize) -> u64 {
         // Generate potential bishop captures from the given square.
         // Used to determine whether a king is in check.
 
@@ -578,7 +578,7 @@ impl MoveGen {
         self.b_move_bitboard[from_sq_ind][key]
     }
 
-    pub fn gen_rook_potential_captures(&self, board: &Bitboard, from_sq_ind: usize) -> u64 {
+    pub fn gen_rook_potential_captures(&self, board: &Board, from_sq_ind: usize) -> u64 {
         // Generate potential rook captures from the given square.
         // Used to determine whether a king is in check.
 
@@ -604,7 +604,7 @@ impl MoveGen {
     /// # Returns
     ///
     /// A tuple containing the capture moves and non-capture moves for the bishop.
-    fn gen_bishop_moves(&self, board: &Bitboard) -> (Vec<Move>, Vec<Move>) {
+    fn gen_bishop_moves(&self, board: &Board) -> (Vec<Move>, Vec<Move>) {
         // Generate all possible bishop moves for the current position.
         // Returns a vector of captures and a vector of non-captures.
         // Uses magic bitboards.
@@ -672,7 +672,7 @@ impl MoveGen {
     /// # Returns
     ///
     /// A tuple containing the capture moves and non-capture moves for the queen.
-    fn gen_queen_moves(&self, board: &Bitboard) -> (Vec<Move>, Vec<Move>) {
+    fn gen_queen_moves(&self, board: &Board) -> (Vec<Move>, Vec<Move>) {
         // Generate all possible queen moves for the current position.
         // Returns a vector of captures and a vector of non-captures.
         // Uses magic bitboards.

@@ -1,12 +1,13 @@
 //! Module for making moves on the chess board
 //!
-//! This module provides functionality to apply and undo moves on the Bitboard representation of a chess position.
+//! This module provides functionality to apply moves on the Bitboard representation of a chess position.
 
-use crate::bitboard::{Bitboard, sq_ind_to_bit};
+use crate::board::Board;
+use crate::board_utils::sq_ind_to_bit;
 use crate::move_types::Move;
 use crate::piece_types::{PAWN, ROOK, KING, WHITE, BLACK};
 
-impl Bitboard {
+impl Board {
     /// Makes a move on the board, returning a new board with the move applied
     ///
     /// This method assumes the move is legal and does not perform any legality checks.
@@ -18,11 +19,11 @@ impl Bitboard {
     /// # Returns
     ///
     /// A new Bitboard representing the position after the move has been made
-    pub fn make_move(&self, the_move: Move) -> Bitboard {
+    pub fn apply_move_to_board(&self, the_move: Move) -> Board {
         // Make a move, returning a new board.
         // Assumes the move is legal.
 
-        let mut new_board: Bitboard = self.clone();
+        let mut new_board = self.clone();
         new_board.halfmove_clock += 1;
 
         let from_bit = sq_ind_to_bit(the_move.from);
@@ -30,6 +31,9 @@ impl Bitboard {
 
         let from_piece = self.get_piece(the_move.from);
         if from_piece.is_none() {
+            println!("Board:");
+            self.print();
+            println!("Move: {}", the_move);
             panic!("No piece at from_sq_ind");
         }
 
@@ -43,7 +47,7 @@ impl Bitboard {
 
         if from_piece.unwrap().1 == PAWN {
             // En passant
-            if new_board.en_passant.is_some() && the_move.to == new_board.en_passant.unwrap() {
+            if new_board.en_passant.is_some() && the_move.to == new_board.en_passant.unwrap() as usize {
                 // Capture the pawn.
                 if new_board.w_to_move {
                     new_board.pieces[BLACK][PAWN] ^= sq_ind_to_bit(the_move.to - 8);
@@ -59,7 +63,7 @@ impl Bitboard {
             new_board.halfmove_clock = 0;
             if ((the_move.to as i8) - (the_move.from as i8)).abs() == 16 {
                 // Pawn double move: Set en passant square.
-                new_board.en_passant = Some((the_move.from + the_move.to) / 2);
+                new_board.en_passant = Some(((the_move.from + the_move.to) / 2) as u8);
             }
         }
 
@@ -87,8 +91,8 @@ impl Bitboard {
                     new_board.pieces[WHITE][ROOK] ^= sq_ind_to_bit(3);
                     new_board.pieces[WHITE][ROOK] ^= sq_ind_to_bit(0);
                 }
-                new_board.w_castle_k = false;
-                new_board.w_castle_q = false;
+                new_board.castling_rights.white_kingside = false;
+                new_board.castling_rights.white_queenside = false;
             } else {
                 // Black king
                 if the_move.from == 60 && the_move.to == 62 {
@@ -100,30 +104,30 @@ impl Bitboard {
                     new_board.pieces[BLACK][ROOK] ^= sq_ind_to_bit(59);
                     new_board.pieces[BLACK][ROOK] ^= sq_ind_to_bit(56);
                 }
-                new_board.b_castle_k = false;
-                new_board.b_castle_q = false;
+                new_board.castling_rights.black_kingside = false;
+                new_board.castling_rights.black_queenside = false;
             }
         } else if from_piece.unwrap().1 == ROOK {
             if from_piece.unwrap().0 == WHITE {
                 // White rook
                 if the_move.from == 0 {
-                    new_board.w_castle_q = false;
+                    new_board.castling_rights.white_queenside= false;
                 } else if the_move.from == 7 {
-                    new_board.w_castle_k = false;
+                    new_board.castling_rights.white_kingside = false;
                 }
             } else {
                 // Black rook
                 if the_move.from == 56 {
-                    new_board.b_castle_q = false;
+                    new_board.castling_rights.black_queenside = false;
                 } else if the_move.from == 63 {
-                    new_board.b_castle_k = false;
+                    new_board.castling_rights.black_kingside = false;
                 }
             }
         }
 
         new_board.w_to_move = !new_board.w_to_move;
         if new_board.w_to_move {
-            new_board.fullmove_clock += 1;
+            new_board.fullmove_number += 1;
         }
 
         // Null move: remove en passant ability and return new board
@@ -138,8 +142,8 @@ impl Bitboard {
             }
         }
 
-        new_board.position_history = self.position_history.clone();
-        new_board.add_to_position_history();
+        // Update zobrist hash
+        new_board.zobrist_hash = new_board.compute_zobrist_hash();
 
         new_board
     }

@@ -33,5 +33,5 @@ fn main() {
     arena.play_game();
 
     // Print the final board state
-    arena.board.print();
+    arena.boardstack.current_state().print();
 }

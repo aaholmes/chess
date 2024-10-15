@@ -20,8 +20,9 @@
 
 use lazy_static::lazy_static;
 use rand::Rng;
-use crate::bitboard::Bitboard;
 use crate::bits::bits;
+use crate::board::Board;
+use crate::boardstack::BoardStack;
 use crate::piece_types::{PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING, WHITE, BLACK};
 
 const PIECE_TYPES: usize = 6;  // Pawn, Knight, Bishop, Rook, Queen, King
@@ -86,7 +87,7 @@ lazy_static! {
     pub static ref ZOBRIST_KEYS: ZobristKeys = ZobristKeys::new();
 }
 
-impl Bitboard {
+impl Board {
     /// Computes the Zobrist hash for the current board position.
     ///
     /// This hash takes into account:
@@ -112,23 +113,23 @@ impl Bitboard {
         }
 
         // Hash castling rights
-        if self.w_castle_k {
+        if self.castling_rights.white_kingside {
             hash ^= ZOBRIST_KEYS.castling_keys[0];
         }
-        if self.w_castle_q {
+        if self.castling_rights.white_queenside {
             hash ^= ZOBRIST_KEYS.castling_keys[1];
         }
-        if self.b_castle_k {
+        if self.castling_rights.black_kingside {
             hash ^= ZOBRIST_KEYS.castling_keys[2];
         }
-        if self.b_castle_q {
+        if self.castling_rights.black_queenside {
             hash ^= ZOBRIST_KEYS.castling_keys[3];
         }
 
         // Hash en passant square
         if let Some(ep_square) = self.en_passant {
             let file = ep_square % 8;
-            hash ^= ZOBRIST_KEYS.en_passant_keys[file];
+            hash ^= ZOBRIST_KEYS.en_passant_keys[file as usize];
         }
 
         // Hash side to move
@@ -138,10 +139,12 @@ impl Bitboard {
 
         hash
     }
+}
 
-    /// Add a position to the bitboard's position history
+impl BoardStack {
+    /// Add a position to the boardstack's position history
     pub fn add_to_position_history(&mut self) {
-        let hash = self.compute_zobrist_hash();
+        let hash = self.current_state().zobrist_hash;
         self.position_history.insert(hash, self.position_history.get(&hash).unwrap_or(&0) + 1);
     }
 }

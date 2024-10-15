@@ -2,7 +2,7 @@
 //!
 //! This module implements the negamax search algorithm for chess position evaluation.
 
-use crate::bitboard::Bitboard;
+use crate::boardstack::BoardStack;
 use crate::move_types::Move;
 use crate::move_generation::MoveGen;
 use crate::eval::PestoEval;
@@ -23,22 +23,23 @@ use crate::utils::print_move;
 /// * The evaluation (in centipawns) of the best move
 /// * The best move to play from the current position
 /// * The number of nodes searched
-pub fn negamax_search(board: &mut Bitboard, move_gen: &MoveGen, pesto: &PestoEval, depth: i32) -> (i32, Move, i32) {
+pub fn negamax_search(board: &mut BoardStack, move_gen: &MoveGen, pesto: &PestoEval, depth: i32) -> (i32, Move, i32) {
     let mut best_eval: i32 = -1000000;
     let mut best_move: Move = Move::null();
     let mut n: i32 = 0;
     
     // Generate and combine captures and regular moves
-    let (mut captures, moves) = move_gen.gen_pseudo_legal_moves_with_evals(board, pesto);
+    let (mut captures, moves) = move_gen.gen_pseudo_legal_moves_with_evals(&mut board.current_state(), pesto);
     captures.extend(moves);
     
     // Iterate through all moves
     for m in captures {
-        let mut new_board: Bitboard = board.make_move(m);
-        if !new_board.is_legal(move_gen) {
+        board.make_move(m);
+        if !board.current_state().is_legal(move_gen) {
+            board.undo_move();
             continue;
         }
-        let (mut eval, nodes) = negamax(&mut new_board, move_gen, pesto, depth - 1);
+        let (mut eval, nodes) = negamax(board, move_gen, pesto, depth - 1);
         eval = -eval;
         n += nodes;
         
@@ -47,6 +48,9 @@ pub fn negamax_search(board: &mut Bitboard, move_gen: &MoveGen, pesto: &PestoEva
             best_eval = eval;
             best_move = m;
         }
+
+        // Undo the move
+        board.undo_move();
     }
     (best_eval, best_move, n)
 }
@@ -65,31 +69,35 @@ pub fn negamax_search(board: &mut Bitboard, move_gen: &MoveGen, pesto: &PestoEva
 /// A tuple containing:
 /// * The evaluation (in centipawns) of the best move
 /// * The number of nodes searched
-fn negamax(board: &mut Bitboard, move_gen: &MoveGen, pesto: &PestoEval, depth: i32) -> (i32, i32) {
+fn negamax(board: &mut BoardStack, move_gen: &MoveGen, pesto: &PestoEval, depth: i32) -> (i32, i32) {
     if depth == 0 {
         // Leaf node: return the board evaluation
-        return (-pesto.eval(board), 1);
+        return (-pesto.eval(&board.current_state()), 1);
     }
     
     let mut best_eval: i32 = -1000000;
     let mut n: i32 = 0;
     
     // Generate and combine captures and regular moves
-    let (mut captures, moves) = move_gen.gen_pseudo_legal_moves_with_evals(board, pesto);
+    let (mut captures, moves) = move_gen.gen_pseudo_legal_moves_with_evals(&mut board.current_state(), pesto);
     captures.extend(moves);
     
     // Iterate through all moves
     for m in captures {
-        let mut new_board: Bitboard = board.make_move(m);
-        if !new_board.is_legal(move_gen) {
+        board.make_move(m);
+        if !board.current_state().is_legal(move_gen) {
+            board.undo_move();
             continue;
         }
-        let (mut eval, nodes) = negamax(&mut new_board, move_gen, pesto, depth - 1);
+        let (mut eval, nodes) = negamax(board, move_gen, pesto, depth - 1);
         eval = -eval;
         n += nodes;
         
         // Update best evaluation
         best_eval = best_eval.max(eval);
+
+        // Undo the move
+        board.undo_move();
     }
     
     (best_eval, n)
@@ -117,7 +125,7 @@ fn negamax(board: &mut Bitboard, move_gen: &MoveGen, pesto: &PestoEval, depth: i
 /// * The evaluation (in centipawns) of the final position
 /// * The best move to play from the current position
 /// * The number of nodes searched
-pub fn alpha_beta_search(board: &mut Bitboard, move_gen: &MoveGen, pesto: &PestoEval, depth: i32, alpha_init: i32, beta_init: i32, q_search_max_depth: i32, verbose: bool) -> (i32, Move, i32) {
+pub fn alpha_beta_search(board: &mut BoardStack, move_gen: &MoveGen, pesto: &PestoEval, depth: i32, alpha_init: i32, beta_init: i32, q_search_max_depth: i32, verbose: bool) -> (i32, Move, i32) {
     // Initialize best move and alpha value
     let mut best_move: Move = Move::null();
     let mut alpha: i32 = alpha_init;
@@ -128,7 +136,7 @@ pub fn alpha_beta_search(board: &mut Bitboard, move_gen: &MoveGen, pesto: &Pesto
     if verbose {
         println!("Checking for checkmate and stalemate");
     }
-    let (checkmate, stalemate) = board.is_checkmate_or_stalemate(move_gen);
+    let (checkmate, stalemate) = board.current_state().is_checkmate_or_stalemate(move_gen);
     if verbose {
         println!("Checkmate and stalemate checked");
         println!("Checkmate: {} Stalemate: {}", checkmate, stalemate);
@@ -148,31 +156,39 @@ pub fn alpha_beta_search(board: &mut Bitboard, move_gen: &MoveGen, pesto: &Pesto
     }
 
     // Generate and combine captures and regular moves
-    let (mut captures, moves) = move_gen.gen_pseudo_legal_moves_with_evals(board, pesto);
+    let (mut captures, moves) = move_gen.gen_pseudo_legal_moves_with_evals(&mut board.current_state(), pesto);
     captures.extend(moves);
 
     for m in captures {
         if verbose {
             println!("Considering move {} at root of search tree", print_move(&m));
         }
-        let mut new_board: Bitboard = board.make_move(m);
-        if !new_board.is_legal(move_gen) {
+        board.make_move(m);
+        if !board.current_state().is_legal(move_gen) {
+            board.undo_move();
             continue;
         }
-        let (mut eval, nodes) = alpha_beta(&mut new_board, move_gen, pesto, depth - 1, -beta, -alpha, q_search_max_depth, verbose);
+        let (mut eval, nodes) = alpha_beta(board, move_gen, pesto, depth - 1, -beta, -alpha, q_search_max_depth, verbose);
         eval = -eval;
         n += nodes;
         if eval > alpha {
             alpha = eval;
             best_move = m;
         }
+
+        // Undo the move
+        board.undo_move();
+
+        // Prune if necessary
         if alpha >= beta {
             break;
         }
     }
+
     if verbose {
         println!("Alpha beta search at depth {} searched {} nodes. Best eval and move are {} {}", depth, n, alpha, print_move(&best_move));
     }
+
     (alpha, best_move, n)
 }
 
@@ -197,7 +213,7 @@ pub fn alpha_beta_search(board: &mut Bitboard, move_gen: &MoveGen, pesto: &Pesto
 /// A tuple containing:
 /// * The evaluation (in centipawns) of the final position
 /// * The number of nodes searched
-pub fn alpha_beta(board: &mut Bitboard, move_gen: &MoveGen, pesto: &PestoEval, depth: i32, mut alpha: i32, beta: i32, q_search_max_depth: i32, verbose: bool) -> (i32, i32) {
+pub fn alpha_beta(board: &mut BoardStack, move_gen: &MoveGen, pesto: &PestoEval, depth: i32, mut alpha: i32, beta: i32, q_search_max_depth: i32, verbose: bool) -> (i32, i32) {
     // Private recursive function used for alpha-beta search
     // External functions should call alpha_beta_search instead
     // Returns the eval (in centipawns) of the final position
@@ -216,23 +232,25 @@ pub fn alpha_beta(board: &mut Bitboard, move_gen: &MoveGen, pesto: &PestoEval, d
     // Non-leaf node
     let mut n: i32 = 1;
     // TODO: Here, consider best move from previous search first
-    let (mut captures, moves) = move_gen.gen_pseudo_legal_moves_with_evals(board, pesto);
+    let (mut captures, moves) = move_gen.gen_pseudo_legal_moves_with_evals(&mut board.current_state(), pesto);
     captures.extend(moves);
 
     for m in captures {
         if verbose {
             println!("Considering move {}", print_move(&m));
         }
-        let mut new_board: Bitboard = board.make_move(m);
-        if !new_board.is_legal(move_gen) {
+        board.make_move(m);
+        if !board.current_state().is_legal(move_gen) {
+            board.undo_move();
             continue;
         }
-        let (mut eval, nodes) = alpha_beta(&mut new_board, move_gen, pesto, depth - 1, -beta, -alpha, q_search_max_depth, verbose);
+        let (mut eval, nodes) = alpha_beta(board, move_gen, pesto, depth - 1, -beta, -alpha, q_search_max_depth, verbose);
         eval = -eval;
         n += nodes;
         if eval > alpha {
             alpha = eval;
         }
+        board.undo_move();
         if alpha >= beta {
             if verbose {
                 println!("Inner Alpha beta search at depth {} searched {} nodes. Best eval and move are {} {}", depth, n, alpha, print_move(&m));
@@ -264,7 +282,7 @@ pub fn alpha_beta(board: &mut Bitboard, move_gen: &MoveGen, pesto: &PestoEval, d
 /// * The evaluation (in centipawns) of the final position
 /// * The best move to play from the current position
 /// * The number of nodes searched
-pub fn iterative_deepening_ab_search(board: &mut Bitboard, move_gen: &MoveGen, pesto: &PestoEval, max_depth: i32, q_search_max_depth: i32, verbose: bool) -> (i32, Move, i32) {
+pub fn iterative_deepening_ab_search(board: &mut BoardStack, move_gen: &MoveGen, pesto: &PestoEval, max_depth: i32, q_search_max_depth: i32, verbose: bool) -> (i32, Move, i32) {
     // Perform iterative deepening alpha-beta search from the given position
     // Searches to the given depth
     // Returns the eval (in centipawns) of the final position, as well as the first move
@@ -308,14 +326,14 @@ pub fn iterative_deepening_ab_search(board: &mut Bitboard, move_gen: &MoveGen, p
 /// * The evaluation (in centipawns) of the final position
 /// * The best move to play from the current position
 /// * The number of nodes searched
-pub fn aspiration_window_ab_search(board: &mut Bitboard, move_gen: &MoveGen, pesto: &PestoEval, max_depth: i32, q_search_max_depth: i32, verbose: bool) -> (i32, Move, i32) {
+pub fn aspiration_window_ab_search(board: &mut BoardStack, move_gen: &MoveGen, pesto: &PestoEval, max_depth: i32, q_search_max_depth: i32, verbose: bool) -> (i32, Move, i32) {
     // Perform aspiration window alpha-beta search from the given position
     // Also uses iterative deepening: After searching at a given depth, starts a new search at that depth + 1, but looks at most promising variation first
     // This is really helpful for alpha-beta pruning
     let lower_bound_param: i32 = -25;
     let upper_bound_param: i32 = 25;
 
-    let mut target_eval: i32 = board.eval;
+    let mut target_eval: i32 = board.current_state().eval;
     let mut best_move: Move = Move::null();
     let mut nodes: i32;
 
@@ -386,7 +404,7 @@ pub fn aspiration_window_ab_search(board: &mut Bitboard, move_gen: &MoveGen, pes
 /// - The score of the position after quiescence search (from the perspective of the side to move).
 /// - The number of nodes searched.
 fn q_search(
-    board: &mut Bitboard,
+    board: &mut BoardStack,
     move_gen: &MoveGen,
     pesto: &PestoEval,
     mut alpha: i32,
@@ -397,7 +415,7 @@ fn q_search(
     let mut nodes = 1;
 
     // Stand-pat evaluation
-    let stand_pat = pesto.eval(board);
+    let stand_pat = pesto.eval(&board.current_state());
 
     // Beta cutoff
     if stand_pat >= beta {
@@ -418,7 +436,7 @@ fn q_search(
     }
 
     // Generate captures and promotions
-    let captures = move_gen.gen_pseudo_legal_captures(board);
+    let captures = move_gen.gen_pseudo_legal_captures(&board.current_state());
 
     if captures.is_empty() {
         if verbose {
@@ -429,16 +447,19 @@ fn q_search(
 
     // Search captures
     for capture in captures {
-        let mut new_board = board.clone();
-        new_board.make_move(capture);
-        if !new_board.is_legal(move_gen) {
+        board.make_move(capture);
+        if !board.current_state().is_legal(move_gen) {
+            board.undo_move();
             continue;
         }
 
         // Recursive call
-        let (mut score, n) = q_search(&mut new_board, move_gen, pesto, -beta, -alpha, max_depth - 1, verbose);
+        let (mut score, n) = q_search(board, move_gen, pesto, -beta, -alpha, max_depth - 1, verbose);
         score = -score; // Negamax
         nodes += n;
+
+        // Undo move
+        board.undo_move();
 
         // Beta cutoff
         if score >= beta {
@@ -478,8 +499,8 @@ fn q_search(
 ///
 /// # Notes
 /// Interesting idea, but not used currently because it is too slow
-fn q_search_consistent_side_to_move_for_final_eval(board: &mut Bitboard, move_gen: &MoveGen, pesto: &PestoEval, mut alpha: i32, beta: i32, eval_after_even_moves: bool, verbose: bool) -> (i32, i32) {
-    let (checkmate, stalemate) = board.is_checkmate_or_stalemate(move_gen);
+fn q_search_consistent_side_to_move_for_final_eval(board: &mut BoardStack, move_gen: &MoveGen, pesto: &PestoEval, mut alpha: i32, beta: i32, eval_after_even_moves: bool, verbose: bool) -> (i32, i32) {
+    let (checkmate, stalemate) = board.current_state().is_checkmate_or_stalemate(move_gen);
     if checkmate {
         if verbose {
             println!("Qsearch: Quiescence: Checkmate!");
@@ -496,8 +517,8 @@ fn q_search_consistent_side_to_move_for_final_eval(board: &mut Bitboard, move_ge
         // The problem here is that we are currently only comparing the eval at the end of the tactics, but
         // sometimes the player to move might not want to play a capture, so we need to consider the stand pat eval too
         // This side can either play a capture, or evaluate the position, whichever is better
-        let eval = pesto.eval(board);
-        let captures = move_gen.gen_pseudo_legal_captures(board);
+        let eval = pesto.eval(&board.current_state());
+        let captures = move_gen.gen_pseudo_legal_captures(&board.current_state());
         if captures.is_empty() {
             if verbose {
                 println!("Quiescence: No captures left! Eval: {}", eval);
@@ -518,16 +539,18 @@ fn q_search_consistent_side_to_move_for_final_eval(board: &mut Bitboard, move_ge
             }
             let mut n: i32 = 1;
             for c in captures {
-                let mut new_board = board.make_move(c);
-                if !new_board.is_legal(move_gen) {
+                board.make_move(c);
+                if !board.current_state().is_legal(move_gen) {
+                    board.undo_move();
                     continue;
                 }
-                let (mut score, nodes) = q_search_consistent_side_to_move_for_final_eval(&mut new_board, move_gen, pesto, -beta, -alpha, !eval_after_even_moves, verbose);
+                let (mut score, nodes) = q_search_consistent_side_to_move_for_final_eval(board, move_gen, pesto, -beta, -alpha, !eval_after_even_moves, verbose);
                 score = -score;
                 if verbose {
                     println!("Capture eval: {}", score);
                 }
                 n += nodes;
+                board.undo_move();
                 if score > alpha {
                     alpha = score;
                     if score >= beta {
@@ -539,15 +562,16 @@ fn q_search_consistent_side_to_move_for_final_eval(board: &mut Bitboard, move_ge
         }
     } else {
         // Other side simply plays best move
-        let (mut captures, moves) = move_gen.gen_pseudo_legal_moves_with_evals(board, pesto);
+        let (mut captures, moves) = move_gen.gen_pseudo_legal_moves_with_evals(&mut board.current_state(), pesto);
         let mut n: i32 = 1;
         captures.extend(moves);
         for c in captures {
-            let mut new_board = board.make_move(c);
-            if !new_board.is_legal(move_gen) {
+            board.make_move(c);
+            if !board.current_state().is_legal(move_gen) {
+                board.undo_move();
                 continue;
             }
-            let (mut score, nodes) = q_search_consistent_side_to_move_for_final_eval(&mut new_board, move_gen, pesto, -beta, -alpha, !eval_after_even_moves, verbose);
+            let (mut score, nodes) = q_search_consistent_side_to_move_for_final_eval(board, move_gen, pesto, -beta, -alpha, !eval_after_even_moves, verbose);
             score = -score;
             if verbose {
                 println!("Other side eval: {}", score);
@@ -556,6 +580,7 @@ fn q_search_consistent_side_to_move_for_final_eval(board: &mut Bitboard, move_ge
             if score > alpha {
                 alpha = score;
             }
+            board.undo_move();
             if alpha >= beta {
                 break;
             }
@@ -584,7 +609,7 @@ fn q_search_consistent_side_to_move_for_final_eval(board: &mut Bitboard, move_ge
 /// * The evaluation: 1000000 for checkmate, -1000000 for checkmate against, or 0 for neither
 /// * The best move to play from the current position
 /// * The number of nodes searched
-pub fn mate_search(board: &Bitboard, move_gen: &MoveGen, max_depth: i32, verbose: bool) -> (i32, Move, i32) {
+pub fn mate_search(board: &mut BoardStack, move_gen: &MoveGen, max_depth: i32, verbose: bool) -> (i32, Move, i32) {
     let mut eval: i32 = 0;
     let mut best_move: Move = Move::null();
     let mut n: i32 = 0;
@@ -599,24 +624,27 @@ pub fn mate_search(board: &Bitboard, move_gen: &MoveGen, max_depth: i32, verbose
         }
 
         // Generate and combine captures and regular moves
-        let (mut captures, moves) = move_gen.gen_pseudo_legal_moves(board);
+        let (mut captures, moves) = move_gen.gen_pseudo_legal_moves(&mut board.current_state());
         captures.extend(moves);
 
         // Iterate through all moves
         for m in captures {
-            let mut new_board: Bitboard = board.make_move(m);
-            if !new_board.is_legal(move_gen) {
+            board.make_move(m);
+            if !board.current_state().is_legal(move_gen) {
+                board.undo_move();
                 continue;
             }
-            if !new_board.is_check(move_gen) {
+            if !board.current_state().is_check(move_gen) {
+                board.undo_move();
                 continue;
             }
-            let (score, nodes) = mate_search_recursive(&mut new_board, move_gen, depth - 1, -beta, -alpha, false);
+            let (score, nodes) = mate_search_recursive(board, move_gen, depth - 1, -beta, -alpha, false);
             eval = -score;
             n += nodes;
             if eval > alpha {
                 alpha = eval;
             }
+            board.undo_move();
             if alpha >= beta {
                 best_move = m;
                 break;
@@ -655,7 +683,7 @@ pub fn mate_search(board: &Bitboard, move_gen: &MoveGen, max_depth: i32, verbose
 /// A tuple containing:
 /// * The evaluation: -1000000 for checkmate, 0 for no mate found
 /// * The number of nodes searched
-fn mate_search_recursive(board: &mut Bitboard, move_gen: &MoveGen, depth: i32, mut alpha: i32, beta: i32, side_to_move: bool) -> (i32, i32) {
+fn mate_search_recursive(board: &mut BoardStack, move_gen: &MoveGen, depth: i32, mut alpha: i32, beta: i32, side_to_move: bool) -> (i32, i32) {
     // Private recursive function used for mate search
     // External functions should call mate_search instead
     // Returns the eval (in centipawns) of the final position
@@ -663,7 +691,7 @@ fn mate_search_recursive(board: &mut Bitboard, move_gen: &MoveGen, depth: i32, m
     if depth == 0 {
         // Leaf node
         // Check whether this is checkmate (could be either side)
-        let (checkmate, stalemate) = board.is_checkmate_or_stalemate(move_gen);
+        let (checkmate, stalemate) = board.current_state().is_checkmate_or_stalemate(move_gen);
         if checkmate {
             return (-1000000, 1);
         } else if stalemate {
@@ -674,22 +702,25 @@ fn mate_search_recursive(board: &mut Bitboard, move_gen: &MoveGen, depth: i32, m
     }
     // Non-leaf node
     let mut n: i32 = 1;
-    let (mut captures, moves) = move_gen.gen_pseudo_legal_moves(board);
+    let (mut captures, moves) = move_gen.gen_pseudo_legal_moves(&board.current_state());
     captures.extend(moves);
     for m in captures {
-        let mut new_board: Bitboard = board.make_move(m);
-        if !new_board.is_legal(move_gen) {
+        board.make_move(m);
+        if !board.current_state().is_legal(move_gen) {
+            board.undo_move();
             continue;
         }
-        if side_to_move && !new_board.is_check(move_gen) {
+        if side_to_move && !board.current_state().is_check(move_gen) {
+            board.undo_move();
             continue;
         }
-        let (mut eval, nodes) = mate_search_recursive(&mut new_board, move_gen, depth - 1, -beta, -alpha, !side_to_move);
+        let (mut eval, nodes) = mate_search_recursive(board, move_gen, depth - 1, -beta, -alpha, !side_to_move);
         eval = -eval;
         n += nodes;
         if eval > alpha {
             alpha = eval;
         }
+        board.undo_move();
         if alpha >= beta {
             break;
         }
