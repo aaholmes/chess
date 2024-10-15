@@ -4,28 +4,32 @@
 //! information about previously analyzed chess positions, improving search efficiency.
 
 use std::collections::HashMap;
-use std::hash::Hash;
-use crate::bitboard::Bitboard;
+use crate::board::Board;
 use crate::move_types::Move;
 
 /// Represents an entry in the transposition table.
 #[derive(PartialEq)]
-struct TranspositionEntry {
+pub struct TranspositionEntry {
     /// The depth at which this position was searched.
     depth: i32,
     /// The evaluation score for this position.
-    score: i32,
-    /// The best move found for this position, if any.
-    best_move: Option<Move>,
+    pub(crate) score: i32,
+    /// The best move found for this position.
+    pub(crate) best_move: Move,
 }
 
 /// A transposition table for caching chess positions and their evaluations.
-struct TranspositionTable {
+pub struct TranspositionTable {
     /// The underlying hash map storing positions and their corresponding entries.
-    table: HashMap<Bitboard, TranspositionEntry>,
+    table: HashMap<u64, TranspositionEntry>,
 }
 
 impl TranspositionTable {
+    /// Creates a new transposition table.
+    pub fn new() -> Self {
+        TranspositionTable { table: HashMap::new() }
+    }
+
     /// Checks the table for a given board position and search depth.
     ///
     /// # Arguments
@@ -37,19 +41,19 @@ impl TranspositionTable {
     ///
     /// An `Option` containing a reference to the `TranspositionEntry` if found and the stored depth
     /// is greater than or equal to the current depth, otherwise `None`.
-    pub fn check_table(&self, board: &Bitboard, depth: i32) -> Option<&TranspositionEntry> {
+    pub fn probe(&self, board: &Board, depth: i32) -> Option<&TranspositionEntry> {
         // Check the table for a given board position and search depth
         // If it exists, return a reference to the entry
         // Else, return None
-        let out = self.table.get(board);
+        let out = self.table.get(&board.zobrist_hash);
         if out == None {
             return None;
         }
         let entry = out.unwrap();
         if entry.depth >= depth {
-            return Some(entry);
+            Some(entry)
         } else {
-            return None;
+            None
         }
     }
 
@@ -61,34 +65,22 @@ impl TranspositionTable {
     /// * `depth` - The depth at which this position was searched.
     /// * `score` - The evaluation score for this position.
     /// * `best_move` - The best move found for this position, if any.
-    pub fn add_position(&mut self, board: &Bitboard, depth: i32, score: i32, best_move: Option<Move>) {
+    pub fn store(&mut self, board: &Board, depth: i32, score: i32, best_move: Move) {
         // Add a position to the table
         // If the position already exists, update it if the depth is greater
-        let entry = self.table.get(board);
+        let entry = self.table.get(&board.zobrist_hash);
         if entry == None {
-            self.table.insert(board.clone(), TranspositionEntry {depth, score, best_move});
+            self.table.insert(board.zobrist_hash, TranspositionEntry {depth, score, best_move});
         } else {
             let entry = entry.unwrap();
             if depth > entry.depth {
-                self.table.insert(board.clone(), TranspositionEntry {depth, score, best_move});
+                self.table.insert(board.zobrist_hash, TranspositionEntry {depth, score, best_move});
             }
         }
     }
-}
 
-impl Hash for Bitboard {
-    /// Implements the `Hash` trait for `Bitboard`.
-    ///
-    /// This function defines how a `Bitboard` is hashed for use in the transposition table.
-    /// It considers the pieces, side to move, castling rights, and en passant ability,
-    /// but not the halfmove or fullmove clocks.
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.pieces.hash(state);
-        self.w_to_move.hash(state);
-        self.w_castle_k.hash(state);
-        self.w_castle_q.hash(state);
-        self.b_castle_k.hash(state);
-        self.b_castle_q.hash(state);
-        self.en_passant.hash(state);
+    /// Clears the transposition table.
+    pub fn clear(&mut self) {
+        self.table.clear();
     }
 }
