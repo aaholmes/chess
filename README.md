@@ -101,6 +101,7 @@ To use Kingfisher, you'll need Rust installed on your system. If you don't have 
 - Negamax search
 - Alpha-beta pruning
 - Iterative deepening
+- Transposition table
 - Pesto evaluation function (tapered)
 - MVV-LVA move ordering
 - Pawn and knight fork move ordering
@@ -111,7 +112,6 @@ To use Kingfisher, you'll need Rust installed on your system. If you don't have 
 
 ### In Progress
 - Mate killer heuristic
-- Transposition table
 - Null move pruning
 - UCI protocol
 
@@ -124,7 +124,7 @@ To use Kingfisher, you'll need Rust installed on your system. If you don't have 
 
 ## Inspirations
 
-- AlphaZero, of course
+- Monte Carlo Tree Search (MCTS)-based chess engines, such as AlphaZero and LeelaZero
 - Efficiently Updatable Neural Networks (NNUE) and state-of-the-art chess engines that combine it with classical search techniques, such as Stockfish and Berserk
 - The book "Neural Networks for Chess" by Dominik Klein
 
