@@ -1,4 +1,3 @@
-use kingfisher::board::Board;
 use kingfisher::boardstack::BoardStack;
 use kingfisher::search::mate_search;
 use kingfisher::move_generation::MoveGen;
@@ -51,11 +50,11 @@ fn test_alpha_beta_pruning_effectiveness() {
     // Now search with a narrow window
     let (score_narrow, _, nodes_narrow) = alpha_beta_search(&mut board, &move_gen, &pesto, depth, score_full - 50, score_full + 50, 0, true);
 
-    println!("Full window - Score: {}, Nodes: {}", score_full, nodes_full);
-    println!("Narrow window - Score: {}, Nodes: {}", score_narrow, nodes_narrow);
+    println!("Full window (White) - Score: {}, Nodes: {}", score_full, nodes_full);
+    println!("Narrow window (White) - Score: {}, Nodes: {}", score_narrow, nodes_narrow);
 
-    assert_eq!(score_full, score_narrow, "Scores don't match");
-    assert!(nodes_narrow < nodes_full * 2 / 3, "Not enough pruning. Full: {}, Narrow: {}", nodes_full, nodes_narrow);
+    assert_eq!(score_full, score_narrow, "Scores don't match for White");
+    assert!(nodes_narrow < nodes_full * 2 / 3, "Not enough pruning for White. Full: {}, Narrow: {}", nodes_full, nodes_narrow);
 
     // Test for black
     board = BoardStack::new_from_fen("r1bqkbnr/ppp2ppp/2np4/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R b KQkq - 0 4");
