@@ -35,9 +35,9 @@ fn test_capture_ordering() {
     let pesto = PestoEval::new();
 
     board.print();
-    let (mut captures, _) = move_gen.gen_pseudo_legal_moves_with_evals(&board, &pesto);
+    let (captures, _) = move_gen.gen_pseudo_legal_moves_with_evals(&board, &pesto);
 
-    let mut capture_vals: Vec<i32> = captures.iter().map(|m| move_gen.mvv_lva(&board, m.from, m.to)).collect();
+    let capture_vals: Vec<i32> = captures.iter().map(|m| move_gen.mvv_lva(&board, m.from, m.to)).collect();
     println!("{} Captures:", captures.len());
     for (i, m) in captures.iter().enumerate() {
         println!("{}. {} ({})", i+1, m, capture_vals[i]);

@@ -46,11 +46,11 @@ fn test_alpha_beta_pruning_effectiveness() {
     let mut tt = TranspositionTable::new();
 
     let depth = 4;
-    let INFINITY = 1000000;
-    let (score_full, _, nodes_full) = alpha_beta_search(&mut board, &move_gen, &pesto, &mut tt, depth, -INFINITY, INFINITY, 0, true);
+    let infinity = 1000000;
+    let (score_full, _, nodes_full, _) = alpha_beta_search(&mut board, &move_gen, &pesto, &mut tt, depth, -infinity, infinity, 0, false, None, None);
 
     // Now search with a narrow window
-    let (score_narrow, _, nodes_narrow) = alpha_beta_search(&mut board, &move_gen, &pesto, &mut tt, depth, score_full - 50, score_full + 50, 0, true);
+    let (score_narrow, _, nodes_narrow, _) = alpha_beta_search(&mut board, &move_gen, &pesto, &mut tt, depth, score_full - 50, score_full + 50, 0, false, None, None);
 
     println!("Full window (White) - Score: {}, Nodes: {}", score_full, nodes_full);
     println!("Narrow window (White) - Score: {}, Nodes: {}", score_narrow, nodes_narrow);
@@ -60,8 +60,8 @@ fn test_alpha_beta_pruning_effectiveness() {
 
     // Test for black
     board = BoardStack::new_from_fen("r1bqkbnr/ppp2ppp/2np4/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R b KQkq - 0 4");
-    let (score_full_black, _, nodes_full_black) = alpha_beta_search(&mut board, &move_gen, &pesto, &mut tt, depth, -INFINITY, INFINITY, 0, false);
-    let (score_narrow_black, _, nodes_narrow_black) = alpha_beta_search(&mut board, &move_gen, &pesto, &mut tt, depth, score_full_black - 50, score_full_black + 50, 0, false);
+    let (score_full_black, _, nodes_full_black, _) = alpha_beta_search(&mut board, &move_gen, &pesto, &mut tt, depth, -infinity, infinity, 0, false, None, None);
+    let (score_narrow_black, _, nodes_narrow_black, _) = alpha_beta_search(&mut board, &move_gen, &pesto, &mut tt, depth, score_full_black - 50, score_full_black + 50, 0, false, None, None);
 
     println!("Full window (Black) - Score: {}, Nodes: {}", score_full_black, nodes_full_black);
     println!("Narrow window (Black) - Score: {}, Nodes: {}", score_narrow_black, nodes_narrow_black);
@@ -98,7 +98,7 @@ fn test_pruning() {
     let mut tt = TranspositionTable::new();
     for depth in 1..6 {
         let (negamax_eval, negamax_move, negamax_nodes) = negamax_search(&mut board, &move_gen, &pesto, depth);
-        let (alpha_beta_eval, alpha_beta_move, alpha_beta_nodes) = alpha_beta_search(&mut board, &move_gen, &pesto, &mut tt, depth, -1000000, 1000000, 0, false);
+        let (alpha_beta_eval, alpha_beta_move, alpha_beta_nodes, _) = alpha_beta_search(&mut board, &move_gen, &pesto, &mut tt, depth, -1000000, 1000000, 0, false, None, None);
         assert!(negamax_eval == alpha_beta_eval, "Evals don't match for depth {}, negamax eval: {}, alpha-beta eval: {}", depth, negamax_eval, alpha_beta_eval);
         assert!(negamax_move == alpha_beta_move, "Moves don't match for depth {}, negamax move: {}, alpha-beta move: {}", depth, negamax_move.print_algebraic(), alpha_beta_move.print_algebraic());
         println!("Move, eval = {}, {}", &negamax_move.print_algebraic(), negamax_eval);

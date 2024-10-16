@@ -113,8 +113,6 @@ impl UCIEngine {
         let start_time = Instant::now();
 
         let max_depth = self.depth.unwrap_or(100);
-        let mut best_move = Move::null();
-        let mut best_score = 0;
 
         let (depth, score, current_best_move, nodes) = iterative_deepening_ab_search(
             &mut self.board,
@@ -128,9 +126,8 @@ impl UCIEngine {
 
         let elapsed = start_time.elapsed();
 
-        // Update best move and score
-        best_move = current_best_move;
-        best_score = score;
+        // Update best move
+        let best_move = current_best_move;
 
         // Print info
         println!("info depth {} score cp {} nodes {} time {} pv {}",

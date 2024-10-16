@@ -13,7 +13,7 @@ mod tests {
         let pesto = PestoEval::new();
         let max_depth = 10;
         let q_search_max_depth = 5;
-        let time_limit = Some(Duration::from_millis(60)); // Very short time limit
+        let time_limit = Some(Duration::from_millis(50)); // Very short time limit
 
         let start = Instant::now();
         let (depth, _, _, _) = iterative_deepening_ab_search(&mut board, &move_gen, &pesto, max_depth, q_search_max_depth, time_limit, false);
@@ -21,7 +21,7 @@ mod tests {
 
         println!("Searched depth: {}", depth);
 
-        assert!(elapsed <= (15 * time_limit.unwrap()) / 10, "Search took too long: {:?}", elapsed);
+        assert!(elapsed <= (12 * time_limit.unwrap()) / 10, "Search took too long: {:?}", elapsed);
     }
 
     #[test]
@@ -38,7 +38,7 @@ mod tests {
         let elapsed = start.elapsed();
 
         println!("Searched depth: {}", depth);
-        assert!(elapsed <= (15 * time_limit.unwrap()) / 10, "Search took too long: {:?}", elapsed);
+        assert!(elapsed <= (12 * time_limit.unwrap()) / 10, "Search took too long: {:?}", elapsed);
     }
 
     #[test]
