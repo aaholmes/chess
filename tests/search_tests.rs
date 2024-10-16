@@ -78,12 +78,14 @@ fn test_search_stability() {
 
     let max_depth = 6;
     let q_search_max_depth = 99;
-    let (score1, best_move1, _) = iterative_deepening_ab_search(&mut board, &move_gen, &pesto, max_depth, q_search_max_depth, false);
-    let (score2, best_move2, _) = iterative_deepening_ab_search(&mut board, &move_gen, &pesto, max_depth, q_search_max_depth, false);
+    let (depth1, score1, best_move1, eval1) = iterative_deepening_ab_search(&mut board, &move_gen, &pesto, max_depth, q_search_max_depth, None, false);
+    let (depth2, score2, best_move2, eval2) = iterative_deepening_ab_search(&mut board, &move_gen, &pesto, max_depth, q_search_max_depth, None, false);
 
     // The scores and best moves should be the same across multiple runs
+    assert_eq!(depth1, depth2);
     assert_eq!(score1, score2);
     assert_eq!(best_move1, best_move2);
+    assert_eq!(eval1, eval2);
 }
 
 // Count the number of nodes visited in the negamax search and the alpha-beeta search, for a depth of up to 4 ply.

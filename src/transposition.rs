@@ -11,7 +11,7 @@ use crate::move_types::Move;
 #[derive(PartialEq)]
 pub struct TranspositionEntry {
     /// The depth at which this position was searched.
-    depth: i32,
+    pub(crate) depth: i32,
     /// The evaluation score for this position.
     pub(crate) score: i32,
     /// The best move found for this position.

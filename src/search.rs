@@ -2,6 +2,7 @@
 //!
 //! This module implements the negamax search algorithm for chess position evaluation.
 
+use std::time::{Duration, Instant};
 use crate::boardstack::BoardStack;
 use crate::move_types::Move;
 use crate::move_generation::MoveGen;
@@ -336,20 +337,17 @@ pub fn alpha_beta(board: &mut BoardStack, move_gen: &MoveGen, pesto: &PestoEval,
 /// * `pesto` - A reference to the Pesto evaluation function
 /// * `max_depth` - The maximum depth to search to
 /// * `q_search_max_depth` - The maximum depth for the quiescence search
+/// * `time_limit` - An optional duration for the search time limit
 /// * `verbose` - A flag indicating whether to print verbose output
 ///
 /// # Returns
 ///
 /// A tuple containing:
+/// * The depth at which the search was stopped
 /// * The evaluation (in centipawns) of the final position
 /// * The best move to play from the current position
 /// * The number of nodes searched
-pub fn iterative_deepening_ab_search(board: &mut BoardStack, move_gen: &MoveGen, pesto: &PestoEval, max_depth: i32, q_search_max_depth: i32, verbose: bool) -> (i32, Move, i32) {
-    // Perform iterative deepening alpha-beta search from the given position
-    // Searches to the given depth
-    // Returns the eval (in centipawns) of the final position, as well as the first move
-    // to play from the current position
-    // Also returns number of nodes searched
+pub fn iterative_deepening_ab_search(board: &mut BoardStack, move_gen: &MoveGen, pesto: &PestoEval, max_depth: i32, q_search_max_depth: i32, time_limit: Option<Duration>, verbose: bool) -> (i32, i32, Move, i32) {
 
     let mut tt = TranspositionTable::new();
     let mut eval: i32 = 0;
@@ -357,26 +355,50 @@ pub fn iterative_deepening_ab_search(board: &mut BoardStack, move_gen: &MoveGen,
     let mut n: i32 = 0;
     let mut nodes: i32;
 
+    let start_time = Instant::now();
 
     // Check the transposition table to see if this node has already been searched at the target depth
     if let Some(entry) = tt.probe(&board.current_state(), max_depth) {
-        return (entry.score, entry.best_move, n);
+        return (entry.depth, entry.score, entry.best_move, n);
     }
 
     // Iterate over increasing depths
-    for depth in 1..max_depth + 1 {
-        // Skip the last odd depth if max_depth is even, since due to the even/odd effect of
-        // alpha-beta search, it is approximately half as expensive as the even depth itself
-        if depth == max_depth - 1 && depth % 2 == 1 {
+    let mut depth = 1;
+    while depth <= max_depth {
+
+        if verbose {
+            println!("Starting search at depth {}", depth);
+        }
+        // Skip odd depths in iterative deepening (other than max_depth if it is odd)
+        if depth < max_depth && depth % 2 == 1 {
+            depth += 1;
             continue;
         }
+
+        // Perform alpha-beta search
         (eval, best_move, nodes) = alpha_beta_search(board, move_gen, pesto, &mut tt, depth, -1000000, 1000000, q_search_max_depth, verbose);
         n += nodes;
+
         if verbose {
             println!("At depth {}, searched {} nodes. best eval and move are {} {}", depth, n, eval, print_move(&best_move));
         }
+
+        // If there is a time limit, check to see if we have exceeded it
+        if let Some(time_limit) = time_limit {
+            if start_time.elapsed() > time_limit {
+                if verbose {
+                    println!("Time limit reached. Stopping search.");
+                }
+                break;
+            }
+        }
+
+        // Store the result in the transposition table
+        tt.store(&board.current_state(), depth, eval, best_move);
+
+        depth += 1;
     }
-    (eval, best_move, n)
+    (depth, eval, best_move, n)
 }
 
 /// Perform aspiration window alpha-beta search from the given position

@@ -71,12 +71,9 @@ impl Agent for SimpleAgent<'_> {
             return m;
         }
 
-        // If no mate found, perform aspiration window search
-        //let (eval, m, n) = aspiration_window_ab_search(board, self.move_gen, self.pesto, self.ab_search_depth, self.q_search_max_depth, self.verbose);
-        //println!("Mate search searched {} nodes, aspiration window search searched another {} nodes ({} total)! Eval: {}", nodes, n, nodes + n, eval);
         // If no mate found, perform iterative deepening search
-        let (eval, m, n) = iterative_deepening_ab_search(board, self.move_gen, self.pesto, self.ab_search_depth, self.q_search_max_depth, self.verbose);
-        println!("Mate search searched {} nodes, iterative deepening search searched another {} nodes ({} total)! Eval: {}", nodes, n, nodes + n, eval);
+        let (depth, eval, m, n) = iterative_deepening_ab_search(board, self.move_gen, self.pesto, self.ab_search_depth, self.q_search_max_depth, None, self.verbose);
+        println!("Mate search searched {} nodes, iterative deepening search searched another {} nodes at a depth of {} ({} total nodes). Eval: {}", nodes, n, depth, nodes + n, eval);
         m
     }
 }
