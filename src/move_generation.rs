@@ -169,10 +169,35 @@ impl MoveGen {
         move_gen
     }
 
+    /// Internal helper to generate all pseudo-legal moves, separated.
+    fn _generate_all_moves(&self, board: &Board) -> (Vec<Move>, Vec<Move>, Vec<Move>) {
+        // Returns (captures, promotions, quiet_moves)
+        let (mut captures, mut promotions, mut moves) = self.gen_pawn_moves(board);
+        let (mut captures_knights, mut moves_knights) = self.gen_knight_moves(board);
+        let (mut captures_kings, mut moves_kings) = self.gen_king_moves(board);
+        let (mut captures_rooks, mut moves_rooks) = self.gen_rook_moves(board);
+        let (mut captures_bishops, mut moves_bishops) = self.gen_bishop_moves(board);
+        let (mut captures_queens, mut moves_queens) = self.gen_queen_moves(board);
+
+        captures.append(&mut captures_knights);
+        captures.append(&mut captures_bishops);
+        captures.append(&mut captures_rooks);
+        captures.append(&mut captures_queens);
+        captures.append(&mut captures_kings);
+
+        moves.append(&mut moves_knights);
+        moves.append(&mut moves_bishops);
+        moves.append(&mut moves_rooks);
+        moves.append(&mut moves_queens);
+        moves.append(&mut moves_kings);
+
+        (captures, promotions, moves)
+    }
+
     /// Generates all pseudo-legal moves for a given position.
     ///
     /// This function generates all pseudo-legal moves for the given position,
-    /// including captures and non-captures.
+    /// including captures and non-captures. Promotions are included in the captures list.
     ///
     /// # Arguments
     ///
@@ -180,59 +205,34 @@ impl MoveGen {
     ///
     /// # Returns
     ///
-    /// A tuple containing the capture moves and non-capture moves.
+    /// A tuple containing the capture moves (including promotions) and non-capture moves.
     pub fn gen_pseudo_legal_moves(&self, board: &Board) -> (Vec<Move>, Vec<Move>) {
-        // Generate all pseudo-legal moves for the current position, i.e., these moves may move into check.
-        // Elsewhere we need to check for legality and perform move ordering.
-        // Returns a vector of captures and a vector of non-captures.
-        // Includes promotions as captures here
-        let (mut captures, mut promotions, mut moves) = self.gen_pawn_moves(board);
-        let (mut captures_knights, mut moves_knights) = self.gen_knight_moves(board);
-        let (mut captures_kings, mut moves_kings) = self.gen_king_moves(board);
-        let (mut captures_rooks, mut moves_rooks) = self.gen_rook_moves(board);
-        let (mut captures_bishops, mut moves_bishops) = self.gen_bishop_moves(board);
-        let (mut captures_queens, mut moves_queens) = self.gen_queen_moves(board);
-        captures.append(&mut captures_knights);
-        captures.append(&mut captures_bishops);
-        captures.append(&mut captures_rooks);
-        captures.append(&mut captures_queens);
-        captures.append(&mut captures_kings);
-        captures.append(&mut promotions);
-        moves.append(&mut moves_knights);
-        moves.append(&mut moves_bishops);
-        moves.append(&mut moves_rooks);
-        moves.append(&mut moves_queens);
-        moves.append(&mut moves_kings);
+        let (mut captures, mut promotions, moves) = self._generate_all_moves(board);
+        captures.append(&mut promotions); // Combine promotions with captures
         (captures, moves)
     }
 
+    /// Generates all pseudo-legal moves, sorted for search efficiency.
+    ///
+    /// Generates captures (including promotions) sorted by MVV-LVA, and
+    /// quiet moves sorted by a heuristic evaluation (`PestoEval::move_eval`).
+    ///
+    /// # Arguments
+    ///
+    /// * `board` - The current chess position.
+    /// * `pesto` - The evaluation function instance for move scoring.
+    ///
+    /// # Returns
+    ///
+    /// A tuple containing the sorted capture moves and sorted non-capture moves.
     pub fn gen_pseudo_legal_moves_with_evals(&self, board: &Board, pesto: &PestoEval) -> (Vec<Move>, Vec<Move>) {
-        // Generate all pseudo-legal moves for the current position, i.e., these moves may move into check.
-        // Elsewhere we need to check for legality and perform move ordering.
-        // Returns a vector of captures and a vector of non-captures.
-        // Includes promotions as captures here
-        let (mut captures, mut promotions, mut moves) = self.gen_pawn_moves(board);
-        let (mut captures_knights, mut moves_knights) = self.gen_knight_moves(board);
-        let (mut captures_kings, mut moves_kings) = self.gen_king_moves(board);
-        let (mut captures_rooks, mut moves_rooks) = self.gen_rook_moves(board);
-        let (mut captures_bishops, mut moves_bishops) = self.gen_bishop_moves(board);
-        let (mut captures_queens, mut moves_queens) = self.gen_queen_moves(board);
-        captures.append(&mut captures_knights);
-        captures.append(&mut captures_bishops);
-        captures.append(&mut captures_rooks);
-        captures.append(&mut captures_queens);
-        captures.append(&mut captures_kings);
-        captures.append(&mut promotions);
-        moves.append(&mut moves_knights);
-        moves.append(&mut moves_bishops);
-        moves.append(&mut moves_rooks);
-        moves.append(&mut moves_queens);
-        moves.append(&mut moves_kings);
+        let (mut captures, mut promotions, mut moves) = self._generate_all_moves(board);
+        captures.append(&mut promotions); // Combine promotions with captures
 
-        // Here let's sort captures by MVV-LVA
+        // Sort captures by MVV-LVA (descending)
         captures.sort_unstable_by_key(|m| -self.mvv_lva(board, m.from, m.to));
 
-        // Also sort moves by pesto eval change
+        // Sort quiet moves by heuristic eval change (descending)
         moves.sort_unstable_by_key(|m| -pesto.move_eval(board, self, m.from, m.to));
 
         (captures, moves)
@@ -249,22 +249,20 @@ impl MoveGen {
     /// # Returns
     ///
     /// A vector of capture moves.
+    /// Generates only the capture and promotion moves, sorted by MVV-LVA.
+    ///
+    /// # Arguments
+    ///
+    /// * `board` - The current chess position.
+    ///
+    /// # Returns
+    ///
+    /// A vector of capture and promotion moves, sorted by MVV-LVA (descending).
     pub fn gen_pseudo_legal_captures(&self, board: &Board) -> Vec<Move> {
-        // Same as above, but only generate captures
-        let (mut captures, mut promotions, _moves) = self.gen_pawn_moves(board);
-        let (mut captures_knights, _moves_knights) = self.gen_knight_moves(board);
-        let (mut captures_kings, _moves_kings) = self.gen_king_moves(board);
-        let (mut captures_rooks, _moves_rooks) = self.gen_rook_moves(board);
-        let (mut captures_bishops, _moves_bishops) = self.gen_bishop_moves(board);
-        let (mut captures_queens, _moves_queens) = self.gen_queen_moves(board);
-        captures.append(&mut captures_knights);
-        captures.append(&mut captures_bishops);
-        captures.append(&mut captures_rooks);
-        captures.append(&mut captures_queens);
-        captures.append(&mut captures_kings);
-        captures.append(&mut promotions);
+        let (mut captures, mut promotions, _moves) = self._generate_all_moves(board);
+        captures.append(&mut promotions); // Combine promotions with captures
 
-        // Here let's sort captures by MVV-LVA
+        // Sort captures by MVV-LVA (descending)
         captures.sort_unstable_by_key(|m| -self.mvv_lva(board, m.from, m.to));
 
         captures
