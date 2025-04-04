@@ -5,11 +5,13 @@
 use std::cmp::max;
 use std::time::{Duration, Instant};
 use crate::boardstack::BoardStack;
-use crate::move_types::Move;
+use crate::move_types::{Move, NULL_MOVE};
 use crate::move_generation::MoveGen;
 use crate::eval::PestoEval;
 use crate::utils::print_move;
-use crate::transposition::TranspositionTable;
+use crate::transposition::{TranspositionEntry, TranspositionTable}; // Added TranspositionEntry
+
+const MAX_PLY: usize = 64; // Max search depth for killer table size
 
 /// Perform negamax search from the given position
 ///
@@ -136,6 +138,8 @@ pub fn alpha_beta_search(
     move_gen: &MoveGen,
     pesto: &PestoEval,
     tt: &mut TranspositionTable,
+    killers: &mut [[Move; 2]; MAX_PLY], // Added killer table
+    ply: usize,                         // Added current ply from root
     depth: i32,
     mut alpha: i32,
     beta: i32,
@@ -173,15 +177,26 @@ pub fn alpha_beta_search(
         return (eval, Move::null(), nodes, false);
     }
 
-    // Null move pruning
-    // TODO: Add `can_null` parameter or logic to control when NMP is allowed (e.g., not in zugzwang positions)
-    // TODO: Verify `board.is_check()` is efficient or cache the check status
-    let can_null = true; // Placeholder: NMP is generally safe except in potential zugzwang
-    if can_null && depth >= 3 && !board.is_check(move_gen) { // Assuming `is_check` checks the current side
+    // --- Null Move Pruning (NMP) ---
+    // Disable NMP in potential Zugzwang positions (e.g., only king and pawns left for the side to move)
+    // A more robust check might consider material counts and endgame phase.
+    let is_zugzwang_candidate = {
+        let current_board = board.current_state();
+        let color = if current_board.w_to_move { crate::piece_types::WHITE } else { crate::piece_types::BLACK };
+        // Check if only pawns and king remain for the side to move
+        let non_pawn_king_material = current_board.pieces_occ[color] & !current_board.pieces[color][crate::piece_types::PAWN] & !current_board.pieces[color][crate::piece_types::KING];
+        non_pawn_king_material == 0
+    };
+
+    let in_check = board.is_check(move_gen); // Cache check status
+
+    // Apply NMP only if not in check, not in a likely Zugzwang candidate position, and depth is sufficient
+    if !in_check && !is_zugzwang_candidate && depth >= 3 {
         board.make_null_move();
         // Note: The reduction factor (R=3 here) is standard, but can be tuned.
         // Search with a null window (-beta, -beta + 1)
-        let (score, _, child_nodes, terminated) = alpha_beta_search(board, move_gen, pesto, tt, depth - 1 - 3, -beta, -beta + 1, q_search_max_depth, false, start_time, time_limit);
+        // Pass killers table and incremented ply to recursive NMP search
+        let (score, _, child_nodes, terminated) = alpha_beta_search(board, move_gen, pesto, tt, killers, ply + 1, depth - 1 - 3, -beta, -beta + 1, q_search_max_depth, false, start_time, time_limit);
         board.undo_null_move();
         nodes += child_nodes;
 
@@ -198,21 +213,61 @@ pub fn alpha_beta_search(
 
     let mut moves_searched = 0;
 
-    let (mut captures, moves) = move_gen.gen_pseudo_legal_moves_with_evals(&mut board.current_state(), pesto);
-    captures.extend(moves);
+    // --- Move Ordering ---
+    // Generate moves (Assuming a function that separates captures/quiets and maybe applies MVV-LVA)
+    // TODO: Ensure `gen_pseudo_legal_moves_ordered` exists and provides ordered captures (MVV-LVA) and separate quiet moves.
+    let (mut captures, mut quiet_moves) = move_gen.gen_pseudo_legal_moves_ordered(&board.current_state(), pesto);
 
-    // Improve alpha-beta pruning by searching the best move from the transposition table first
-    // The move must have a depth of at least 1
-    if let Some(entry) = tt.probe(board.current_state(), 1) {
-        if let Some(tt_best_move) = captures.iter().find(|&m| *m == entry.best_move) {
-            // Move the transposition table's best move to the front
-            let index = captures.iter().position(|m| *m == *tt_best_move).unwrap();
-            let best_move = captures.remove(index);
-            captures.insert(0, best_move);
-        }
+    // 1. Transposition Table Move
+    let mut tt_move = NULL_MOVE;
+    if let Some(entry) = tt.probe(board.current_state(), 1) { // Probe shallow depth for move ordering hint
+       tt_move = entry.best_move;
+       // Remove the TT move from captures or quiet moves if present, to avoid duplication
+       if let Some(pos) = captures.iter().position(|&m| m == tt_move) {
+           captures.remove(pos);
+       } else if let Some(pos) = quiet_moves.iter().position(|&m| m == tt_move) {
+           quiet_moves.remove(pos);
+       } else {
+           tt_move = NULL_MOVE; // TT move is not legal/found in generated moves
+       }
     }
 
-    for mov in captures {
+    // 2. Killer Moves (prioritize non-captures that caused cutoffs)
+    let killer1 = if ply < MAX_PLY { killers[ply][0] } else { NULL_MOVE };
+    let killer2 = if ply < MAX_PLY { killers[ply][1] } else { NULL_MOVE };
+
+    // Build the ordered list for iteration
+    let mut ordered_moves = Vec::with_capacity(captures.len() + quiet_moves.len() + 3);
+
+    // Add TT Move first if valid
+    if tt_move != NULL_MOVE {
+        ordered_moves.push(tt_move);
+    }
+
+    // Add Captures (assumed pre-ordered by MVV-LVA)
+    ordered_moves.extend(captures);
+
+    // Add Killer 1 if it's a quiet move and not the TT move
+    let mut killer1_added = false;
+    if killer1 != NULL_MOVE && killer1 != tt_move && !move_gen.is_capture(&board.current_state(), killer1) {
+         if let Some(pos) = quiet_moves.iter().position(|&m| m == killer1) {
+             ordered_moves.push(quiet_moves.remove(pos));
+             killer1_added = true;
+         }
+    }
+
+    // Add Killer 2 if it's a quiet move, not the TT move, and different from Killer 1
+     if killer2 != NULL_MOVE && killer2 != tt_move && killer1 != killer2 && !move_gen.is_capture(&board.current_state(), killer2) {
+         if let Some(pos) = quiet_moves.iter().position(|&m| m == killer2) {
+             ordered_moves.push(quiet_moves.remove(pos));
+         }
+    }
+
+    // Add remaining quiet moves (potentially ordered by history heuristic later)
+    // TODO: Implement History Heuristic for remaining quiet moves
+    ordered_moves.extend(quiet_moves);
+
+    for mov in ordered_moves { // Iterate through the ordered list
         // Increment the number of moves searched
         moves_searched += 1;
 
@@ -236,8 +291,9 @@ pub fn alpha_beta_search(
            && !is_pv_node
         {
             // Reduced depth search
+            // Pass killers table and incremented ply
             let (reduced_score, _, child_nodes, terminated) = alpha_beta_search(
-                board, move_gen, pesto, tt, depth - REDUCTION_AMOUNT - 1,
+                board, move_gen, pesto, tt, killers, ply + 1, depth - REDUCTION_AMOUNT - 1,
                 -beta, -alpha, q_search_max_depth, verbose, start_time, time_limit
             );
             score = -reduced_score;
@@ -250,8 +306,9 @@ pub fn alpha_beta_search(
 
             // Re-search at full depth if the reduced search was promising
             if score > alpha {
+                // Pass killers table and incremented ply
                 let (full_score, _, child_nodes, terminated) = alpha_beta_search(
-                    board, move_gen, pesto, tt, depth - 1,
+                    board, move_gen, pesto, tt, killers, ply + 1, depth - 1,
                     -beta, -alpha, q_search_max_depth, verbose, start_time, time_limit
                 );
                 score = -full_score;
@@ -264,8 +321,9 @@ pub fn alpha_beta_search(
             }
         } else {
             // Full depth search
+            // Pass killers table and incremented ply
             let (child_score, _, child_nodes, terminated) = alpha_beta_search(
-                board, move_gen, pesto, tt, depth - 1,
+                board, move_gen, pesto, tt, killers, ply + 1, depth - 1,
                 -beta, -alpha, q_search_max_depth, verbose, start_time, time_limit
             );
             score = -child_score;
@@ -284,9 +342,18 @@ pub fn alpha_beta_search(
             best_move = mov;
 
             if alpha >= beta {
-                // Store in transposition table
-                tt.store(&board.current_state(), depth, beta, best_move);
-                return (beta, best_move, nodes, false);
+                // Beta cutoff
+                // Store Killer Move if it's a quiet move and ply is valid
+                if ply < MAX_PLY && !move_gen.is_capture(&board.current_state(), mov) {
+                    if mov != killers[ply][0] { // Avoid storing the same killer twice
+                       killers[ply][1] = killers[ply][0]; // Shift older killer
+                       killers[ply][0] = mov;             // Store new killer
+                    }
+                }
+                // Store Beta cutoff in transposition table
+                // Use the move that caused the cutoff (mov)
+                tt.store(&board.current_state(), depth, beta, mov);
+                return (beta, mov, nodes, false); // Return beta and the cutoff move
             }
         }
     }
@@ -328,6 +395,7 @@ pub fn iterative_deepening_ab_search(board: &mut BoardStack, move_gen: &MoveGen,
     let mut last_fully_searched_depth: i32 = 0;
 
     let start_time = Instant::now();
+    let mut killers = [[NULL_MOVE; 2]; MAX_PLY]; // Initialize killer table
 
     // Check the transposition table to see if this node has already been searched at the target depth
     if let Some(entry) = tt.probe(&board.current_state(), max_depth) {
@@ -348,17 +416,20 @@ pub fn iterative_deepening_ab_search(board: &mut BoardStack, move_gen: &MoveGen,
         }
 
         // Perform alpha-beta search
+        // Pass killer table to alpha_beta_search (ply starts at 0)
         let (new_eval, new_best_move, new_nodes, terminated) = alpha_beta_search(
-            board, 
-            move_gen, 
-            pesto, 
-            tt, 
-            depth, 
-            -1000000, 
-            1000000, 
-            q_search_max_depth, 
-            verbose, 
-            Some(start_time), 
+            board,
+            move_gen,
+            pesto,
+            tt,
+            &mut killers, // Pass killers table
+            0, // Starting ply is 0
+            depth,
+            -1000000,
+            1000000,
+            q_search_max_depth,
+            verbose,
+            Some(start_time),
             time_limit
         );
 
@@ -433,6 +504,7 @@ pub fn aspiration_window_ab_search(board: &mut BoardStack, move_gen: &MoveGen, t
     let (mut eval, mut n) = quiescence_search(board, move_gen, pesto, lower_bound, upper_bound, q_search_max_depth, verbose);
 
     // Now perform an iterative deepening search with aspiration windows
+    let mut killers = [[NULL_MOVE; 2]; MAX_PLY]; // Initialize killer table for this search instance
     for d in 1..= max_depth {
         let depth = 2 * d; // Only even depths, due to the even/odd effect
         let mut lower_window_scale: i32 = 1;
@@ -443,7 +515,8 @@ pub fn aspiration_window_ab_search(board: &mut BoardStack, move_gen: &MoveGen, t
             if verbose {
                 println!("Aspiration window search with window {} {}", lower_bound, upper_bound);
             }
-            (eval, best_move, nodes, _) = alpha_beta_search(board, move_gen, pesto, tt, depth, lower_bound, upper_bound, q_search_max_depth, verbose, None, None);
+            // Pass killer table to alpha_beta_search (ply starts at 0)
+            (eval, best_move, nodes, _) = alpha_beta_search(board, move_gen, pesto, tt, &mut killers, 0, depth, lower_bound, upper_bound, q_search_max_depth, verbose, None, None);
             n += nodes;
             if verbose {
                 println!("At depth {}, searched {} nodes. best eval and move are {} {}", depth, n, eval, print_move(&best_move));
