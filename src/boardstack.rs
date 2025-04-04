@@ -117,4 +117,45 @@ impl BoardStack {
         // Check if there are 3 or more repetitions of the same hash
         *self.position_history.get(&hash).unwrap() >= 3
     }
+
+    /// Checks if the side to move is in check
+    ///
+    /// # Arguments
+    ///
+    /// * `move_gen` - A reference to the move generator
+    ///
+    /// # Returns
+    ///
+    /// `true` if the side to move is in check, `false` otherwise.
+    pub fn is_check(&self, move_gen: &crate::move_generation::MoveGen) -> bool {
+        self.current_state().is_check(move_gen)
+    }
+
+    /// Makes a null move (passes the turn to the opponent)
+    /// 
+    /// This is used for null move pruning in the search algorithm.
+    /// It doesn't change the board position except for the side to move.
+    pub fn make_null_move(&mut self) {
+        // Create a new board that's the same as the current one but with the side to move flipped
+        let mut new_board = self.current_state().clone();
+        new_board.w_to_move = !new_board.w_to_move;
+        
+        // Reset en passant target if any
+        new_board.en_passant = None;
+        
+        // Update zobrist hash for the side to move change and en passant reset
+        new_board.zobrist_hash = new_board.compute_zobrist_hash();
+        
+        // Push the new board onto the stack and record a null move
+        *self.position_history.entry(new_board.zobrist_hash).or_insert(0) += 1;
+        self.state_stack.push_front(new_board);
+        self.move_stack.push_front(Move::null());
+    }
+
+    /// Undoes a null move
+    ///
+    /// This is the counterpart to make_null_move.
+    pub fn undo_null_move(&mut self) {
+        self.undo_move();
+    }
 }

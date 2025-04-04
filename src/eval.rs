@@ -12,7 +12,7 @@ use crate::bits::{popcnt, bits};
 use crate::board::Board;
 use crate::board_utils::{
     sq_to_rank, sq_to_file, get_passed_pawn_mask, get_king_shield_zone_mask,
-    get_adjacent_files_mask, sq_ind_to_bit, get_pawn_front_square_mask, get_rank_mask, get_file_mask // Added rank/file mask
+    get_adjacent_files_mask, sq_ind_to_bit, get_pawn_front_square_mask, get_rank_mask, get_file_mask
 };
 use crate::move_generation::MoveGen;
 use crate::piece_types::{PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING, WHITE, BLACK};
@@ -23,7 +23,7 @@ use crate::eval_constants::{
     MOBILE_PAWN_DUO_BONUS_MG, MOBILE_PAWN_DUO_BONUS_EG,
     ROOK_ON_SEVENTH_BONUS, ROOK_BEHIND_PASSED_PAWN_BONUS,
     DOUBLED_ROOKS_ON_SEVENTH_BONUS, ROOK_BEHIND_ENEMY_PASSED_PAWN_BONUS, CASTLING_RIGHTS_BONUS,
-    ROOK_OPEN_FILE_BONUS, ROOK_HALF_OPEN_FILE_BONUS // Added open file constants
+    ROOK_OPEN_FILE_BONUS, ROOK_HALF_OPEN_FILE_BONUS
 };
 
 /// Struct representing the Pesto evaluation function
@@ -68,7 +68,7 @@ impl PestoEval {
     ///
     /// (eval, game_phase)
     // Note: Added move_gen parameter
-    fn eval_plus_game_phase(&self, board: &Board, move_gen: &MoveGen) -> (i32, i32) {
+    fn eval_plus_game_phase(&self, board: &Board, _move_gen: &MoveGen) -> (i32, i32) {
 
         let mut mg: [i32; 2] = [0, 0];
         let mut eg: [i32; 2] = [0, 0];
@@ -186,6 +186,7 @@ impl PestoEval {
                 // Rook on 7th bonus is handled by Doubled Rooks bonus below if applicable
 
                 // Rook on Open/Half-Open File
+                let file_mask = get_file_mask(file);
                 let friendly_pawns_on_file = friendly_pawns & file_mask;
                 let enemy_pawns_on_file = enemy_pawns & file_mask;
 

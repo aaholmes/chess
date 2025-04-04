@@ -1,6 +1,6 @@
-/c/! Alpha-beta negamax search module
-//!
-//! This module implements the negamax search algorithm for chess position evaluation.
+/// Alpha-beta negamax search module
+///
+/// This module implements the negamax search algorithm for chess position evaluation.
 
 use std::cmp::max;
 use std::time::{Duration, Instant};
@@ -348,7 +348,19 @@ pub fn iterative_deepening_ab_search(board: &mut BoardStack, move_gen: &MoveGen,
         }
 
         // Perform alpha-beta search
-        let (new_eval, new_best_move, new_nodes, terminated) = alpha_beta_search(board, move_gen, pesto, &mut tt, depth, -1000000, 1000000, q_search_max_depth, verbose, Some(start_time), time_limit);
+        let (new_eval, new_best_move, new_nodes, terminated) = alpha_beta_search(
+            board, 
+            move_gen, 
+            pesto, 
+            tt, 
+            depth, 
+            -1000000, 
+            1000000, 
+            q_search_max_depth, 
+            verbose, 
+            Some(start_time), 
+            time_limit
+        );
 
         if !terminated {
             eval = new_eval;
@@ -667,16 +679,16 @@ fn q_search_consistent_side_to_move_for_final_eval(board: &mut BoardStack, move_
     }
 }
 
-/// Perform a mate search from the given position
+/// Perform mate search from the given position
 ///
 /// This function performs an iteratively deepening search for forced checkmates,
 /// where the side to move always gives check. It finds checkmates but does not
-/// find forced checkmates where the side to move does not give check, nor does
-/// it find forced stalemates or threefold repetitions.
+/// find other winning positions. It is useful at low depths to avoid blundering
+/// checkmates.
 ///
 /// # Arguments
 ///
-/// * `board` - A reference to the current board state
+/// * `board` - A mutable reference to the current board state
 /// * `move_gen` - A reference to the move generator
 /// * `max_depth` - The maximum depth to search to
 /// * `verbose` - A flag indicating whether to print verbose output
@@ -721,19 +733,19 @@ pub fn mate_search(board: &mut BoardStack, move_gen: &MoveGen, max_depth: i32, v
             n += nodes;
             if eval > alpha {
                 alpha = eval;
+                best_move = m;
             }
             board.undo_move();
             if alpha >= beta {
-                best_move = m;
                 break;
             }
         }
-        if verbose{
+        if verbose {
             println!("At depth {} ply, searched {} nodes. best eval {}", depth, n, eval);
         }
         // If checkmate found, stop searching
         if eval == 1000000 {
-            if verbose{
+            if verbose {
                 println!("Mate search: Checkmate! No need to go deeper");
             }
             break;

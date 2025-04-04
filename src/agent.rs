@@ -5,6 +5,7 @@ use crate::eval::PestoEval;
 use crate::move_types::Move;
 use crate::move_generation::MoveGen;
 use crate::search::{iterative_deepening_ab_search, mate_search};
+use crate::transposition::TranspositionTable;
 
 /// Trait defining the interface for chess agents.
 pub trait Agent {
@@ -37,19 +38,20 @@ pub struct SimpleAgent<'a> {
 }
 
 impl SimpleAgent<'_> {
-    /// Creates a new `SimpleAgent` with the specified parameters.
+    /// Generate a new simple agent with the specified parameters.
     ///
     /// # Arguments
     ///
     /// * `mate_search_depth` - The depth to search for mate.
     /// * `ab_search_depth` - The depth for alpha-beta search.
+    /// * `q_search_max_depth` - The maximum depth for the quiescence search.
     /// * `verbose` - Whether to print verbose output during search.
     /// * `move_gen` - Reference to the move generator.
     /// * `pesto` - Reference to the Pesto evaluation function.
     ///
     /// # Returns
     ///
-    /// A new `SimpleAgent` instance.
+    /// A new `SimpleAgent` with the specified parameters.
     pub fn new<'a>(mate_search_depth: i32, ab_search_depth: i32, q_search_max_depth: i32, verbose: bool, move_gen: &'a MoveGen, pesto: &'a PestoEval) -> SimpleAgent<'a> {
         SimpleAgent {
             mate_search_depth,
@@ -71,8 +73,11 @@ impl Agent for SimpleAgent<'_> {
             return m;
         }
 
+        // Create a transposition table for the search
+        let mut tt = TranspositionTable::new();
+
         // If no mate found, perform iterative deepening search
-        let (depth, eval, m, n) = iterative_deepening_ab_search(board, self.move_gen, self.pesto, self.ab_search_depth, self.q_search_max_depth, None, self.verbose);
+        let (depth, eval, m, n) = iterative_deepening_ab_search(board, self.move_gen, self.pesto, &mut tt, self.ab_search_depth, self.q_search_max_depth, None, self.verbose);
         println!("Mate search searched {} nodes, iterative deepening search searched another {} nodes at a depth of {} ({} total nodes). Eval: {}", nodes, n, depth, nodes + n, eval);
         m
     }

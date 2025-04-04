@@ -9,6 +9,7 @@ use crate::eval::PestoEval;
 use crate::move_types::Move;
 use crate::move_generation::MoveGen;
 use crate::search::iterative_deepening_ab_search;
+use crate::transposition::TranspositionTable;
 
 pub struct UCIEngine {
     board: BoardStack,
@@ -74,7 +75,7 @@ impl UCIEngine {
 
         if args[0] == "startpos" {
             self.board = BoardStack::new();
-            let mut moves_idx = 2;
+            let moves_idx = 2;
 
             if args.len() > 1 && args[1] == "moves" {
                 for move_str in &args[moves_idx..] {
@@ -114,10 +115,14 @@ impl UCIEngine {
 
         let max_depth = self.depth.unwrap_or(100);
 
+        // Create a transposition table for the search
+        let mut tt = TranspositionTable::new();
+
         let (depth, score, current_best_move, nodes) = iterative_deepening_ab_search(
             &mut self.board,
             &self.move_gen,
             &self.pesto,
+            &mut tt,
             max_depth,
             4,
             Some(allocated_time),
