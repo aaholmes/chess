@@ -102,6 +102,7 @@ To use Kingfisher, you'll need Rust installed on your system. If you don't have 
 *   Null Move Pruning (NMP) with Zugzwang Refinement
 *   Late Move Reductions (LMR)
 *   Move Ordering: MVV-LVA, TT Move, Killer Heuristic, History Heuristic, Basic Fork Detection
+*   Check Extensions
 *   Mate Search Function
 *   Evaluation Terms:
     *   Piece-Square Tables (PSTs)
