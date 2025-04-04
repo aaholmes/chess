@@ -147,3 +147,113 @@ pub fn flip_vertically(bit: u64) -> u64 {
         ( (bit >> 40) & (0x000000000000ff00) ) |
         ( (bit >> 56) )
 }
+
+/// Returns the rank (0-7) of a given square index.
+pub fn sq_to_rank(sq_ind: usize) -> usize {
+    sq_ind / 8
+}
+
+/// Returns the file (0-7) of a given square index.
+pub fn sq_to_file(sq_ind: usize) -> usize {
+    sq_ind % 8
+}
+
+// --- Masks for Evaluation ---
+use lazy_static::lazy_static;
+use crate::piece_types::{WHITE, BLACK}; // Assuming WHITE=0, BLACK=1
+
+// Precomputed masks for determining passed pawns.
+// For a given square `sq`, `PASSED_MASKS[color][sq]` contains a mask of squares
+// in front of the pawn on the same file and adjacent files, in the direction
+// of pawn movement for that color. If this mask AND the opponent's pawn bitboard
+// is zero, the pawn is passed.
+lazy_static! {
+    static ref PASSED_MASKS: [[u64; 64]; 2] = {
+        let mut masks = [[0u64; 64]; 2];
+        for sq in 0..64 {
+            let file = sq_to_file(sq);
+            let rank = sq_to_rank(sq);
+
+            // White passed pawn mask
+            let mut white_mask: u64 = 0;
+            for r in (rank + 1)..8 {
+                // Same file
+                white_mask |= sq_ind_to_bit(coords_to_sq_ind(file, r));
+                // Adjacent files
+                if file > 0 {
+                    white_mask |= sq_ind_to_bit(coords_to_sq_ind(file - 1, r));
+                }
+                if file < 7 {
+                    white_mask |= sq_ind_to_bit(coords_to_sq_ind(file + 1, r));
+                }
+            }
+            masks[WHITE][sq] = white_mask;
+
+            // Black passed pawn mask
+            let mut black_mask: u64 = 0;
+            for r in 0..rank { // Iterate ranks below the pawn
+                 // Same file
+                 black_mask |= sq_ind_to_bit(coords_to_sq_ind(file, r));
+                 // Adjacent files
+                 if file > 0 {
+                     black_mask |= sq_ind_to_bit(coords_to_sq_ind(file - 1, r));
+                 }
+                 if file < 7 {
+                     black_mask |= sq_ind_to_bit(coords_to_sq_ind(file + 1, r));
+                 }
+            }
+             masks[BLACK][sq] = black_mask;
+        }
+        masks
+    };
+
+    // Precomputed masks for the king shield zone (squares directly and diagonally in front).
+    // Index is [color][king_square]
+    static ref KING_SHIELD_ZONES: [[u64; 64]; 2] = {
+        let mut masks = [[0u64; 64]; 2];
+        for sq in 0..64 {
+            let file = sq_to_file(sq);
+            let rank = sq_to_rank(sq);
+
+            // White king shield zone (rank + 1)
+            if rank < 7 {
+                let front_rank = rank + 1;
+                // Directly in front
+                masks[WHITE][sq] |= sq_ind_to_bit(coords_to_sq_ind(file, front_rank));
+                // Diagonally in front
+                if file > 0 {
+                    masks[WHITE][sq] |= sq_ind_to_bit(coords_to_sq_ind(file - 1, front_rank));
+                }
+                if file < 7 {
+                    masks[WHITE][sq] |= sq_ind_to_bit(coords_to_sq_ind(file + 1, front_rank));
+                }
+            }
+
+            // Black king shield zone (rank - 1)
+            if rank > 0 {
+                let front_rank = rank - 1;
+                 // Directly in front
+                 masks[BLACK][sq] |= sq_ind_to_bit(coords_to_sq_ind(file, front_rank));
+                 // Diagonally in front
+                 if file > 0 {
+                     masks[BLACK][sq] |= sq_ind_to_bit(coords_to_sq_ind(file - 1, front_rank));
+                 }
+                 if file < 7 {
+                     masks[BLACK][sq] |= sq_ind_to_bit(coords_to_sq_ind(file + 1, front_rank));
+                 }
+            }
+        }
+        masks
+    };
+}
+
+/// Returns a bitmask representing the path and adjacent files in front of a pawn.
+/// Used to check if a pawn is passed.
+pub fn get_passed_pawn_mask(color: usize, sq_ind: usize) -> u64 {
+    PASSED_MASKS[color][sq_ind]
+}
+
+/// Returns a bitmask representing the king shield zone (squares directly/diagonally in front).
+pub fn get_king_shield_zone_mask(color: usize, king_sq_ind: usize) -> u64 {
+    KING_SHIELD_ZONES[color][king_sq_ind]
+}

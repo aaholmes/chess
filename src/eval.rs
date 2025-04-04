@@ -8,11 +8,15 @@
 
 use std::cmp::min;
 use crate::board_utils::flip_sq_ind_vertically;
-use crate::bits::popcnt;
+use crate::bits::{popcnt, bits};
 use crate::board::Board;
+use crate::board_utils::{sq_to_rank, get_passed_pawn_mask, get_king_shield_zone_mask}; // Added helpers
 use crate::move_generation::MoveGen;
-use crate::piece_types::{PAWN, KNIGHT, ROOK, QUEEN, KING, WHITE, BLACK};
-use crate::eval_constants::{MG_VALUE, MG_PESTO_TABLE, EG_VALUE, EG_PESTO_TABLE, GAMEPHASE_INC};
+use crate::piece_types::{PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING, WHITE, BLACK}; // Added BISHOP
+use crate::eval_constants::{
+    MG_VALUE, MG_PESTO_TABLE, EG_VALUE, EG_PESTO_TABLE, GAMEPHASE_INC,
+    TWO_BISHOPS_BONUS, PASSED_PAWN_BONUS_MG, PASSED_PAWN_BONUS_EG, KING_SAFETY_PAWN_SHIELD_BONUS
+};
 
 /// Struct representing the Pesto evaluation function
 pub struct PestoEval {
@@ -75,7 +79,44 @@ impl PestoEval {
             }
         }
 
-        // Tapered eval
+        // --- Add Bonus Terms ---
+
+        for color in [WHITE, BLACK] {
+            let enemy_color = 1 - color;
+
+            // 1. Two Bishops Bonus
+            if popcnt(board.pieces[color][BISHOP]) >= 2 {
+                mg[color] += TWO_BISHOPS_BONUS[0];
+                eg[color] += TWO_BISHOPS_BONUS[1];
+            }
+
+            // 2. Passed Pawn Bonus
+            let friendly_pawns = board.pieces[color][PAWN];
+            let enemy_pawns = board.pieces[enemy_color][PAWN];
+            for sq in bits(&friendly_pawns) {
+                let passed_mask = get_passed_pawn_mask(color, sq);
+                if (passed_mask & enemy_pawns) == 0 { // Check if no enemy pawns are in the path
+                    let rank = sq_to_rank(sq); // Rank 0-7
+                    // Adjust rank for black if needed, assuming PASSED_PAWN_BONUS arrays are from white's perspective
+                    let bonus_rank = if color == WHITE { rank } else { 7 - rank };
+                    mg[color] += PASSED_PAWN_BONUS_MG[bonus_rank];
+                    eg[color] += PASSED_PAWN_BONUS_EG[bonus_rank];
+                // }
+            }
+
+            // 3. King Safety (Pawn Shield) Bonus
+            let king_sq = board.pieces[color][KING].trailing_zeros() as usize;
+            let king_sq = board.pieces[color][KING].trailing_zeros() as usize;
+            if king_sq < 64 { // Ensure king exists
+                let shield_zone_mask = get_king_shield_zone_mask(color, king_sq);
+                let shield_pawns = popcnt(shield_zone_mask & friendly_pawns);
+                mg[color] += shield_pawns as i32 * KING_SAFETY_PAWN_SHIELD_BONUS[0];
+                eg[color] += shield_pawns as i32 * KING_SAFETY_PAWN_SHIELD_BONUS[1];
+            }
+        }
+
+
+        // --- Tapered Eval ---
         let mg_score = mg[0] - mg[1]; // White - Black
         let eg_score = eg[0] - eg[1]; // White - Black
 

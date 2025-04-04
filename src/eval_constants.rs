@@ -193,3 +193,18 @@ pub const EG_PESTO_TABLE: [[i32; 64]; 6] =
 /// Weighted sum of all pieces except pawns and kings.
 /// Starts at 24 when all are still on the board, and decreases to 0 when all are gone.
 pub const GAMEPHASE_INC: [i32; 6] = [0,1,1,2,4,0];
+
+// --- Additional Evaluation Terms ---
+
+// Two Bishops Bonus (MG/EG)
+pub const TWO_BISHOPS_BONUS: [i32; 2] = [40, 50]; // [MG, EG]
+
+// Passed Pawn Bonus by Rank (Index 0 = Rank 1, Index 7 = Rank 8) - From White's perspective
+// Rank 1 and 8 are impossible for passed pawns, but included for array size.
+// Values increase significantly as the pawn advances.
+pub const PASSED_PAWN_BONUS_MG: [i32; 8] = [0, 10, 15, 25, 40, 60, 90, 0];
+pub const PASSED_PAWN_BONUS_EG: [i32; 8] = [0, 20, 30, 50, 80, 120, 180, 0];
+
+// King Safety Bonus per Pawn in Shield Zone (MG/EG)
+// Zone typically includes squares directly and diagonally one step in front of the king.
+pub const KING_SAFETY_PAWN_SHIELD_BONUS: [i32; 2] = [8, 4]; // [MG, EG]
