@@ -197,13 +197,13 @@ pub const GAMEPHASE_INC: [i32; 6] = [0,1,1,2,4,0];
 // --- Additional Evaluation Terms ---
 
 // Two Bishops Bonus (MG/EG)
-pub const TWO_BISHOPS_BONUS: [i32; 2] = [40, 50]; // [MG, EG]
+pub const TWO_BISHOPS_BONUS: [i32; 2] = [25, 35]; // [MG, EG]
 
 // Passed Pawn Bonus by Rank (Index 0 = Rank 1, Index 7 = Rank 8) - From White's perspective
 // Rank 1 and 8 are impossible for passed pawns, but included for array size.
 // Values increase significantly as the pawn advances.
 pub const PASSED_PAWN_BONUS_MG: [i32; 8] = [0, 10, 15, 25, 40, 60, 90, 0];
-pub const PASSED_PAWN_BONUS_EG: [i32; 8] = [0, 20, 30, 50, 80, 120, 180, 0];
+pub const PASSED_PAWN_BONUS_EG: [i32; 8] = [0, 20, 30, 50, 100, 150, 200, 0];
 
 // King Safety Bonus per Pawn in Shield Zone (MG/EG)
 // Zone typically includes squares directly and diagonally one step in front of the king.
@@ -215,10 +215,10 @@ pub const KING_SAFETY_PAWN_SHIELD_BONUS: [i32; 2] = [15, 4]; // [MG, EG] - Incre
 pub const ISOLATED_PAWN_PENALTY: [i32; 2] = [-10, -15]; // [MG, EG]
 
 // Pawn Chain Bonus (MG/EG) - Applied per pawn defended by another pawn diagonally
-pub const PAWN_CHAIN_BONUS: [i32; 2] = [15, 20]; // [MG, EG] - Increased Further
+pub const PAWN_CHAIN_BONUS: [i32; 2] = [10, 15]; // [MG, EG] - Reduced based on review
 
 // Pawn Duo Bonus (MG/EG) - Applied per pair of pawns on adjacent files on the same rank
-pub const PAWN_DUO_BONUS: [i32; 2] = [10, 15]; // [MG, EG] - Increased Further
+pub const PAWN_DUO_BONUS: [i32; 2] = [8, 12]; // [MG, EG] - Increased Further
 
 // Mobile Pawn Duo Bonus (MG/EG) - Bonus if squares in front are clear. Indexed by square of one of the pawns.
 // Values increase by rank and are slightly higher for central files (c-f).
@@ -248,16 +248,16 @@ pub const MOBILE_PAWN_DUO_BONUS_MG: [i32; 64] = MOBILE_DUO_BONUS_TABLE_MG;
 pub const MOBILE_PAWN_DUO_BONUS_EG: [i32; 64] = MOBILE_DUO_BONUS_TABLE_EG;
 
 // Doubled Rooks on 7th Rank Bonus (MG/EG) - Additional bonus if two rooks are on 7th
-pub const DOUBLED_ROOKS_ON_SEVENTH_BONUS: [i32; 2] = [30, 15]; // [MG, EG]
+pub const DOUBLED_ROOKS_ON_SEVENTH_BONUS: [i32; 2] = [50, 25]; // [MG, EG] - Increased MG/EG based on review
 
 // Rook Behind Passed Pawn Bonus (MG/EG) - Applied per rook on the same file as a friendly passed pawn, behind it.
-pub const ROOK_BEHIND_PASSED_PAWN_BONUS: [i32; 2] = [30, 40]; // [MG, EG] - Increased Significantly
+pub const ROOK_BEHIND_PASSED_PAWN_BONUS: [i32; 2] = [20, 30]; // [MG, EG] - Increased Significantly
 
 // Rook Behind Enemy Passed Pawn Bonus (MG/EG) - Bonus for blockading rook
 pub const ROOK_BEHIND_ENEMY_PASSED_PAWN_BONUS: [i32; 2] = [25, 30]; // [MG, EG]
 
 // Castling Rights Bonus (MG/EG) - Small bonus per available castling right
-pub const CASTLING_RIGHTS_BONUS: [i32; 2] = [25, 0]; // [MG, EG] - Increased MG value
+pub const CASTLING_RIGHTS_BONUS: [i32; 2] = [15, 0]; // [MG, EG] - Increased MG value
 
 // Rook on Open File Bonus (MG/EG) - No pawns of either color on the file
 pub const ROOK_OPEN_FILE_BONUS: [i32; 2] = [25, 15]; // [MG, EG] - Increased
