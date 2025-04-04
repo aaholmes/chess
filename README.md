@@ -29,7 +29,7 @@ This research direction seeks to bridge the gap between traditional chess progra
     *   Late Move Reductions (LMR).
     *   Aspiration Windows.
     *   Dedicated Mate Search function.
-*   **Evaluation:** Pesto-style tapered evaluation using Piece-Square Tables (PSTs). Includes bonuses for Passed Pawns (scaled by rank/phase), Two Bishops, and basic King Safety (pawn shield). Also includes MVV-LVA and heuristic move ordering.
+*   **Evaluation:** Pesto-style tapered evaluation using Piece-Square Tables (PSTs). Includes bonuses/penalties for Passed Pawns, Two Bishops, basic King Safety (pawn shield, castling rights), Pawn Structure (isolated, chains, duos, mobile duos), Rook positioning (doubled on 7th, behind friendly/enemy passed pawns, open/half-open files). Also includes MVV-LVA and heuristic move ordering.
 *   **Protocol:** Basic UCI (Universal Chess Interface) support (`engine/src/uci.rs`).
 
 ## Installation
@@ -86,7 +86,6 @@ To use Kingfisher, you'll need Rust installed on your system. If you don't have 
 *   Negamax search / Alpha-beta pruning
 *   Iterative deepening
 *   Transposition table
-*   Pesto evaluation function (tapered)
 *   MVV-LVA move ordering
 *   Pawn and knight fork move ordering / Heuristic non-capture ordering
 *   Mate search function
@@ -94,7 +93,13 @@ To use Kingfisher, you'll need Rust installed on your system. If you don't have 
 *   Aspiration windows
 *   Null move pruning (basic implementation enabled)
 *   Late Move Reductions (LMR)
-*   Basic Evaluation Terms: Passed Pawns, Two Bishops Bonus, King Safety (Pawn Shield)
+*   Evaluation Terms:
+    *   Piece-Square Tables (PSTs)
+    *   Passed Pawns
+    *   Two Bishops Bonus
+    *   King Safety (Pawn Shield, Castling Rights)
+    *   Pawn Structure (Isolated, Chains, Duos, Mobile Duos)
+    *   Rook Bonuses (Doubled on 7th, Behind Friendly/Enemy Passed Pawn, Open/Half-Open File)
 
 ### In Progress
 *   Mate killer heuristic (mentioned in original roadmap)
@@ -102,7 +107,7 @@ To use Kingfisher, you'll need Rust installed on your system. If you don't have 
 *   Refining NMP (e.g., Zugzwang detection)
 
 ### Implementation Roadmap
-*   **Improved Evaluation:** Add more evaluation terms (e.g., detailed pawn structure like isolated/doubled pawns, advanced king safety like open files/attacker proximity) and tune existing term weights.
+*   **Improved Evaluation:** Add King Attack Score (including slider attacks), add more terms (e.g., open files near king), refine pawn structure logic, and tune all term weights.
 *   **Time Management:** Implement robust time controls for UCI.
 *   **Opening Book:** Integrate a standard opening book format.
 *   **Endgame Tablebases:** Add support for querying tablebases (e.g., Syzygy).

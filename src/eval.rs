@@ -10,12 +10,20 @@ use std::cmp::min;
 use crate::board_utils::flip_sq_ind_vertically;
 use crate::bits::{popcnt, bits};
 use crate::board::Board;
-use crate::board_utils::{sq_to_rank, get_passed_pawn_mask, get_king_shield_zone_mask}; // Added helpers
+use crate::board_utils::{
+    sq_to_rank, sq_to_file, get_passed_pawn_mask, get_king_shield_zone_mask,
+    get_adjacent_files_mask, sq_ind_to_bit, get_pawn_front_square_mask, get_rank_mask, get_file_mask // Added rank/file mask
+};
 use crate::move_generation::MoveGen;
-use crate::piece_types::{PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING, WHITE, BLACK}; // Added BISHOP
+use crate::piece_types::{PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING, WHITE, BLACK};
 use crate::eval_constants::{
     MG_VALUE, MG_PESTO_TABLE, EG_VALUE, EG_PESTO_TABLE, GAMEPHASE_INC,
-    TWO_BISHOPS_BONUS, PASSED_PAWN_BONUS_MG, PASSED_PAWN_BONUS_EG, KING_SAFETY_PAWN_SHIELD_BONUS
+    TWO_BISHOPS_BONUS, PASSED_PAWN_BONUS_MG, PASSED_PAWN_BONUS_EG, KING_SAFETY_PAWN_SHIELD_BONUS,
+    ISOLATED_PAWN_PENALTY, PAWN_CHAIN_BONUS, PAWN_DUO_BONUS,
+    MOBILE_PAWN_DUO_BONUS_MG, MOBILE_PAWN_DUO_BONUS_EG,
+    ROOK_ON_SEVENTH_BONUS, ROOK_BEHIND_PASSED_PAWN_BONUS,
+    DOUBLED_ROOKS_ON_SEVENTH_BONUS, ROOK_BEHIND_ENEMY_PASSED_PAWN_BONUS, CASTLING_RIGHTS_BONUS,
+    ROOK_OPEN_FILE_BONUS, ROOK_HALF_OPEN_FILE_BONUS // Added open file constants
 };
 
 /// Struct representing the Pesto evaluation function
@@ -59,7 +67,8 @@ impl PestoEval {
     /// # Returns
     ///
     /// (eval, game_phase)
-    fn eval_plus_game_phase(&self, board: &Board) -> (i32, i32) {
+    // Note: Added move_gen parameter
+    fn eval_plus_game_phase(&self, board: &Board, move_gen: &MoveGen) -> (i32, i32) {
 
         let mut mg: [i32; 2] = [0, 0];
         let mut eg: [i32; 2] = [0, 0];
@@ -80,7 +89,6 @@ impl PestoEval {
         }
 
         // --- Add Bonus Terms ---
-
         for color in [WHITE, BLACK] {
             let enemy_color = 1 - color;
 
@@ -90,30 +98,154 @@ impl PestoEval {
                 eg[color] += TWO_BISHOPS_BONUS[1];
             }
 
-            // 2. Passed Pawn Bonus
+            // --- Pawn Structure ---
             let friendly_pawns = board.pieces[color][PAWN];
             let enemy_pawns = board.pieces[enemy_color][PAWN];
+            let mut chain_bonus_mg = 0;
+            let mut chain_bonus_eg = 0;
+            let mut duo_bonus_mg = 0;
+            let mut duo_bonus_eg = 0;
+
             for sq in bits(&friendly_pawns) {
+                let file = sq_to_file(sq);
+
+                // 2. Passed Pawn Bonus
                 let passed_mask = get_passed_pawn_mask(color, sq);
-                if (passed_mask & enemy_pawns) == 0 { // Check if no enemy pawns are in the path
-                    let rank = sq_to_rank(sq); // Rank 0-7
-                    // Adjust rank for black if needed, assuming PASSED_PAWN_BONUS arrays are from white's perspective
+                if (passed_mask & enemy_pawns) == 0 {
+                    let rank = sq_to_rank(sq);
                     let bonus_rank = if color == WHITE { rank } else { 7 - rank };
                     mg[color] += PASSED_PAWN_BONUS_MG[bonus_rank];
                     eg[color] += PASSED_PAWN_BONUS_EG[bonus_rank];
-                // }
-            }
+                }
 
-            // 3. King Safety (Pawn Shield) Bonus
-            let king_sq = board.pieces[color][KING].trailing_zeros() as usize;
-            let king_sq = board.pieces[color][KING].trailing_zeros() as usize;
+                // 4. Isolated Pawn Penalty
+                let adjacent_mask = get_adjacent_files_mask(sq);
+                if (adjacent_mask & friendly_pawns) == 0 {
+                    mg[color] += ISOLATED_PAWN_PENALTY[0];
+                    eg[color] += ISOLATED_PAWN_PENALTY[1];
+                }
+
+                // 5. Pawn Chain Bonus (Diagonal defense)
+                let (defend1_sq_opt, defend2_sq_opt) = if color == WHITE {
+                    (sq.checked_sub(9), sq.checked_sub(7)) // Check squares diagonally behind (SW, SE)
+                } else {
+                    (sq.checked_add(7), sq.checked_add(9)) // Check squares diagonally behind (NW, NE)
+                };
+
+                if let Some(defend1_sq) = defend1_sq_opt {
+                    // Check bounds and if squares are actually diagonal (same color squares) and on board
+                    if defend1_sq < 64 && (sq % 2 == defend1_sq % 2) && (friendly_pawns & sq_ind_to_bit(defend1_sq) != 0) {
+                        chain_bonus_mg += PAWN_CHAIN_BONUS[0];
+                        chain_bonus_eg += PAWN_CHAIN_BONUS[1];
+                    }
+                }
+                 if let Some(defend2_sq) = defend2_sq_opt {
+                    // Check bounds and if squares are actually diagonal (same color squares) and on board
+                    if defend2_sq < 64 && (sq % 2 == defend2_sq % 2) && (friendly_pawns & sq_ind_to_bit(defend2_sq) != 0) {
+                        chain_bonus_mg += PAWN_CHAIN_BONUS[0];
+                        chain_bonus_eg += PAWN_CHAIN_BONUS[1];
+                    }
+                }
+
+                // 6. Pawn Duo Bonus (Side-by-side) - Check only right neighbor to avoid double counting
+                if file < 7 {
+                    let neighbor_sq = sq + 1;
+                    if (friendly_pawns & sq_ind_to_bit(neighbor_sq)) != 0 {
+                        duo_bonus_mg += PAWN_DUO_BONUS[0];
+                        duo_bonus_eg += PAWN_DUO_BONUS[1];
+                    }
+                }
+            } // End of loop through friendly_pawns
+            mg[color] += chain_bonus_mg;
+            eg[color] += chain_bonus_eg;
+            mg[color] += duo_bonus_mg;
+            eg[color] += duo_bonus_eg;
+
+
+            // --- King Safety ---
+            let king_sq = board.pieces[color][KING].trailing_zeros() as usize; // Keep only one definition
             if king_sq < 64 { // Ensure king exists
+                // 3. Pawn Shield Bonus
                 let shield_zone_mask = get_king_shield_zone_mask(color, king_sq);
                 let shield_pawns = popcnt(shield_zone_mask & friendly_pawns);
                 mg[color] += shield_pawns as i32 * KING_SAFETY_PAWN_SHIELD_BONUS[0];
                 eg[color] += shield_pawns as i32 * KING_SAFETY_PAWN_SHIELD_BONUS[1];
+
+                // King Attack Score removed for now due to complexity of slider attacks
             }
-        }
+            // --- Rook Bonuses ---
+            let friendly_rooks = board.pieces[color][ROOK];
+            let seventh_rank = if color == WHITE { 6 } else { 1 };
+            let seventh_rank_mask = get_rank_mask(seventh_rank);
+            let rooks_on_seventh = friendly_rooks & seventh_rank_mask;
+
+            for rook_sq in bits(&friendly_rooks) {
+                let rank = sq_to_rank(rook_sq);
+                let file = sq_to_file(rook_sq);
+
+                // Rook on 7th bonus is handled by Doubled Rooks bonus below if applicable
+
+                // Rook on Open/Half-Open File
+                let friendly_pawns_on_file = friendly_pawns & file_mask;
+                let enemy_pawns_on_file = enemy_pawns & file_mask;
+
+                if friendly_pawns_on_file == 0 {
+                    if enemy_pawns_on_file == 0 { // Open File
+                        mg[color] += ROOK_OPEN_FILE_BONUS[0];
+                        eg[color] += ROOK_OPEN_FILE_BONUS[1];
+                    } else { // Half-Open File (for this rook's color)
+                        mg[color] += ROOK_HALF_OPEN_FILE_BONUS[0];
+                        eg[color] += ROOK_HALF_OPEN_FILE_BONUS[1];
+                    }
+                }
+
+                // Rook behind friendly passed pawn
+                let friendly_file_pawns = friendly_pawns & get_file_mask(file);
+                for pawn_sq in bits(&friendly_file_pawns) {
+                    let passed_mask = get_passed_pawn_mask(color, pawn_sq);
+                    if (passed_mask & enemy_pawns) == 0 { // Is pawn passed?
+                        let pawn_rank = sq_to_rank(pawn_sq);
+                        if (color == WHITE && rank < pawn_rank) || (color == BLACK && rank > pawn_rank) { // Is rook behind?
+                            mg[color] += ROOK_BEHIND_PASSED_PAWN_BONUS[0];
+                            eg[color] += ROOK_BEHIND_PASSED_PAWN_BONUS[1];
+                            break; // Only once per rook
+                        }
+                    }
+                }
+
+                // Rook behind enemy passed pawn
+                let enemy_file_pawns = enemy_pawns & get_file_mask(file);
+                 for pawn_sq in bits(&enemy_file_pawns) {
+                    let passed_mask = get_passed_pawn_mask(enemy_color, pawn_sq);
+                    if (passed_mask & friendly_pawns) == 0 { // Is enemy pawn passed?
+                        let pawn_rank = sq_to_rank(pawn_sq);
+                         // Is rook behind enemy pawn (relative to enemy pawn direction)?
+                        if (color == WHITE && rank > pawn_rank) || (color == BLACK && rank < pawn_rank) {
+                            mg[color] += ROOK_BEHIND_ENEMY_PASSED_PAWN_BONUS[0];
+                            eg[color] += ROOK_BEHIND_ENEMY_PASSED_PAWN_BONUS[1];
+                            break; // Only once per rook
+                        }
+                    }
+                }
+            }
+
+            // Doubled Rooks on 7th - Additional bonus if 2+ rooks are there
+            if popcnt(rooks_on_seventh) >= 2 {
+                mg[color] += DOUBLED_ROOKS_ON_SEVENTH_BONUS[0];
+                eg[color] += DOUBLED_ROOKS_ON_SEVENTH_BONUS[1];
+            }
+
+            // --- Castling Rights Bonus ---
+            // Small bonus for retaining castling rights, mainly in middlegame
+            if color == WHITE {
+                if board.castling_rights.white_kingside { mg[color] += CASTLING_RIGHTS_BONUS[0]; }
+                if board.castling_rights.white_queenside { mg[color] += CASTLING_RIGHTS_BONUS[0]; }
+            } else { // BLACK
+                if board.castling_rights.black_kingside { mg[color] += CASTLING_RIGHTS_BONUS[0]; }
+                if board.castling_rights.black_queenside { mg[color] += CASTLING_RIGHTS_BONUS[0]; }
+            }
+
+        } // End of loop through colors [WHITE, BLACK]
 
 
         // --- Tapered Eval ---
@@ -123,7 +255,10 @@ impl PestoEval {
         let mg_phase: i32 = min(24, game_phase);
         let eg_phase: i32 = 24 - mg_phase;
 
-        let score = (mg_score * mg_phase + eg_score * eg_phase) / 24;
+        // Ensure eg_phase is not negative if game_phase > 24 (e.g., promotions)
+        let eg_phase_clamped = if eg_phase < 0 { 0 } else { eg_phase };
+
+        let score = (mg_score * mg_phase + eg_score * eg_phase_clamped) / 24;
 
         // Return score from the perspective of the side to move
         if board.w_to_move {
@@ -143,8 +278,9 @@ impl PestoEval {
     /// # Returns
     ///
     /// A tuple (i32, i32) representing the middlegame and endgame scores
-    pub fn eval(&self, board: &Board) -> i32 {
-        let (eval, _) = self.eval_plus_game_phase(board);
+    // Note: Added move_gen parameter
+    pub fn eval(&self, board: &Board, move_gen: &MoveGen) -> i32 {
+        let (eval, _) = self.eval_plus_game_phase(board, move_gen);
         eval
     }
 
@@ -161,9 +297,10 @@ impl PestoEval {
     /// # Returns
     ///
     /// An i32 representing the evaluation of the position in centipawns, relative to the side to move
-    pub fn eval_update_board(&self, board: &mut Board) -> i32 {
-        // Evaluate and save the eval and game phase so we can quickly compute move evals from this position
-        let (score, game_phase) = self.eval_plus_game_phase(board);
+    // Note: Added move_gen parameter
+    pub fn eval_update_board(&self, board: &mut Board, move_gen: &MoveGen) -> i32 {
+        // Evaluate and save the eval and game phase
+        let (score, game_phase) = self.eval_plus_game_phase(board, move_gen);
 
         // Save eval and game phase
         board.eval = if board.w_to_move { score } else { -score };

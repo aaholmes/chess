@@ -1,4 +1,4 @@
-//! Alpha-beta negamax search module
+/c/! Alpha-beta negamax search module
 //!
 //! This module implements the negamax search algorithm for chess position evaluation.
 
@@ -75,7 +75,7 @@ pub fn negamax_search(board: &mut BoardStack, move_gen: &MoveGen, pesto: &PestoE
 fn negamax(board: &mut BoardStack, move_gen: &MoveGen, pesto: &PestoEval, depth: i32) -> (i32, i32) {
     if depth == 0 {
         // Leaf node: return the board evaluation
-        return (pesto.eval(&board.current_state()), 1);
+        return (pesto.eval(&board.current_state(), move_gen), 1);
     }
     
     let mut best_eval: i32 = -1000000;
@@ -493,7 +493,7 @@ fn quiescence_search(
     let mut nodes = 1;
 
     // Stand-pat evaluation
-    let stand_pat = pesto.eval(&board.current_state());
+    let stand_pat = pesto.eval(&board.current_state(), move_gen);
 
     // Beta cutoff
     if stand_pat >= beta {
@@ -595,7 +595,7 @@ fn q_search_consistent_side_to_move_for_final_eval(board: &mut BoardStack, move_
         // The problem here is that we are currently only comparing the eval at the end of the tactics, but
         // sometimes the player to move might not want to play a capture, so we need to consider the stand pat eval too
         // This side can either play a capture, or evaluate the position, whichever is better
-        let eval = pesto.eval(&board.current_state());
+        let eval = pesto.eval(&board.current_state(), move_gen);
         let captures = move_gen.gen_pseudo_legal_captures(&board.current_state());
         if captures.is_empty() {
             if verbose {

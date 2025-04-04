@@ -160,7 +160,7 @@ pub fn sq_to_file(sq_ind: usize) -> usize {
 
 // --- Masks for Evaluation ---
 use lazy_static::lazy_static;
-use crate::piece_types::{WHITE, BLACK}; // Assuming WHITE=0, BLACK=1
+use crate::piece_types::{WHITE, BLACK};
 
 // Precomputed masks for determining passed pawns.
 // For a given square `sq`, `PASSED_MASKS[color][sq]` contains a mask of squares
@@ -245,6 +245,61 @@ lazy_static! {
         }
         masks
     };
+
+    // Precomputed file masks (A-H)
+    static ref FILE_MASKS: [u64; 8] = {
+        let mut masks = [0u64; 8];
+        for file in 0..8 {
+            for rank in 0..8 {
+                masks[file] |= sq_ind_to_bit(coords_to_sq_ind(file, rank));
+            }
+        }
+        masks
+    };
+
+    // Precomputed masks for files adjacent to a given square's file
+    static ref ADJACENT_FILE_MASKS: [u64; 64] = {
+        let mut masks = [0u64; 64];
+        for sq in 0..64 {
+            let file = sq_to_file(sq);
+            if file > 0 {
+                masks[sq] |= FILE_MASKS[file - 1];
+            }
+            if file < 7 {
+                masks[sq] |= FILE_MASKS[file + 1];
+            }
+        }
+        masks
+    };
+
+    // Precomputed masks for the square directly in front of a pawn.
+    static ref PAWN_FRONT_SQUARE_MASKS: [[u64; 64]; 2] = {
+        let mut masks = [[0u64; 64]; 2];
+        for sq in 0..64 {
+            let rank = sq_to_rank(sq);
+            // White pawn front square (rank + 1)
+            if rank < 7 {
+                masks[WHITE][sq] = sq_ind_to_bit(sq + 8);
+            }
+            // Black pawn front square (rank - 1)
+            if rank > 0 {
+                 masks[BLACK][sq] = sq_ind_to_bit(sq - 8);
+            }
+        }
+        masks
+    };
+
+    // Precomputed rank masks (1-8)
+    static ref RANK_MASKS: [u64; 8] = {
+        let mut masks = [0u64; 8];
+        for rank in 0..8 {
+            for file in 0..8 {
+                masks[rank] |= sq_ind_to_bit(coords_to_sq_ind(file, rank));
+            }
+        }
+        masks
+    };
+
 }
 
 /// Returns a bitmask representing the path and adjacent files in front of a pawn.
@@ -257,3 +312,29 @@ pub fn get_passed_pawn_mask(color: usize, sq_ind: usize) -> u64 {
 pub fn get_king_shield_zone_mask(color: usize, king_sq_ind: usize) -> u64 {
     KING_SHIELD_ZONES[color][king_sq_ind]
 }
+
+/// Returns a bitmask for a given file (0-7).
+pub fn get_file_mask(file: usize) -> u64 {
+    FILE_MASKS[file]
+}
+
+/// Returns a bitmask for files adjacent to the given square's file.
+pub fn get_adjacent_files_mask(sq_ind: usize) -> u64 {
+    ADJACENT_FILE_MASKS[sq_ind]
+}
+
+/// Returns a bitmask for the square directly in front of a pawn.
+pub fn get_pawn_front_square_mask(color: usize, sq_ind: usize) -> u64 {
+    PAWN_FRONT_SQUARE_MASKS[color][sq_ind]
+}
+
+/// Returns a bitmask for a given rank (0-7).
+pub fn get_rank_mask(rank: usize) -> u64 {
+    RANK_MASKS[rank]
+}
+
+
+// TODO: Add functions to calculate attacks to a square if not using MoveGen directly in eval.
+// e.g., pub fn knight_attacks(sq: usize) -> u64 { ... }
+// pub fn bishop_attacks(sq: usize, occupied: u64) -> u64 { ... } // Using magic bitboards
+// pub fn rook_attacks(sq: usize, occupied: u64) -> u64 { ... } // Using magic bitboards
