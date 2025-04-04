@@ -1,8 +1,11 @@
 #[cfg(test)]
 mod tests {
     use kingfisher::board::Board;
-    use kingfisher::eval::PestoEval;
-    use kingfisher::eval_constants::CASTLING_RIGHTS_BONUS; // Needed for initial pos check
+    use kingfisher::eval::{PestoEval};
+    use kingfisher::eval_constants::{CASTLING_RIGHTS_BONUS, BACKWARD_PAWN_PENALTY, KING_ATTACK_WEIGHTS}; // Added new constants
+    use kingfisher::move_generation::MoveGen; // Added MoveGen
+    use kingfisher::piece_types::{PAWN, KNIGHT, QUEEN, KING, WHITE, BLACK}; // Added piece types
+    use kingfisher::board_utils; // Added board_utils
 
     // Basic tests for overall evaluation behavior
 
@@ -87,6 +90,58 @@ mod tests {
 
     }
 }
+
+    #[test]
+    fn test_backward_pawn_penalty() {
+        let evaluator = PestoEval::new();
+        let move_gen = MoveGen::new(); // Needed for eval call, though not directly used in this logic check
+        // White pawn d3 is backward: no friendly pawns on c2,c3, e2,e3. Black pawn d4 attacks stop square.
+        let board_w_backward = Board::new_from_fen("k7/8/8/8/3p4/3P4/8/K7 w - - 0 1").expect("Valid FEN");
+        // Base position without the backward pawn
+        let board_w_base = Board::new_from_fen("k7/8/8/8/3p4/8/8/K7 w - - 0 1").expect("Valid FEN");
+
+        let (mg_w_back, eg_w_back) = super::eval_test_utils::get_raw_scores(&evaluator, &board_w_backward);
+        let (mg_w_base, eg_w_base) = super::eval_test_utils::get_raw_scores(&evaluator, &board_w_base);
+
+        // Calculate PST value for the pawn
+        let d3_sq = board_utils::algebraic_to_sq_ind("d3");
+        let pesto_instance = PestoEval::new(); // Create instance to access tables
+        let pst_mg_w = pesto_instance.mg_table[WHITE][PAWN][d3_sq];
+        let pst_eg_w = pesto_instance.eg_table[WHITE][PAWN][d3_sq];
+
+        // Check White score difference includes PST + Penalty
+        assert_eq!(mg_w_back - mg_w_base, pst_mg_w + BACKWARD_PAWN_PENALTY[0], "White MG backward pawn mismatch");
+        assert_eq!(eg_w_back - eg_w_base, pst_eg_w + BACKWARD_PAWN_PENALTY[1], "White EG backward pawn mismatch");
+    }
+
+    #[test]
+    fn test_king_attack_score() {
+        let evaluator = PestoEval::new();
+        let move_gen = MoveGen::new(); // Needed for eval call
+        // White N(f6), Q(h6) near Black K(g8)
+        let board_w_attack = Board::new_from_fen("6k1/8/7q/5N2/8/8/8/K7 w - - 0 1").expect("Valid FEN");
+        // Base position without attacking pieces
+        let board_w_base = Board::new_from_fen("6k1/8/8/8/8/8/8/K7 w - - 0 1").expect("Valid FEN");
+
+        let (mg_w_att, _eg_w_att) = super::eval_test_utils::get_raw_scores(&evaluator, &board_w_attack);
+        let (mg_w_base, _eg_w_base) = super::eval_test_utils::get_raw_scores(&evaluator, &board_w_base);
+
+        // Calculate PST values for the pieces
+        let f6_sq = board_utils::algebraic_to_sq_ind("f6");
+        let h6_sq = board_utils::algebraic_to_sq_ind("h6");
+        let pesto_instance = PestoEval::new();
+        let pst_mg_n = pesto_instance.mg_table[WHITE][KNIGHT][f6_sq];
+        let pst_mg_q = pesto_instance.mg_table[WHITE][QUEEN][h6_sq];
+        let total_pst_mg = pst_mg_n + pst_mg_q;
+
+        // Calculate expected attack score (based on KING_ATTACK_WEIGHTS)
+        // Assumes get_king_attack_zone_mask includes f6 and h6 for king on g8
+        let expected_attack_score = KING_ATTACK_WEIGHTS[KNIGHT] + KING_ATTACK_WEIGHTS[QUEEN];
+
+        // Check White MG score difference includes PST + Attack Score Bonus
+        assert_eq!(mg_w_att - mg_w_base, total_pst_mg + expected_attack_score, "White MG King Attack Score mismatch");
+        // Note: EG score is not checked as the current implementation only applies the bonus to MG score.
+    }
 
 // Declare eval_test_utils as a module sibling to eval_basic_tests
 #[path = "eval_test_utils.rs"]

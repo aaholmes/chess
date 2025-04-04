@@ -20,16 +20,26 @@ This research direction seeks to bridge the gap between traditional chess progra
 
 *   **Board Representation:** Bitboards for efficient state representation.
 *   **Move Generation:** Magic Bitboards for fast generation of sliding piece moves (rooks, bishops, queens), plus precomputed tables for other pieces. Handles castling, en passant, and promotions.
-*   **Search:**
-    *   Alpha-Beta search framework.
-    *   Iterative Deepening.
-    *   Transposition Tables (TT) for caching previously searched positions.
-    *   Quiescence Search (QSearch) to mitigate the horizon effect.
-    *   Null Move Pruning (NMP).
+*   **Search:** (Modularized in `src/search/`)
+    *   Alpha-Beta search framework (`alpha_beta.rs`).
+    *   Iterative Deepening (`iterative_deepening.rs`).
+    *   Transposition Tables (TT) (`transposition.rs`).
+    *   Quiescence Search (QSearch) (`quiescence.rs`).
+    *   Static Exchange Evaluation (SEE) for pruning bad captures (`see.rs`).
+    *   Null Move Pruning (NMP) with Zugzwang detection refinement.
     *   Late Move Reductions (LMR).
+    *   Killer Heuristic move ordering.
+    *   History Heuristic move ordering (`history.rs`).
     *   Aspiration Windows.
     *   Dedicated Mate Search function.
-*   **Evaluation:** Pesto-style tapered evaluation using Piece-Square Tables (PSTs). Includes bonuses/penalties for Passed Pawns, Two Bishops, basic King Safety (pawn shield, castling rights), Pawn Structure (isolated, chains, duos, mobile duos), Rook positioning (doubled on 7th, behind friendly/enemy passed pawns, open/half-open files). Also includes MVV-LVA and heuristic move ordering.
+*   **Evaluation:** Pesto-style tapered evaluation (`eval.rs`) using Piece-Square Tables (PSTs). Includes bonuses/penalties for:
+    *   Material and PSTs
+    *   Passed Pawns
+    *   Two Bishops Bonus
+    *   King Safety (Pawn Shield, Castling Rights, King Attack Score)
+    *   Pawn Structure (Isolated, Chains, Duos, Mobile Duos, Backward Pawns)
+    *   Rook Positioning (Doubled on 7th, Behind Friendly/Enemy Passed Pawn, Open/Half-Open File)
+    *   Move Ordering Heuristics (MVV-LVA, Forks, PST diffs).
 *   **Protocol:** Basic UCI (Universal Chess Interface) support (`engine/src/uci.rs`).
 
 ## Installation
@@ -65,7 +75,7 @@ To use Kingfisher, you'll need Rust installed on your system. If you don't have 
 *   `src/magic_constants.rs`: Magic bitboard constants.
 *   `src/eval.rs`: Position evaluation using Pesto function (`PestoEval` struct).
 *   `src/eval_constants.rs`: Constants for the Pesto evaluation (PSTs, game phase increments).
-*   `src/search.rs`: Negamax search with alpha-beta pruning, iterative deepening, etc.
+*   `src/search/`: Module containing search algorithms (alpha-beta, iterative deepening, quiescence, SEE, etc.).
 *   `src/transposition.rs`: Transposition table implementation.
 *   `src/make_move.rs`: Move execution and board state updates (integrated into `BoardStack`).
 *   `src/uci.rs`: Handles the UCI protocol for communication with GUIs.
@@ -83,36 +93,37 @@ To use Kingfisher, you'll need Rust installed on your system. If you don't have 
 ### Completed Features
 *   Bitboards
 *   Move generation including magic bitboards
-*   Negamax search / Alpha-beta pruning
-*   Iterative deepening
-*   Transposition table
-*   MVV-LVA move ordering
-*   Pawn and knight fork move ordering / Heuristic non-capture ordering
-*   Mate search function
-*   Quiescence search
-*   Aspiration windows
-*   Null move pruning (basic implementation enabled)
+*   Alpha-Beta Search Framework (Modularized)
+*   Iterative Deepening
+*   Aspiration Windows
+*   Transposition Tables (TT)
+*   Quiescence Search (QSearch)
+*   Static Exchange Evaluation (SEE) - Function & QSearch Pruning
+*   Null Move Pruning (NMP) with Zugzwang Refinement
 *   Late Move Reductions (LMR)
+*   Move Ordering: MVV-LVA, TT Move, Killer Heuristic, History Heuristic, Basic Fork Detection
+*   Mate Search Function
 *   Evaluation Terms:
     *   Piece-Square Tables (PSTs)
     *   Passed Pawns
     *   Two Bishops Bonus
     *   King Safety (Pawn Shield, Castling Rights)
-    *   Pawn Structure (Isolated, Chains, Duos, Mobile Duos)
+    *   Pawn Structure (Isolated, Chains, Duos, Mobile Duos, Backward Pawns)
     *   Rook Bonuses (Doubled on 7th, Behind Friendly/Enemy Passed Pawn, Open/Half-Open File)
+    *   King Attack Score (Simplified)
 
 ### In Progress
-*   Mate killer heuristic (mentioned in original roadmap)
-*   UCI protocol (basic implementation exists)
-*   Refining NMP (e.g., Zugzwang detection)
+*   UCI protocol refinement (basic implementation exists)
+*   Mate Search Integration (Function exists, integration into main search TBD)
+*   History Heuristic Decay/Scaling (Optional refinement)
 
 ### Implementation Roadmap
-*   **Improved Evaluation:** Add King Attack Score (including slider attacks), add more terms (e.g., open files near king), refine pawn structure logic, and tune all term weights.
+*   **Improved Evaluation:** Refine King Attack Score (e.g., slider attacks, safety table), add more terms (e.g., mobility, open files near king), refine pawn structure logic, tune all term weights.
 *   **Time Management:** Implement robust time controls for UCI.
 *   **Opening Book:** Integrate a standard opening book format.
 *   **Endgame Tablebases:** Add support for querying tablebases (e.g., Syzygy).
 *   **Parallel Search:** Explore parallelization techniques (e.g., Lazy SMP).
-*   **Comprehensive Testing:** Expand test suite
+*   **Comprehensive Testing:** Expand test suite (heuristics, eval terms, search interactions).
 
 ### Research Directions
 *   **Hybrid Search (Core Goal):** Integrate the classical search (especially mate search) with MCTS and a neural network evaluation/policy component.

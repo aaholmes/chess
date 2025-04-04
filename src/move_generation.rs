@@ -772,4 +772,75 @@ impl MoveGen {
         }
         (captures, moves)
     }
+
+    /// Calculates a bitboard of all pieces of a given side attacking a specific square.
+    ///
+    /// # Arguments
+    /// * `board` - The current board state.
+    /// * `sq` - The target square index (0-63).
+    /// * `side` - The attacking side (true for white, false for black).
+    ///
+    /// # Returns
+    /// A bitboard containing the locations of all pieces of `side` attacking `sq`.
+    pub fn attackers_to(&self, board: &Board, sq: usize, side: bool) -> u64 {
+        let mut attackers: u64 = 0;
+        let color_index = side as usize;
+        let enemy_color_index = !side as usize; // Needed for pawn captures
+
+        // Pawns (check captures from the target square's perspective)
+        if side == WHITE { // White attackers
+            if sq > 8 && sq % 8 != 0 { // Can be attacked from sq - 9 (black pawn on sq-9 attacks sq)
+                 attackers |= board.pieces[color_index][PAWN] & sq_ind_to_bit(sq - 9);
+            }
+            if sq > 7 && sq % 8 != 7 { // Can be attacked from sq - 7 (black pawn on sq-7 attacks sq)
+                 attackers |= board.pieces[color_index][PAWN] & sq_ind_to_bit(sq - 7);
+            }
+        } else { // Black attackers
+             if sq < 55 && sq % 8 != 0 { // Can be attacked from sq + 7 (white pawn on sq+7 attacks sq)
+                 attackers |= board.pieces[color_index][PAWN] & sq_ind_to_bit(sq + 7);
+            }
+             if sq < 56 && sq % 8 != 7 { // Can be attacked from sq + 9 (white pawn on sq+9 attacks sq)
+                 attackers |= board.pieces[color_index][PAWN] & sq_ind_to_bit(sq + 9);
+            }
+        }
+
+        // Knights
+        attackers |= self.n_move_bitboard[sq] & board.pieces[color_index][KNIGHT];
+
+        // King
+        attackers |= self.k_move_bitboard[sq] & board.pieces[color_index][KING];
+
+        // Bishops and Queens (diagonal)
+        let bishop_attacks = self.gen_bishop_potential_captures(board, sq);
+        attackers |= bishop_attacks & (board.pieces[color_index][BISHOP] | board.pieces[color_index][QUEEN]);
+
+        // Rooks and Queens (horizontal/vertical)
+        let rook_attacks = self.gen_rook_potential_captures(board, sq);
+        attackers |= rook_attacks & (board.pieces[color_index][ROOK] | board.pieces[color_index][QUEEN]);
+
+        attackers
+    }
+
+     /// Finds the square index of the least valuable attacker from a bitboard of attackers.
+     /// Returns 64 if no attacker is found (should not happen if attackers_bb > 0).
+     ///
+     /// # Arguments
+     /// * `board` - The current board state.
+     /// * `attackers_bb` - A bitboard of pieces attacking a square.
+     /// * `side` - The side whose attackers we are considering.
+     ///
+     /// # Returns
+     /// The square index (0-63) of the least valuable attacker, or 64 if none found.
+     pub fn least_valuable_attacker_sq(&self, board: &Board, attackers_bb: u64, side: bool) -> usize {
+         let color_index = side as usize;
+         for piece_type_idx in PAWN..=KING { // Iterate from Pawn (least valuable) to King
+             let piece_bb = board.pieces[color_index][piece_type_idx as usize];
+             let intersection = attackers_bb & piece_bb;
+             if intersection != 0 {
+                 return intersection.trailing_zeros() as usize; // Return square of the first found attacker of this type
+             }
+         }
+         64 // Indicate no attacker found (error condition)
+     }
+}
 }

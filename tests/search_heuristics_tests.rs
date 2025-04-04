@@ -146,5 +146,35 @@ mod tests {
         assert_eq!(eval_zw, 0, "NMP likely not disabled correctly in Zugzwang; eval should be 0, got: {}", eval_zw);
     }
 
+    #[test]
+    fn test_see_complex_sequence() {
+        let (move_gen, _pesto) = setup();
+        // White NxN on d5. N defended by B(c6), P(e6). White N attacked by B(c4), Q(d8), R(d1)
+        // FEN: 3q1rk1/8/2p1p1n1/3n4/2B5/8/8/K2R4 w - - 0 1
+        let board = Board::new_from_fen("3q1rk1/8/2p1p1n1/3n4/2B5/8/8/K2R4 w - - 0 1").expect("Valid FEN");
+        let target_sq = kingfisher::board_utils::algebraic_to_sq_ind("d5"); // Black Knight
+        let attacker_sq = kingfisher::board_utils::algebraic_to_sq_ind("f6"); // White Knight
+
+        // Attackers on d5: W: N(f6), R(d1). B: B(c4), Q(d8)
+        // Defenders of d5: B: B(c6), P(e6)
+
+        // Let's trace SEE for W:N(f6) captures B:N(d5)
+        // Initial capture: NxN. Captured piece value = N(320). gain[0] = 320. Attacker = N(320). Side = Black.
+        // Black's turn. Least valuable attacker on d5 for Black: B(c4) [value 330].
+        // Capture 2: BxN. Captured piece value = N(320). gain[1] = 320 - gain[0] = 320 - 320 = 0. Attacker = B(330). Side = White.
+        // White's turn. Least valuable attacker on d5 for White: R(d1) [value 500].
+        // Capture 3: RxB. Captured piece value = B(330). gain[2] = 330 - gain[1] = 330 - 0 = 330. Attacker = R(500). Side = Black.
+        // Black's turn. Least valuable attacker on d5 for Black: Q(d8) [value 975].
+        // Capture 4: QxR. Captured piece value = R(500). gain[3] = 500 - gain[2] = 500 - 330 = 170. Attacker = Q(975). Side = White.
+        // White's turn. No more attackers for White. Sequence ends.
+        // Propagate back:
+        // depth = 3: gain[2] = -max(-gain[2], gain[3]) = -max(-330, 170) = -170
+        // depth = 2: gain[1] = -max(-gain[1], gain[2]) = -max(-0, -170) = -(-0) = 0
+        // depth = 1: gain[0] = -max(-gain[0], gain[1]) = -max(-320, 0) = -(0) = 0
+
+        let score = see(&board, &move_gen, target_sq, attacker_sq);
+        assert_eq!(score, 0, "SEE Complex sequence NxN, BxN, RxB, QxR failed");
+    }
+
     // TODO: Add tests for Killer/History (potentially indirect, e.g., node count comparison)
 }

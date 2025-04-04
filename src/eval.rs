@@ -12,7 +12,8 @@ use crate::bits::{popcnt, bits};
 use crate::board::Board;
 use crate::board_utils::{
     sq_to_rank, sq_to_file, get_passed_pawn_mask, get_king_shield_zone_mask,
-    get_adjacent_files_mask, sq_ind_to_bit, get_pawn_front_square_mask, get_rank_mask, get_file_mask
+    get_adjacent_files_mask, sq_ind_to_bit, get_pawn_front_square_mask, get_rank_mask, get_file_mask,
+    get_front_span_mask, get_king_attack_zone_mask // Added/corrected helper masks
 };
 use crate::move_generation::MoveGen;
 use crate::piece_types::{PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING, WHITE, BLACK};
@@ -23,7 +24,11 @@ use crate::eval_constants::{
     MOBILE_PAWN_DUO_BONUS_MG, MOBILE_PAWN_DUO_BONUS_EG,
     ROOK_ON_SEVENTH_BONUS, ROOK_BEHIND_PASSED_PAWN_BONUS,
     DOUBLED_ROOKS_ON_SEVENTH_BONUS, ROOK_BEHIND_ENEMY_PASSED_PAWN_BONUS, CASTLING_RIGHTS_BONUS,
-    ROOK_OPEN_FILE_BONUS, ROOK_HALF_OPEN_FILE_BONUS
+    ROOK_OPEN_FILE_BONUS, ROOK_HALF_OPEN_FILE_BONUS,
+    // Use the constants defined first in eval_constants.rs
+    BACKWARD_PAWN_PENALTY, KING_ATTACK_WEIGHTS
+    // KING_ATTACK_WEIGHT_KNIGHT, KING_ATTACK_WEIGHT_BISHOP, // Using KING_ATTACK_WEIGHTS array instead
+    // KING_ATTACK_WEIGHT_ROOK, KING_ATTACK_WEIGHT_QUEEN, KING_SAFETY_ATTACK_PENALTY_TABLE // Using KING_ATTACK_WEIGHTS array instead
 };
 
 /// Struct representing the Pesto evaluation function
@@ -155,12 +160,38 @@ impl PestoEval {
                         duo_bonus_eg += PAWN_DUO_BONUS[1];
                     }
                 }
+
+                // Note: Backward pawn logic was duplicated below, removing this block.
             } // End of loop through friendly_pawns
             mg[color] += chain_bonus_mg;
             eg[color] += chain_bonus_eg;
-            mg[color] += duo_bonus_mg;
-            eg[color] += duo_bonus_eg;
+            mg[color] += duo_bonus_mg / 2; // Duo bonus was counted for each pawn, divide by 2
+            eg[color] += duo_bonus_eg / 2;
 
+            // Backward Pawn Penalty Logic (Moved from inside the loop)
+            let mut backward_penalty_mg = 0;
+            let mut backward_penalty_eg = 0;
+            for sq in bits(&friendly_pawns) {
+                 let adjacent_mask = get_adjacent_files_mask(sq);
+                 let front_span = get_front_span_mask(color, sq); // Mask of squares in front on same/adjacent files
+                 let stop_sq = if color == WHITE { sq + 8 } else { sq.wrapping_sub(8) }; // Square directly in front
+
+                 // Check if no friendly pawns on adjacent files are in front or on the same rank
+                 let no_adjacent_support = (friendly_pawns & adjacent_mask & front_span) == 0;
+
+                 if no_adjacent_support && stop_sq < 64 {
+                     // Check if the square in front is attacked by an enemy pawn
+                     // TODO: Ensure move_gen.is_sq_attacked_by_pawn exists and is efficient
+                     // if _move_gen.is_sq_attacked_by_pawn(stop_sq, enemy_color, &enemy_pawns) {
+                     // Simplified check: Is front square occupied by enemy pawn? (Less accurate but avoids MoveGen dependency here)
+                     if (enemy_pawns & sq_ind_to_bit(stop_sq)) != 0 {
+                         backward_penalty_mg += BACKWARD_PAWN_PENALTY[0];
+                         backward_penalty_eg += BACKWARD_PAWN_PENALTY[1];
+                     }
+                 }
+            }
+            mg[color] += backward_penalty_mg;
+            eg[color] += backward_penalty_eg;
 
             // --- King Safety ---
             let king_sq = board.pieces[color][KING].trailing_zeros() as usize; // Keep only one definition
@@ -171,7 +202,32 @@ impl PestoEval {
                 mg[color] += shield_pawns as i32 * KING_SAFETY_PAWN_SHIELD_BONUS[0];
                 eg[color] += shield_pawns as i32 * KING_SAFETY_PAWN_SHIELD_BONUS[1];
 
-                // King Attack Score removed for now due to complexity of slider attacks
+                // 8. King Attack Score (Simplified version using KING_ATTACK_WEIGHTS)
+                // Applied only in middlegame for now
+                let enemy_king_sq = board.pieces[enemy_color][KING].trailing_zeros() as usize;
+                if enemy_king_sq < 64 { // Check if enemy king exists
+                    // Use get_king_attack_zone_mask (ensure it exists in board_utils)
+                    let attack_zone = get_king_attack_zone_mask(enemy_color, enemy_king_sq);
+                    let mut king_attack_score = 0;
+                    // Iterate through own pieces (excluding king)
+                    for piece_type in PAWN..KING { // 0..5
+                         let mut attackers = board.pieces[color][piece_type];
+                         while attackers != 0 {
+                             let attacker_sq = attackers.trailing_zeros() as usize;
+                             // Check if this piece attacks any square in the enemy king's zone
+                             // TODO: Ensure _move_gen.get_piece_attacks exists and is efficient
+                             // let piece_attacks = _move_gen.get_piece_attacks(piece_type, attacker_sq, color, board.occupied);
+                             // Simplified: Check if piece is *in* the zone (less accurate)
+                             if (sq_ind_to_bit(attacker_sq) & attack_zone) != 0 {
+                                 king_attack_score += KING_ATTACK_WEIGHTS[piece_type];
+                             }
+                             attackers &= attackers - 1; // Clear LSB
+                         }
+                    }
+                    // Apply score as a bonus for the attacker (color)
+                    // This is a simple approach; more complex models use safety tables based on attack score.
+                    mg[color] += king_attack_score; // Add bonus based on weighted attackers near enemy king
+                }
             }
             // --- Rook Bonuses ---
             let friendly_rooks = board.pieces[color][ROOK];

@@ -1,4 +1,4 @@
-//! Constants for the Pesto evaluation function module
+/DOUBLED_ROOKS_ON_SEVENTH_BONUS, ss/! Constants for the Pesto evaluation function module
 //! Values from Rofchade: <http://www.talkchess.com/forum3/viewtopic.php?f=2&t=68311&start=19>
 //! We only modify the middlegame king table, so that the king doesn't want to go forward when all the pieces are on the board.
 //! Note that these apparently use a different indexing, so we need to flip the board vertically for white.
@@ -264,3 +264,17 @@ pub const ROOK_OPEN_FILE_BONUS: [i32; 2] = [25, 15]; // [MG, EG] - Increased
 
 // Rook on Half-Open File Bonus (MG/EG) - No friendly pawns on the file
 pub const ROOK_HALF_OPEN_FILE_BONUS: [i32; 2] = [15, 8]; // [MG, EG] - Increased
+
+// Backward Pawn Penalty (MG/EG) - Applied per backward pawn
+pub const BACKWARD_PAWN_PENALTY: [i32; 2] = [-8, -12]; // [MG, EG]
+
+// King Attack Score Constants (Simplified)
+// Bonus per attacking piece type near the enemy king zone (MG only)
+// Zone typically includes squares around the king (e.g., 3x3 area)
+pub const KING_ATTACK_WEIGHTS: [i32; 6] = [0, 7, 7, 10, 15, 0]; // P, N, B, R, Q, K (King weight is 0)
+pub const KING_ATTACK_COUNT_BONUS: [i32; 2] = [0, 0]; // Bonus based on *number* of attackers (can be tuned)
+// Example: KING_ATTACK_SCORE = sum(KING_ATTACK_WEIGHTS[piece] for piece attacking zone) + KING_ATTACK_COUNT_BONUS[min(4, num_attackers)]
+// We will implement a simpler version for now using just weights.
+
+// --- Redundant King Safety Constants Removed ---
+// (Using KING_ATTACK_WEIGHTS array defined above instead)
