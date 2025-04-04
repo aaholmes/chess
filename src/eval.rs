@@ -61,15 +61,16 @@ impl PestoEval {
         let mut eg: [i32; 2] = [0, 0];
         let mut game_phase: i32 = 0;
 
-        // Evaluate each piece
+        // Evaluate each piece using efficient bitboard iteration
         for color in 0..2 {
             for piece in 0..6 {
-                for sq in 0..64 {
-                    if board.pieces[color][piece] & (1u64 << sq) != 0 {
-                        mg[color] += self.mg_table[color][piece][sq];
-                        eg[color] += self.eg_table[color][piece][sq];
-                        game_phase += GAMEPHASE_INC[piece];
-                    }
+                let mut piece_bb = board.pieces[color][piece];
+                while piece_bb != 0 {
+                    let sq = piece_bb.trailing_zeros() as usize;
+                    mg[color] += self.mg_table[color][piece][sq];
+                    eg[color] += self.eg_table[color][piece][sq];
+                    game_phase += GAMEPHASE_INC[piece];
+                    piece_bb &= piece_bb - 1; // Clear the least significant bit
                 }
             }
         }

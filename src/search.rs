@@ -2,6 +2,7 @@
 //!
 //! This module implements the negamax search algorithm for chess position evaluation.
 
+use std::cmp::max;
 use std::time::{Duration, Instant};
 use crate::boardstack::BoardStack;
 use crate::move_types::Move;
@@ -130,58 +131,80 @@ fn negamax(board: &mut BoardStack, move_gen: &MoveGen, pesto: &PestoEval, depth:
 /// * The best move to play from the current position
 /// * The number of nodes searched
 /// * Whether the search was terminated
-pub fn alpha_beta_search(board: &mut BoardStack, move_gen: &MoveGen, pesto: &PestoEval, tt: &mut TranspositionTable, depth: i32, alpha_init: i32, beta_init: i32, q_search_max_depth: i32, verbose: bool, start_time: Option<Instant>, time_limit: Option<Duration>) -> (i32, Move, i32, bool) {
-    // Initialize best move and alpha value
-    let mut best_move: Move = Move::null();
-    let mut alpha: i32 = alpha_init;
-    let beta: i32 = beta_init;
-    let mut n: i32 = 0;
-    let mut eval: i32 = 0;
+pub fn alpha_beta_search(
+    board: &mut BoardStack,
+    move_gen: &MoveGen,
+    pesto: &PestoEval,
+    tt: &mut TranspositionTable,
+    depth: i32,
+    mut alpha: i32,
+    beta: i32,
+    q_search_max_depth: i32,
+    verbose: bool,
+    start_time: Option<Instant>,
+    time_limit: Option<Duration>,
+) -> (i32, Move, i32, bool) {
 
-    // Check for checkmate and stalemate
-    if verbose {
-        println!("Checking for checkmate and stalemate");
-    }
-    let (checkmate, stalemate) = board.current_state().is_checkmate_or_stalemate(move_gen);
-    if verbose {
-        println!("Checkmate and stalemate checked");
-        println!("Checkmate: {} Stalemate: {}", checkmate, stalemate);
+    let mut nodes = 1;
+    let mut best_move = Move::null();
+    let is_pv_node = beta - alpha > 1;
+
+    // Transposition table lookup: If this position has already been searched at the target depth
+    // then return the transposition table entry.
+    // Note: this also grabs the old answer even if the old answer was for a greater depth,
+    // and due to the fact that the value of having the move is not taken into account,
+    // this can lead to an eval that differs from similar positions by the value of one tempo
+    // (in either direction).
+    if let Some(entry) = tt.probe(board.current_state(), depth) {
+        return (entry.score, entry.best_move, entry.depth, false);
     }
 
-    // Handle checkmate and stalemate cases
-    if checkmate {
-        if verbose {
-            println!("AB search: Checkmate!");
+    // Check for time limit
+    if let Some(time_limit) = time_limit {
+        let elapsed_time = start_time.unwrap().elapsed();
+        if elapsed_time >= time_limit {
+            return (beta, best_move, nodes, true); // Time limit exceeded
         }
-        return (1000000, best_move, 1, true);
-    } else if stalemate {
-        if verbose {
-            println!("AB search: Stalemate!");
-        }
-        return (0, best_move, 1, true);
     }
 
-    // Generate and combine captures and regular moves
+    // Quiescence search
+    if depth <= 0 {
+        let (eval, nodes) = quiescence_search(board, move_gen, pesto, alpha, beta, q_search_max_depth, verbose);
+        return (eval, Move::null(), nodes, false);
+    }
+
+    // Null move pruning
+    // TODO: Add `can_null` parameter or logic to control when NMP is allowed (e.g., not in zugzwang positions)
+    // TODO: Verify `board.is_check()` is efficient or cache the check status
+    let can_null = true; // Placeholder: NMP is generally safe except in potential zugzwang
+    if can_null && depth >= 3 && !board.is_check(move_gen) { // Assuming `is_check` checks the current side
+        board.make_null_move();
+        // Note: The reduction factor (R=3 here) is standard, but can be tuned.
+        // Search with a null window (-beta, -beta + 1)
+        let (score, _, child_nodes, terminated) = alpha_beta_search(board, move_gen, pesto, tt, depth - 1 - 3, -beta, -beta + 1, q_search_max_depth, false, start_time, time_limit);
+        board.undo_null_move();
+        nodes += child_nodes;
+
+        if terminated { // Check if the sub-search was terminated due to time limit
+            return (alpha, best_move, nodes, true); // Propagate termination
+        }
+
+        if -score >= beta {
+            // Null move cutoff: The opponent has a move that forces a beta cutoff even after we pass the turn.
+            // Store beta cutoff in TT? Some engines do, some don't for NMP cutoffs.
+            return (beta, Move::null(), nodes, false); // Return beta, indicating a cutoff
+        }
+    }
+
+    let mut moves_searched = 0;
+
     let (mut captures, moves) = move_gen.gen_pseudo_legal_moves_with_evals(&mut board.current_state(), pesto);
     captures.extend(moves);
 
-    // Print the list of captures
-    if verbose {
-        println!("Before probing transition table:");
-        for m in &captures {
-            println!("{}", print_move(&m));
-        }
-    }
-
     // Improve alpha-beta pruning by searching the best move from the transposition table first
-    // Check if there's a best move from the transposition table
-    let mut found_best_move = false;
+    // The move must have a depth of at least 1
     if let Some(entry) = tt.probe(board.current_state(), 1) {
         if let Some(tt_best_move) = captures.iter().find(|&m| *m == entry.best_move) {
-            if verbose {
-                found_best_move = true;
-                println!("Found best move from transposition table: {}", print_move(&tt_best_move));
-            }
             // Move the transposition table's best move to the front
             let index = captures.iter().position(|m| *m == *tt_best_move).unwrap();
             let best_move = captures.remove(index);
@@ -189,159 +212,89 @@ pub fn alpha_beta_search(board: &mut BoardStack, move_gen: &MoveGen, pesto: &Pes
         }
     }
 
-    // Print the list of captures after sorting
-    if found_best_move {
-        println!("After probing transition table:");
-        for m in &captures {
-            println!("{}", print_move(&m));
-        }
-    }
+    for mov in captures {
+        // Increment the number of moves searched
+        moves_searched += 1;
 
-    for m in captures {
-        if verbose {
-            println!("Considering move {} at root of search tree", print_move(&m));
-        }
-        board.make_move(m);
+        // Make the move
+        board.make_move(mov);
+
+        // If the move is illegal, undo the move and continue
         if !board.current_state().is_legal(move_gen) {
             board.undo_move();
             continue;
         }
-        let (search_eval, nodes) = alpha_beta(board, move_gen, pesto, tt, depth - 1, -beta, -alpha, q_search_max_depth, verbose);
-        eval = -search_eval;
-        n += nodes;
-        if eval > alpha {
-            alpha = eval;
-            best_move = m;
-        }
 
-        if verbose {
-            println!("Just checked move {}, current best move is {}", &m.print_algebraic(), &best_move.print_algebraic());
-            if let Some(start_time) = start_time {
-                println!("Current time: {:?}, time limit: {:?}", start_time.elapsed(), time_limit);
+        let mut score;
+
+        // Late Move Reduction
+        let FULL_DEPTH_MOVES = 2;
+        let REDUCTION_LIMIT = 2;
+        let REDUCTION_AMOUNT = 2;
+        if moves_searched > FULL_DEPTH_MOVES
+           && depth >= REDUCTION_LIMIT + REDUCTION_AMOUNT + 1
+           && !is_pv_node
+        {
+            // Reduced depth search
+            let (reduced_score, _, child_nodes, terminated) = alpha_beta_search(
+                board, move_gen, pesto, tt, depth - REDUCTION_AMOUNT - 1,
+                -beta, -alpha, q_search_max_depth, verbose, start_time, time_limit
+            );
+            score = -reduced_score;
+            nodes += child_nodes;
+
+            if terminated {
+                board.undo_move();
+                return (alpha, best_move, nodes, true);
             }
-        }
 
-        // Check time limit
-        if let Some(start_time) = start_time {
-            if let Some(time_limit) = time_limit {
-                if start_time.elapsed() > time_limit {
-                    if verbose {
-                        println!("Time limit reached. Stopping search.");
-                    }
+            // Re-search at full depth if the reduced search was promising
+            if score > alpha {
+                let (full_score, _, child_nodes, terminated) = alpha_beta_search(
+                    board, move_gen, pesto, tt, depth - 1,
+                    -beta, -alpha, q_search_max_depth, verbose, start_time, time_limit
+                );
+                score = -full_score;
+                nodes += child_nodes;
+
+                if terminated {
+                    board.undo_move();
                     return (alpha, best_move, nodes, true);
                 }
             }
-        }
+        } else {
+            // Full depth search
+            let (child_score, _, child_nodes, terminated) = alpha_beta_search(
+                board, move_gen, pesto, tt, depth - 1,
+                -beta, -alpha, q_search_max_depth, verbose, start_time, time_limit
+            );
+            score = -child_score;
+            nodes += child_nodes;
 
-        // Undo the move
-        board.undo_move();
-
-        // Prune if necessary
-        if alpha >= beta {
-            break;
-        }
-    }
-
-    if verbose {
-        println!("Alpha beta search at depth {} searched {} nodes. Best eval and move are {} {}", depth, n, alpha, print_move(&best_move));
-    }
-
-    // Store the result in the transposition table
-    tt.store(board.current_state(), depth, eval, best_move);
-
-    (alpha, best_move, n, false)
-}
-
-/// Recursive helper function for alpha-beta search
-///
-/// This function performs a recursive alpha-beta search to the given depth, using alpha-beta pruning
-/// to optimize the search process.
-///
-/// # Arguments
-///
-/// * `board` - A mutable reference to the current board state
-/// * `move_gen` - A reference to the move generator
-/// * `pesto` - A reference to the Pesto evaluation function
-/// * `depth` - The current depth in the search tree
-/// * `alpha` - The current alpha value for alpha-beta pruning
-/// * `beta` - The current beta value for alpha-beta pruning
-/// * `q_search_max_depth` - The maximum depth for the quiescence search
-/// * `verbose` - A flag indicating whether to print verbose output
-///
-/// # Returns
-///
-/// A tuple containing:
-/// * The evaluation (in centipawns) of the final position
-/// * The best move to play from the current position
-/// * The number of nodes searched
-pub fn alpha_beta(board: &mut BoardStack, move_gen: &MoveGen, pesto: &PestoEval, tt: &mut TranspositionTable, depth: i32, mut alpha: i32, beta: i32, q_search_max_depth: i32, verbose: bool) -> (i32, i32) {
-    // Private recursive function used for alpha-beta search
-    // External functions should call alpha_beta_search instead
-    // Returns the eval (in centipawns) of the final position
-    // Also returns number of nodes searched
-    if verbose {
-        println!("Alpha beta search at depth {} with alpha {} and beta {}", depth, alpha, beta);
-    }
-    if depth == 0 {
-        // Leaf node
-        let (eval, nodes) = q_search(board, move_gen, pesto, alpha, beta, q_search_max_depth, verbose);
-        if verbose {
-            println!("Outcome of Q search: {} {}", eval, nodes);
-        }
-        return (eval, nodes);
-    }
-
-    // Best move
-    let mut eval: i32 = 0;
-    let mut best_move: Move = Move::null();
-
-    // Non-leaf node
-    let mut n: i32 = 1;
-
-    let (mut captures, moves) = move_gen.gen_pseudo_legal_moves_with_evals(&mut board.current_state(), pesto);
-    captures.extend(moves);
-
-    // Improve alpha-beta pruning by searching the best move from the transposition table first
-
-    // Check if there's a best move from the transposition table
-    if let Some(entry) = tt.probe(board.current_state(), 1) {
-        if let Some(tt_best_move) = captures.iter().find(|&m| *m == entry.best_move) {
-            // Move the transposition table's best move to the front
-            let index = captures.iter().position(|m| *m == *tt_best_move).unwrap();
-            let best_move = captures.remove(index);
-            captures.insert(0, best_move);
-        }
-    }
-
-    for m in captures {
-        if verbose {
-            println!("Considering move {}", print_move(&m));
-        }
-        board.make_move(m);
-        if !board.current_state().is_legal(move_gen) {
-            board.undo_move();
-            continue;
-        }
-        let (search_eval, nodes) = alpha_beta(board, move_gen, pesto, tt, depth - 1, -beta, -alpha, q_search_max_depth, verbose);
-        eval = -search_eval;
-        n += nodes;
-        if eval > alpha {
-            alpha = eval;
-            best_move = m;
-        }
-        board.undo_move();
-        if alpha >= beta {
-            if verbose {
-                println!("Inner Alpha beta search at depth {} searched {} nodes. Best eval and move are {} {}", depth, n, alpha, print_move(&m));
+            if terminated {
+                board.undo_move();
+                return (alpha, best_move, nodes, true);
             }
-            break;
+        }
+
+        board.undo_move();
+
+        if score > alpha {
+            alpha = score;
+            best_move = mov;
+
+            if alpha >= beta {
+                // Store in transposition table
+                tt.store(&board.current_state(), depth, beta, best_move);
+                return (beta, best_move, nodes, false);
+            }
         }
     }
 
-    // Store the result in the transposition table, but no need to return it
-    tt.store(board.current_state(), depth, eval, best_move);
+    // Store in transposition table
+    tt.store(&board.current_state(), depth, alpha, best_move);
 
-    (alpha, n)
+    (alpha, best_move, nodes, false)
 }
 
 /// Perform iterative deepening alpha-beta search from the given position
@@ -367,9 +320,8 @@ pub fn alpha_beta(board: &mut BoardStack, move_gen: &MoveGen, pesto: &PestoEval,
 /// * The evaluation (in centipawns) of the final position
 /// * The best move to play from the current position
 /// * The number of nodes searched
-pub fn iterative_deepening_ab_search(board: &mut BoardStack, move_gen: &MoveGen, pesto: &PestoEval, max_depth: i32, q_search_max_depth: i32, time_limit: Option<Duration>, verbose: bool) -> (i32, i32, Move, i32) {
+pub fn iterative_deepening_ab_search(board: &mut BoardStack, move_gen: &MoveGen, pesto: &PestoEval, tt: &mut TranspositionTable, max_depth: i32, q_search_max_depth: i32, time_limit: Option<Duration>, verbose: bool) -> (i32, i32, Move, i32) {
 
-    let mut tt = TranspositionTable::new();
     let mut eval: i32 = 0;
     let mut best_move: Move = Move::null();
     let mut nodes: i32 = 0;
@@ -466,7 +418,7 @@ pub fn aspiration_window_ab_search(board: &mut BoardStack, move_gen: &MoveGen, t
     // First perform a quiescence search at a depth of 0
     let mut lower_bound: i32 = -1000000;
     let mut upper_bound: i32 = 1000000;
-    let (mut eval, mut n) = q_search(board, move_gen, pesto, lower_bound, upper_bound, q_search_max_depth, verbose);
+    let (mut eval, mut n) = quiescence_search(board, move_gen, pesto, lower_bound, upper_bound, q_search_max_depth, verbose);
 
     // Now perform an iterative deepening search with aspiration windows
     for d in 1..= max_depth {
@@ -529,7 +481,7 @@ pub fn aspiration_window_ab_search(board: &mut BoardStack, move_gen: &MoveGen, t
 /// A tuple containing:
 /// - The score of the position after quiescence search (from the perspective of the side to move).
 /// - The number of nodes searched.
-fn q_search(
+fn quiescence_search(
     board: &mut BoardStack,
     move_gen: &MoveGen,
     pesto: &PestoEval,
@@ -580,7 +532,7 @@ fn q_search(
         }
 
         // Recursive call
-        let (mut score, n) = q_search(board, move_gen, pesto, -beta, -alpha, max_depth - 1, verbose);
+        let (mut score, n) = quiescence_search(board, move_gen, pesto, -beta, -alpha, max_depth - 1, verbose);
         score = -score; // Negamax
         nodes += n;
 

@@ -10,123 +10,115 @@ The project aims to learn to play chess by self-play a la AlphaZero, but reduce 
 
 The primary goal of Kingfisher is to explore a hybrid approach that leverages the strengths of both traditional chess engines and modern AI techniques:
 
-1. **Mate Search First**: Before evaluating a position with a neural network, Kingfisher performs an exhaustive mate search, potentially replacing an expensive, noisy (and randomly initialized) neural network evaluation with an exact evaluation and corresponding best move from perfect play in the forced win.
-
-2. **Accelerated Training**: By identifying mate sequences early, we hypothesize that the engine can play much more effectively, especially at the start of training, by correctly evaluating positions where forced wins are possible.
-
-3. **Interpretable Evaluation**: Unlike the deep neural networks of AlphaZero, Kingfisher uses a simple, interpretable board evaluation function, allowing for better insight into the engine's decision-making process and further reducing the required compute.
-
+1.  **Mate Search First**: Before evaluating a position with a neural network, Kingfisher performs an exhaustive mate search, potentially replacing an expensive, noisy (and randomly initialized) neural network evaluation with an exact evaluation and corresponding best move from perfect play in the forced win.
+2.  **Accelerated Training**: By identifying mate sequences early, we hypothesize that the engine can play much more effectively, especially at the start of training, by correctly evaluating positions where forced wins are possible.
+3.  **Interpretable Evaluation**: Unlike the deep neural networks of AlphaZero, Kingfisher uses a simple, interpretable board evaluation function (Pesto), allowing for better insight into the engine's decision-making process and further reducing the required compute.
 
 This research direction seeks to bridge the gap between traditional chess programming techniques and cutting-edge AI methods, potentially leading to more efficient and understandable chess AI systems.
 
 ## Features
 
-- Bitboard representation for fast move generation and evaluation
-- Magic bitboards for sliding piece move generation
-- Negamax search with alpha-beta pruning
-- Iterative deepening
-- Pesto evaluation function (tapered)
-- Advanced move ordering techniques
-- Quiescence search
-- Aspiration windows
+*   **Board Representation:** Bitboards for efficient state representation.
+*   **Move Generation:** Magic Bitboards for fast generation of sliding piece moves (rooks, bishops, queens), plus precomputed tables for other pieces. Handles castling, en passant, and promotions.
+*   **Search:**
+    *   Alpha-Beta search framework.
+    *   Iterative Deepening.
+    *   Transposition Tables (TT) for caching previously searched positions.
+    *   Quiescence Search (QSearch) to mitigate the horizon effect.
+    *   Null Move Pruning (NMP).
+    *   Late Move Reductions (LMR).
+    *   Aspiration Windows.
+    *   Dedicated Mate Search function.
+*   **Evaluation:** Pesto-style tapered evaluation using Piece-Square Tables (PSTs) for middlegame and endgame, interpolated based on game phase. Includes MVV-LVA and heuristic move ordering.
+*   **Protocol:** Basic UCI (Universal Chess Interface) support (`engine/src/uci.rs`).
 
 ## Installation
 
 To use Kingfisher, you'll need Rust installed on your system. If you don't have Rust, you can install it from [rustup.rs](https://rustup.rs/).
 
-1. Clone the repository:
-   ```
-   git clone https://github.com/yourusername/kingfisher.git
-   cd kingfisher
-   ```
+1.  Clone the repository:
+    ```bash
+    git clone https://github.com/aaholmes/kingfisher.git
+    cd kingfisher/engine
+    ```
+    *(Note: Adjusted `cd` path assuming the repo root contains the `engine` directory)*
 
-2. Build the project:
-   ```
-   cargo build --release
-   ```
+2.  Build the project:
+    ```bash
+    cargo build --release
+    ```
 
-3. Run the engine:
-   ```
-   cargo run --release
-   ```
+3.  Run the engine:
+    The executable will be located at `target/release/engine` (relative to the `engine` directory).
+    ```bash
+    ./target/release/engine
+    ```
+    Or connect it to a UCI-compatible GUI.
 
 ## Project Structure
 
-- `src/bitboard.rs`: Bitboard representation and operations
-  - Implements the `Bitboard` struct and associated methods
-  - Includes utility functions for bitboard manipulation
-
-- `src/gen_moves.rs`: Move generation including magic bitboards
-  - Implements the `MoveGen` struct for move generation
-  - Contains functions for generating legal moves for all piece types
-  - Implements magic bitboard techniques for sliding piece move generation
-
-- `src/gen_moves_arr.rs`: Alternative move generation implementation
-  - Provides an array-based approach to move generation
-  - May be used for performance comparison or specific use cases
-
-- `src/eval.rs`: Position evaluation using Pesto function
-  - Implements the positional evaluation function
-  - Contains piece-square tables for both middlegame and endgame phases
-
-- `src/search.rs`: Negamax search with alpha-beta pruning
-  - Implements the main search algorithm
-  - Includes iterative deepening, quiescence search, and aspiration windows
-
-- `src/make_move.rs`: Move execution and board state updates
-  - Contains functions to apply and undo moves on the board
-  - Handles special moves like castling and en passant
-
-- `src/utils.rs`: Utility functions
-  - Includes helper functions for printing board state and moves
-  - May contain other miscellaneous utility functions
-
-- `src/bits.rs`: Low-level bitwise operations
-  - Implements efficient bitwise manipulations used throughout the engine
-
-- `src/magic_constants.rs`: Magic bitboard constants
-  - Stores pre-computed magic numbers and related constants for magic bitboards
-
-- `main.rs`: Entry point of the application
-  - Sets up the engine and handles user interaction or UCI protocol
-
-- `tests/`: Directory containing test files
-  - Includes unit tests and integration tests for various components of the engine
+*   `src/board.rs`: Bitboard representation and operations (`Board` struct).
+*   `src/board_utils.rs`: Utility functions for board coordinates and indices.
+*   `src/boardstack.rs`: Manages the stack of board states for make/unmake.
+*   `src/move_generation.rs`: Move generation including magic bitboards (`MoveGen` struct).
+*   `src/magic_bitboard.rs`: Logic for initializing and using magic bitboards.
+*   `src/magic_constants.rs`: Magic bitboard constants.
+*   `src/eval.rs`: Position evaluation using Pesto function (`PestoEval` struct).
+*   `src/eval_constants.rs`: Constants for the Pesto evaluation (PSTs, game phase increments).
+*   `src/search.rs`: Negamax search with alpha-beta pruning, iterative deepening, etc.
+*   `src/transposition.rs`: Transposition table implementation.
+*   `src/make_move.rs`: Move execution and board state updates (integrated into `BoardStack`).
+*   `src/uci.rs`: Handles the UCI protocol for communication with GUIs.
+*   `src/utils.rs`: Utility functions (e.g., printing moves).
+*   `src/bits.rs`: Low-level bitwise operations.
+*   `src/move_types.rs`: Defines `Move` struct and related types (e.g., `CastlingRights`).
+*   `src/piece_types.rs`: Constants for piece types and colors.
+*   `src/hash.rs`: Zobrist hashing implementation.
+*   `src/lib.rs`: Library root, declares modules.
+*   `src/main.rs`: Entry point of the application.
+*   `tests/`: Directory containing test files.
 
 ## Roadmap
 
 ### Completed Features
-- Bitboards
-- Move generation including magic bitboards
-- Negamax search
-- Alpha-beta pruning
-- Iterative deepening
-- Transposition table
-- Pesto evaluation function (tapered)
-- MVV-LVA move ordering
-- Pawn and knight fork move ordering
-- Non-captures ordered according to Pesto eval
-- Mate search
-- Quiescence search
-- Aspiration windows
+*   Bitboards
+*   Move generation including magic bitboards
+*   Negamax search / Alpha-beta pruning
+*   Iterative deepening
+*   Transposition table
+*   Pesto evaluation function (tapered)
+*   MVV-LVA move ordering
+*   Pawn and knight fork move ordering / Heuristic non-capture ordering
+*   Mate search function
+*   Quiescence search
+*   Aspiration windows
+*   Null move pruning (basic implementation enabled)
+*   Late Move Reductions (LMR)
 
 ### In Progress
-- Mate killer heuristic
-- Null move pruning
-- UCI protocol
+*   Mate killer heuristic (mentioned in original roadmap)
+*   UCI protocol (basic implementation exists)
+*   Refining NMP (e.g., Zugzwang detection)
 
-### Future Goals
-- Interpretable neural network for evaluation function and move proposal probabilities
-- Time management
-- Opening book
-- Endgame tablebases
-- Parallel search
+### Implementation Roadmap
+*   **Improved Evaluation:** Add interpretable, efficiently updatable terms such as pawn structure and king safety.
+*   **Time Management:** Implement robust time controls for UCI.
+*   **Opening Book:** Integrate a standard opening book format.
+*   **Endgame Tablebases:** Add support for querying tablebases (e.g., Syzygy).
+*   **Parallel Search:** Explore parallelization techniques (e.g., Lazy SMP).
+*   **Comprehensive Testing:** Expand test suite
+
+### Research Directions
+*   **Hybrid Search (Core Goal):** Integrate the classical search (especially mate search) with MCTS and a neural network evaluation/policy component.
+*   **Neural Network Design:** Develop and train an interpretable neural network suitable for the hybrid approach.
+*   **Style Mimicry:** Investigate training the NN component to emulate specific human or engine playing styles.
+*   **Variant Exploration:** Apply and evaluate the hybrid approach in chess variants like King of the Hill.
 
 ## Inspirations
 
-- Monte Carlo Tree Search (MCTS)-based chess engines, such as AlphaZero and LeelaZero
-- Efficiently Updatable Neural Networks (NNUE) and state-of-the-art chess engines that combine it with classical search techniques, such as Stockfish and Berserk
-- The book "Neural Networks for Chess" by Dominik Klein
+*   Monte Carlo Tree Search (MCTS)-based chess engines, such as AlphaZero and LeelaZero
+*   Efficiently Updatable Neural Networks (NNUE) and state-of-the-art chess engines that combine it with classical search techniques, such as Stockfish and Berserk
+*   The book "Neural Networks for Chess" by Dominik Klein
 
 ---
 

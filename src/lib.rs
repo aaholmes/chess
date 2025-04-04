@@ -1,3 +1,20 @@
+//! # Chess Engine Library
+//!
+//! This library implements a classical chess engine using bitboards, magic bitboards
+//! for move generation, alpha-beta search with various enhancements (iterative deepening,
+//! transposition tables, quiescence search, null move pruning), and a Pesto-style
+//! tapered evaluation function.
+//!
+//! It provides modules for:
+//! - Board representation (`board`, `board_utils`, `boardstack`)
+//! - Move generation (`move_generation`, `magic_bitboard`, `magic_constants`)
+//! - Evaluation (`eval`, `eval_constants`)
+//! - Search algorithms (`search`, `transposition`)
+//! - UCI protocol handling (`uci`)
+//! - Core types and utilities (`move_types`, `piece_types`, `bits`, `hash`, `utils`)
+//! - Agent interaction (`agent`)
+//! - Memory management (`arena`)
+
 pub mod agent;
 pub mod arena;
 pub mod board;

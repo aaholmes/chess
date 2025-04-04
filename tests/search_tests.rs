@@ -59,7 +59,8 @@ fn test_alpha_beta_pruning_effectiveness() {
     assert!(nodes_narrow < nodes_full * 2 / 3, "Not enough pruning for White. Full: {}, Narrow: {}", nodes_full, nodes_narrow);
 
     // Test for black
-    board = BoardStack::new_from_fen("r1bqkbnr/ppp2ppp/2np4/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R b KQkq - 0 4");
+    board = BoardStack::new_from_fen("r1bqkbnr/ppp2ppp/2np4/4p3/2BPP3/5N2/PPP2PPP/RNBQK2R b KQkq - 0 4");
+    tt = TranspositionTable::new();
     let (score_full_black, _, nodes_full_black, _) = alpha_beta_search(&mut board, &move_gen, &pesto, &mut tt, depth, -infinity, infinity, 0, false, None, None);
     let (score_narrow_black, _, nodes_narrow_black, _) = alpha_beta_search(&mut board, &move_gen, &pesto, &mut tt, depth, score_full_black - 50, score_full_black + 50, 0, false, None, None);
 
