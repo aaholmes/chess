@@ -22,6 +22,7 @@ use crate::magic_bitboard::{init_pawn_moves, init_knight_moves, init_bishop_move
 
 use crate::eval::PestoEval;
 use crate::piece_types::{PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING, WHITE, BLACK};
+use crate::search::HistoryTable;
 
 /// Represents the move generator, which generates pseudo-legal moves.
 ///
@@ -215,25 +216,35 @@ impl MoveGen {
     /// Generates all pseudo-legal moves, sorted for search efficiency.
     ///
     /// Generates captures (including promotions) sorted by MVV-LVA, and
-    /// quiet moves sorted by a heuristic evaluation (`PestoEval::move_eval`).
+    /// quiet moves sorted first by history score and then by evaluation score.
     ///
     /// # Arguments
     ///
     /// * `board` - The current chess position.
     /// * `pesto` - The evaluation function instance for move scoring.
+    /// * `history` - Optional history table for move ordering.
     ///
     /// # Returns
     ///
     /// A tuple containing the sorted capture moves and sorted non-capture moves.
-    pub fn gen_pseudo_legal_moves_with_evals(&self, board: &Board, pesto: &PestoEval) -> (Vec<Move>, Vec<Move>) {
+    pub fn gen_pseudo_legal_moves_with_evals(&self, board: &Board, pesto: &PestoEval, history: Option<&HistoryTable>) -> (Vec<Move>, Vec<Move>) {
         let (mut captures, mut promotions, mut moves) = self._generate_all_moves(board);
         captures.append(&mut promotions); // Combine promotions with captures
 
         // Sort captures by MVV-LVA (descending)
         captures.sort_unstable_by_key(|m| -self.mvv_lva(board, m.from, m.to));
 
-        // Sort quiet moves by heuristic eval change (descending)
-        moves.sort_unstable_by_key(|m| -pesto.move_eval(board, self, m.from, m.to));
+        // Sort quiet moves first by history score (if available), then by evaluation score
+        if let Some(history) = history {
+            // First sort by history score (unstable)
+            moves.sort_unstable_by_key(|m| -history.get_score(m));
+            
+            // Then do a stable sort by eval score to maintain history order for equal evals
+            moves.sort_by_key(|m| -pesto.move_eval(board, self, m.from, m.to));
+        } else {
+            // If no history table, just sort by eval score
+            moves.sort_unstable_by_key(|m| -pesto.move_eval(board, self, m.from, m.to));
+        }
 
         (captures, moves)
     }
