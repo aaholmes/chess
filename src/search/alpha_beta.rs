@@ -191,7 +191,16 @@ fn alpha_beta_recursive(
             board.undo_move();
             continue;
         }
-        let (mut eval, nodes) = alpha_beta_recursive(board, move_gen, pesto, tt, killers, history, depth - 1, -beta, -alpha, q_search_max_depth, verbose);
+        // --- Check Extension ---
+        // Extend search if the move 'm' results in check for the opponent
+        let mut extension = 0;
+        if board.is_check(move_gen) {
+            extension = 1;
+            // Optional: Limit extension depth or based on move type (e.g., only for non-quiet moves?)
+        }
+        let new_depth = depth - 1 + extension;
+
+        let (mut eval, nodes) = alpha_beta_recursive(board, move_gen, pesto, tt, killers, history, new_depth, -beta, -alpha, q_search_max_depth, verbose);
         eval = -eval;
         n += nodes;
 

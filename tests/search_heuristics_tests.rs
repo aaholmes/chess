@@ -176,5 +176,41 @@ mod tests {
         assert_eq!(score, 0, "SEE Complex sequence NxN, BxN, RxB, QxR failed");
     }
 
+    #[test]
+    fn test_check_extension_finds_mate() {
+        let (move_gen, pesto) = setup();
+        let mut board_stack = BoardStack::new();
+        let mut tt = TranspositionTable::new(16);
+        let mut killers = [[NULL_MOVE; 2]; MAX_PLY];
+        let mut history = [[0i32; 64]; 64]; // Use the correct type if HistoryTable struct exists
+
+        // Position: White to move, can force mate in 2 via check.
+        // Quiet move Rh2 looks okay short-term.
+        // Check Qa1+ forces Ka2, then Rh2#
+        // FEN: k7/8/8/8/8/8/6q1/K6r w - - 0 1
+        let fen = "k7/8/8/8/8/8/6q1/K6r w - - 0 1";
+        board_stack.set_fen(&move_gen, fen).expect("Valid FEN");
+
+        // Search at depth 1. Without check extension, it might not see the mate.
+        // With check extension, Qa1+ should extend the search to depth 1 (relative), revealing Rh2#
+        // We use iterative_deepening up to depth 2 to ensure the mate is found.
+        // A depth 1 search might be too shallow even with extension depending on qsearch.
+        let (depth_searched, eval, best_move, _nodes) = iterative_deepening_ab_search(
+            &mut board_stack, &move_gen, &pesto, &mut tt,
+            2, // Max depth 2 should be enough with extension
+            5, // Q-search depth
+            None, false // No time limit, not verbose
+        );
+
+        let expected_move = Move::new_from_algebraic("a1a2", &board_stack.current_state(), &move_gen).expect("Qa1+ should be valid"); // Corrected algebraic notation Qa1+ -> a1a2
+        
+        // Assert that the best move found is the checking move Qa1+
+        assert_eq!(best_move, expected_move, "Check extension failed: Did not find Qa1+ leading to mate");
+        // Assert that the evaluation reflects a forced mate (or very high score)
+        // Note: Mate scores are often represented as LARGE_NUM - ply
+        assert!(eval > 900000, "Check extension failed: Evaluation ({}) doesn't reflect forced mate", eval);
+         assert!(depth_searched >= 1, "Search did not complete at least depth 1"); // Sanity check
+    }
+
     // TODO: Add tests for Killer/History (potentially indirect, e.g., node count comparison)
 }
