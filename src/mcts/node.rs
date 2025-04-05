@@ -15,15 +15,17 @@ use std::collections::HashMap; // For priors and categorized moves
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum MoveCategory {
     // ForcedMate,      // Not used directly here, handled by terminal_or_mate_value
-    PromotionToQueen = 1,
-    WinningCapture   = 2,  // SEE > threshold
-    KillerMove1      = 3,  // Placeholder category
-    KillerMove2      = 4,  // Placeholder category
-    EqualCapture     = 5,  // abs(SEE) <= threshold
-    Check            = 6,  // Non-capture, non-promo, non-killer check
-    // HistoryHeuristic, // History integrated into OtherQuiet sorting for now
-    OtherQuiet       = 8,
-    LosingCapture    = 9,  // SEE < -threshold
+    // Simplified Categories for now:
+    Capture = 1, // Any capture (could refine with SEE later)
+    Quiet   = 2, // Any non-capture
+    // PromotionToQueen = 1,
+    // WinningCapture   = 2,  // SEE > threshold
+    // KillerMove1      = 3,  // Placeholder category
+    // KillerMove2      = 4,  // Placeholder category
+    // EqualCapture     = 5,  // abs(SEE) <= threshold
+    // Check            = 6,  // Non-capture, non-promo, non-killer check
+    // OtherQuiet       = 8,
+    // LosingCapture    = 9,  // SEE < -threshold
 }
 
 /// A node in the Monte Carlo Search Tree
@@ -283,9 +285,9 @@ impl MctsNode {
          if let Some(current_cat) = self.current_priority_category {
              // Find the next category in the sorted order
              let mut next_cat_found = false;
-             // Iterate through enum variants by discriminant value
-             for cat_num in (current_cat as usize + 1)..=(MoveCategory::LosingCapture as usize) {
-                  // This unsafe transmute assumes a standard C-like enum layout
+             // Iterate through simplified enum variants by discriminant value
+             for cat_num in (current_cat as usize + 1)..=(MoveCategory::Quiet as usize) {
+                  // This unsafe transmute assumes a standard C-like enum layout (safe for simple cases)
                   let next_possible_cat = unsafe { std::mem::transmute::<u8, MoveCategory>(cat_num as u8) };
                   if self.unexplored_moves_by_cat.contains_key(&next_possible_cat) {
                       self.current_priority_category = Some(next_possible_cat);

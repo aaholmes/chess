@@ -25,7 +25,8 @@ use crate::eval_constants::{
     ROOK_OPEN_FILE_BONUS, ROOK_HALF_OPEN_FILE_BONUS,
     DOUBLED_ROOKS_ON_SEVENTH_BONUS,
     BACKWARD_PAWN_PENALTY, KING_ATTACK_WEIGHTS,
-    CASTLING_RIGHTS_BONUS
+    CASTLING_RIGHTS_BONUS,
+    MOBILITY_WEIGHTS_MG, MOBILITY_WEIGHTS_EG // Added mobility constants
 };
 /// Struct representing the Pesto evaluation function
 pub struct PestoEval {
@@ -100,7 +101,7 @@ impl PestoEval {
     /// (eval, game_phase)
     // Note: Added move_gen parameter
     // Pass MoveGen explicitly now as it's needed for king attack calculation
-    fn eval_plus_game_phase(&self, board: &Board, _move_gen: &MoveGen) -> (i32, i32) {
+    fn eval_plus_game_phase(&self, board: &Board, move_gen: &MoveGen) -> (i32, i32) { // Use move_gen now
 
         let mut mg: [i32; 2] = [0, 0];
         let mut eg: [i32; 2] = [0, 0];
@@ -327,6 +328,55 @@ impl PestoEval {
 
         } // End of loop through colors [WHITE, BLACK]
 
+
+        // --- Mobility Bonus ---
+        // Calculate weighted mobility score based on pseudo-legal moves
+        // Note: Using pseudo-legal is faster but less accurate than legal.
+        // Weights apply per piece type [N, B, R, Q]
+        let mut mobility_mg = [0; 2];
+        let mut mobility_eg = [0; 2];
+        let occupied = board.get_all_occupancy();
+
+        for color in [WHITE, BLACK] {
+            let friendly_occ = board.pieces_occ[color];
+            let enemy_occ = board.pieces_occ[1 - color];
+
+            // Knight Mobility
+            let mut knight_moves = 0;
+            for sq in bits(&board.pieces[color][KNIGHT]) {
+                knight_moves += popcnt(move_gen.n_move_bitboard[sq] & !friendly_occ);
+            }
+            mobility_mg[color] += knight_moves as i32 * MOBILITY_WEIGHTS_MG[0]; // Index 0 for Knight
+            mobility_eg[color] += knight_moves as i32 * MOBILITY_WEIGHTS_EG[0];
+
+            // Bishop Mobility
+            let mut bishop_moves = 0;
+            for sq in bits(&board.pieces[color][BISHOP]) {
+                bishop_moves += popcnt(move_gen.get_bishop_moves(sq, occupied) & !friendly_occ);
+            }
+            mobility_mg[color] += bishop_moves as i32 * MOBILITY_WEIGHTS_MG[1]; // Index 1 for Bishop
+            mobility_eg[color] += bishop_moves as i32 * MOBILITY_WEIGHTS_EG[1];
+
+            // Rook Mobility
+            let mut rook_moves = 0;
+            for sq in bits(&board.pieces[color][ROOK]) {
+                rook_moves += popcnt(move_gen.get_rook_moves(sq, occupied) & !friendly_occ);
+            }
+            mobility_mg[color] += rook_moves as i32 * MOBILITY_WEIGHTS_MG[2]; // Index 2 for Rook
+            mobility_eg[color] += rook_moves as i32 * MOBILITY_WEIGHTS_EG[2];
+
+            // Queen Mobility
+            let mut queen_moves = 0;
+            for sq in bits(&board.pieces[color][QUEEN]) {
+                queen_moves += popcnt(move_gen.get_queen_moves(sq, occupied) & !friendly_occ);
+            }
+            mobility_mg[color] += queen_moves as i32 * MOBILITY_WEIGHTS_MG[3]; // Index 3 for Queen
+            mobility_eg[color] += queen_moves as i32 * MOBILITY_WEIGHTS_EG[3];
+
+            // Add mobility score to the main score components
+            mg[color] += mobility_mg[color];
+            eg[color] += mobility_eg[color];
+        }
 
         // --- Tapered Eval ---
         let mg_score = mg[0] - mg[1]; // White - Black

@@ -267,6 +267,11 @@ pub const KING_ATTACK_COUNT_BONUS: [i32; 2] = [0, 0]; // Bonus based on *number*
 // Example: KING_ATTACK_SCORE = sum(KING_ATTACK_WEIGHTS[piece] for piece attacking zone) + KING_ATTACK_COUNT_BONUS[min(4, num_attackers)]
 // We will implement a simpler version for now using just weights.
 
+// --- Mobility Constants ---
+// Bonus per legal move for each piece type [N, B, R, Q] (MG/EG)
+// Knights and Bishops benefit more in open endgames? Queens less critical?
+pub const MOBILITY_WEIGHTS_MG: [i32; 4] = [3, 3, 2, 1]; // N, B, R, Q
+pub const MOBILITY_WEIGHTS_EG: [i32; 4] = [4, 4, 3, 2]; // N, B, R, Q
 // --- Redundant King Safety Constants Removed ---
 // (Using KING_ATTACK_WEIGHTS array defined above instead)
 
