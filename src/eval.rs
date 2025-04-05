@@ -25,10 +25,7 @@ use crate::eval_constants::{
     ROOK_ON_SEVENTH_BONUS, ROOK_BEHIND_PASSED_PAWN_BONUS,
     DOUBLED_ROOKS_ON_SEVENTH_BONUS, ROOK_BEHIND_ENEMY_PASSED_PAWN_BONUS, CASTLING_RIGHTS_BONUS,
     ROOK_OPEN_FILE_BONUS, ROOK_HALF_OPEN_FILE_BONUS,
-    // Use the constants defined first in eval_constants.rs
     BACKWARD_PAWN_PENALTY, KING_ATTACK_WEIGHTS
-    // KING_ATTACK_WEIGHT_KNIGHT, KING_ATTACK_WEIGHT_BISHOP, // Using KING_ATTACK_WEIGHTS array instead
-    // KING_ATTACK_WEIGHT_ROOK, KING_ATTACK_WEIGHT_QUEEN, KING_SAFETY_ATTACK_PENALTY_TABLE // Using KING_ATTACK_WEIGHTS array instead
 };
 
 /// Struct representing the Pesto evaluation function
@@ -73,7 +70,8 @@ impl PestoEval {
     ///
     /// (eval, game_phase)
     // Note: Added move_gen parameter
-    fn eval_plus_game_phase(&self, board: &Board, _move_gen: &MoveGen) -> (i32, i32) {
+    // Pass MoveGen explicitly now as it's needed for king attack calculation
+    fn eval_plus_game_phase(&self, board: &Board, move_gen: &MoveGen) -> (i32, i32) {
 
         let mut mg: [i32; 2] = [0, 0];
         let mut eg: [i32; 2] = [0, 0];
@@ -202,31 +200,52 @@ impl PestoEval {
                 mg[color] += shield_pawns as i32 * KING_SAFETY_PAWN_SHIELD_BONUS[0];
                 eg[color] += shield_pawns as i32 * KING_SAFETY_PAWN_SHIELD_BONUS[1];
 
-                // 8. King Attack Score (Simplified version using KING_ATTACK_WEIGHTS)
+                // 8. King Attack Score (Refined: Sum weights of pieces attacking the king zone)
                 // Applied only in middlegame for now
                 let enemy_king_sq = board.pieces[enemy_color][KING].trailing_zeros() as usize;
                 if enemy_king_sq < 64 { // Check if enemy king exists
-                    // Use get_king_attack_zone_mask (ensure it exists in board_utils)
                     let attack_zone = get_king_attack_zone_mask(enemy_color, enemy_king_sq);
-                    let mut king_attack_score = 0;
-                    // Iterate through own pieces (excluding king)
-                    for piece_type in PAWN..KING { // 0..5
-                         let mut attackers = board.pieces[color][piece_type];
-                         while attackers != 0 {
-                             let attacker_sq = attackers.trailing_zeros() as usize;
-                             // Check if this piece attacks any square in the enemy king's zone
-                             // TODO: Ensure _move_gen.get_piece_attacks exists and is efficient
-                             // let piece_attacks = _move_gen.get_piece_attacks(piece_type, attacker_sq, color, board.occupied);
-                             // Simplified: Check if piece is *in* the zone (less accurate)
-                             if (sq_ind_to_bit(attacker_sq) & attack_zone) != 0 {
-                                 king_attack_score += KING_ATTACK_WEIGHTS[piece_type];
-                             }
-                             attackers &= attackers - 1; // Clear LSB
-                         }
+                    let mut total_attack_weight = 0;
+                    let mut unique_attackers_bb: u64 = 0;
+
+                    // Find all squares attacked by friendly pieces
+                    let mut all_attacked_squares: u64 = 0;
+                    for piece_type in PAWN..KING { // Iterate through attacker piece types
+                        let mut piece_locations = board.pieces[color][piece_type];
+                        while piece_locations != 0 {
+                            let sq = piece_locations.trailing_zeros() as usize;
+                            // Get attacks for this specific piece
+                            // TODO: Ensure move_gen.get_piece_attacks is efficient
+                            all_attacked_squares |= move_gen.get_piece_attacks(piece_type, sq, color, board.occupied);
+                            piece_locations &= piece_locations - 1;
+                        }
                     }
+
+                    // Check which squares in the king zone are attacked
+                    let attacked_zone_squares = attack_zone & all_attacked_squares;
+
+                    // Find unique pieces attacking the zone
+                    if attacked_zone_squares != 0 {
+                        for zone_sq in bits(&attacked_zone_squares) {
+                            // Find pieces of 'color' attacking this specific zone square
+                            unique_attackers_bb |= move_gen.attackers_to(board, zone_sq, color);
+                        }
+                    }
+
+                    // Sum weights of unique attackers
+                    while unique_attackers_bb != 0 {
+                        let attacker_sq = unique_attackers_bb.trailing_zeros() as usize;
+                        if let Some(piece_type) = board.get_piece_type_on_sq(attacker_sq) {
+                             // Ensure piece type index is valid for KING_ATTACK_WEIGHTS
+                             if (piece_type as usize) < KING_ATTACK_WEIGHTS.len() {
+                                total_attack_weight += KING_ATTACK_WEIGHTS[piece_type as usize];
+                             }
+                        }
+                        unique_attackers_bb &= unique_attackers_bb - 1; // Clear LSB
+                    }
+
                     // Apply score as a bonus for the attacker (color)
-                    // This is a simple approach; more complex models use safety tables based on attack score.
-                    mg[color] += king_attack_score; // Add bonus based on weighted attackers near enemy king
+                    mg[color] += total_attack_weight;
                 }
             }
             // --- Rook Bonuses ---
