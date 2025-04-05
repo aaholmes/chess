@@ -1,4 +1,4 @@
-/DOUBLED_ROOKS_ON_SEVENTH_BONUS, ss/! Constants for the Pesto evaluation function module
+//! Constants for the Pesto evaluation function module
 //! Values from Rofchade: <http://www.talkchess.com/forum3/viewtopic.php?f=2&t=68311&start=19>
 //! We only modify the middlegame king table, so that the king doesn't want to go forward when all the pieces are on the board.
 //! Note that these apparently use a different indexing, so we need to flip the board vertically for white.
@@ -250,15 +250,6 @@ pub const MOBILE_PAWN_DUO_BONUS_EG: [i32; 64] = MOBILE_DUO_BONUS_TABLE_EG;
 // Doubled Rooks on 7th Rank Bonus (MG/EG) - Additional bonus if two rooks are on 7th
 pub const DOUBLED_ROOKS_ON_SEVENTH_BONUS: [i32; 2] = [50, 25]; // [MG, EG] - Increased MG/EG based on review
 
-// Rook Behind Passed Pawn Bonus (MG/EG) - Applied per rook on the same file as a friendly passed pawn, behind it.
-pub const ROOK_BEHIND_PASSED_PAWN_BONUS: [i32; 2] = [20, 30]; // [MG, EG] - Increased Significantly
-
-// Rook Behind Enemy Passed Pawn Bonus (MG/EG) - Bonus for blockading rook
-pub const ROOK_BEHIND_ENEMY_PASSED_PAWN_BONUS: [i32; 2] = [25, 30]; // [MG, EG]
-
-// Castling Rights Bonus (MG/EG) - Small bonus per available castling right
-pub const CASTLING_RIGHTS_BONUS: [i32; 2] = [15, 0]; // [MG, EG] - Increased MG value
-
 // Rook on Open File Bonus (MG/EG) - No pawns of either color on the file
 pub const ROOK_OPEN_FILE_BONUS: [i32; 2] = [25, 15]; // [MG, EG] - Increased
 
@@ -278,3 +269,15 @@ pub const KING_ATTACK_COUNT_BONUS: [i32; 2] = [0, 0]; // Bonus based on *number*
 
 // --- Redundant King Safety Constants Removed ---
 // (Using KING_ATTACK_WEIGHTS array defined above instead)
+
+/// Bonus for a rook on the 7th rank [mg, eg]
+pub const ROOK_ON_SEVENTH_BONUS: [i32; 2] = [20, 40];
+
+// Add constant for ROOK_BEHIND_PASSED_PAWN_BONUS if it doesn't exist
+pub const ROOK_BEHIND_PASSED_PAWN_BONUS: [i32; 2] = [20, 30]; // [MG, EG]
+
+// Add ROOK_BEHIND_ENEMY_PASSED_PAWN_BONUS if it doesn't exist
+pub const ROOK_BEHIND_ENEMY_PASSED_PAWN_BONUS: [i32; 2] = [25, 30]; // [MG, EG]
+
+// Add CASTLING_RIGHTS_BONUS if it doesn't exist
+pub const CASTLING_RIGHTS_BONUS: [i32; 2] = [15, 0]; // [MG, EG]

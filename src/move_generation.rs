@@ -783,40 +783,40 @@ impl MoveGen {
     /// # Returns
     /// A bitboard containing the locations of all pieces of `side` attacking `sq`.
     pub fn attackers_to(&self, board: &Board, sq: usize, side: bool) -> u64 {
+        let side_idx = side as usize;
         let mut attackers: u64 = 0;
-        let color_index = side as usize;
         let enemy_color_index = !side as usize; // Needed for pawn captures
 
         // Pawns (check captures from the target square's perspective)
-        if side == WHITE { // White attackers
+        if side_idx == 0 { // White attackers
             if sq > 8 && sq % 8 != 0 { // Can be attacked from sq - 9 (black pawn on sq-9 attacks sq)
-                 attackers |= board.pieces[color_index][PAWN] & sq_ind_to_bit(sq - 9);
+                 attackers |= board.pieces[side_idx][PAWN] & sq_ind_to_bit(sq - 9);
             }
             if sq > 7 && sq % 8 != 7 { // Can be attacked from sq - 7 (black pawn on sq-7 attacks sq)
-                 attackers |= board.pieces[color_index][PAWN] & sq_ind_to_bit(sq - 7);
+                 attackers |= board.pieces[side_idx][PAWN] & sq_ind_to_bit(sq - 7);
             }
         } else { // Black attackers
              if sq < 55 && sq % 8 != 0 { // Can be attacked from sq + 7 (white pawn on sq+7 attacks sq)
-                 attackers |= board.pieces[color_index][PAWN] & sq_ind_to_bit(sq + 7);
+                 attackers |= board.pieces[side_idx][PAWN] & sq_ind_to_bit(sq + 7);
             }
              if sq < 56 && sq % 8 != 7 { // Can be attacked from sq + 9 (white pawn on sq+9 attacks sq)
-                 attackers |= board.pieces[color_index][PAWN] & sq_ind_to_bit(sq + 9);
+                 attackers |= board.pieces[side_idx][PAWN] & sq_ind_to_bit(sq + 9);
             }
         }
 
         // Knights
-        attackers |= self.n_move_bitboard[sq] & board.pieces[color_index][KNIGHT];
+        attackers |= self.n_move_bitboard[sq] & board.pieces[side_idx][KNIGHT];
 
         // King
-        attackers |= self.k_move_bitboard[sq] & board.pieces[color_index][KING];
+        attackers |= self.k_move_bitboard[sq] & board.pieces[side_idx][KING];
 
         // Bishops and Queens (diagonal)
         let bishop_attacks = self.gen_bishop_potential_captures(board, sq);
-        attackers |= bishop_attacks & (board.pieces[color_index][BISHOP] | board.pieces[color_index][QUEEN]);
+        attackers |= bishop_attacks & (board.pieces[side_idx][BISHOP] | board.pieces[side_idx][QUEEN]);
 
         // Rooks and Queens (horizontal/vertical)
         let rook_attacks = self.gen_rook_potential_captures(board, sq);
-        attackers |= rook_attacks & (board.pieces[color_index][ROOK] | board.pieces[color_index][QUEEN]);
+        attackers |= rook_attacks & (board.pieces[side_idx][ROOK] | board.pieces[side_idx][QUEEN]);
 
         attackers
     }
@@ -842,5 +842,4 @@ impl MoveGen {
          }
          64 // Indicate no attacker found (error condition)
      }
-}
 }

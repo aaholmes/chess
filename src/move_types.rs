@@ -41,6 +41,9 @@ impl CastlingRights {
     }
 }
 
+/// A constant representing a null move, used in search algorithms
+pub const NULL_MOVE: Move = Move { from: 0, to: 0, promotion: None };
+
 impl Move {
     /// Creates a new `Move` instance.
     ///

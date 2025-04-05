@@ -3,7 +3,8 @@ use crate::boardstack::BoardStack;
 use crate::move_generation::MoveGen;
 use crate::eval::PestoEval;
 use crate::move_types::{Move, NULL_MOVE};
-use crate::transposition::{TranspositionEntry, TranspositionTable};
+use crate::transposition::{TranspositionTable};
+use crate::board::Board;
 use super::history::HistoryTable;
 use super::history::MAX_PLY;
 use super::quiescence::quiescence_search;
@@ -142,7 +143,7 @@ pub fn alpha_beta_search(
         // Prune if necessary
         if alpha >= beta {
             // Update history table for the cutoff move
-            if !move_gen.is_capture(&board.current_state(), &best_move) {
+            if !is_capture(&board.current_state(), &best_move) {
                 history.update(&best_move, depth);
             }
             break;
@@ -191,6 +192,7 @@ fn alpha_beta_recursive(
             board.undo_move();
             continue;
         }
+        
         // --- Check Extension ---
         // Extend search if the move 'm' results in check for the opponent
         let mut extension = 0;
@@ -210,7 +212,7 @@ fn alpha_beta_recursive(
             alpha = eval;
             if alpha >= beta {
                 // Update history table for the cutoff move
-                if !move_gen.is_capture(&board.current_state(), &m) {
+                if !is_capture(&board.current_state(), &m) {
                     history.update(&m, depth);
                 }
                 board.undo_move();
@@ -223,4 +225,13 @@ fn alpha_beta_recursive(
     }
 
     (best_eval, n)
+}
+
+/// Helper function to check if a move is a capture
+fn is_capture(board: &Board, mv: &Move) -> bool {
+    let target_square_bb = 1u64 << mv.to;
+    let opponent_color = !board.w_to_move as usize;
+    
+    // Check if the target square is occupied by an opponent's piece
+    (board.pieces_occ[opponent_color] & target_square_bb) != 0
 } 

@@ -44,7 +44,7 @@ pub fn quiescence_search(
     // --- Iterate Through Captures ---
     for capture in captures {
         // --- Static Exchange Evaluation (SEE) Pruning ---
-        if see(&board.current_state(), move_gen, capture.to(), capture.from()) < 0 {
+        if see(&board.current_state(), move_gen, capture.to, capture.from) < 0 {
             continue; // Skip this likely losing capture
         }
 

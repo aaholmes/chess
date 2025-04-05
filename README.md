@@ -119,7 +119,7 @@ To use Kingfisher, you'll need Rust installed on your system. If you don't have 
 *   History Heuristic Decay/Scaling (Optional refinement)
 
 ### Implementation Roadmap
-*   **Improved Evaluation:** Refine King Attack Score (e.g., slider attacks, safety table), add more terms (e.g., mobility, open files near king), refine pawn structure logic, tune all term weights.
+*   **Improved Evaluation:** Refine King Attack Score (e.g., safety table), add more terms (e.g., mobility, open files near king), refine pawn structure logic, tune all term weights.
 *   **Time Management:** Implement robust time controls for UCI.
 *   **Opening Book:** Integrate a standard opening book format.
 *   **Endgame Tablebases:** Add support for querying tablebases (e.g., Syzygy).

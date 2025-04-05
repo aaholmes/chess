@@ -4,7 +4,7 @@ use crate::move_generation::MoveGen;
 use crate::piece_types::{PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING};
 
 // Piece values for SEE (simple centipawn values)
-// Order: P, N, B, R, Q, K (index 6 for NO_PIECE_TYPE is 0)
+// Order: P, N, B, R, Q, K (index 6 is 0)
 const SEE_PIECE_VALUES: [i32; 7] = [100, 320, 330, 500, 975, 10000, 0];
 
 /// Calculates the Static Exchange Evaluation (SEE) for a move to a target square.
@@ -27,22 +27,22 @@ pub fn see(board: &Board, move_gen: &MoveGen, target_sq: usize, initial_attacker
     let mut side_to_move = board.w_to_move;
 
     // Get initial captured piece type and value
-    let captured_piece_type = match current_board.get_piece_type_on_sq(target_sq) {
+    let captured_piece_type = match get_piece_type_on_sq(&current_board, target_sq) {
         Some(pt) => pt,
         None => return 0, // Target square is empty, not a capture
     };
     gain[depth] = SEE_PIECE_VALUES[captured_piece_type as usize];
 
     // Get initial attacker piece type
-    let mut attacker_piece_type = match current_board.get_piece_type_on_sq(initial_attacker_sq) {
+    let mut attacker_piece_type = match get_piece_type_on_sq(&current_board, initial_attacker_sq) {
         Some(pt) => pt,
         None => return 0, // Should not happen for a valid capture move
     };
 
     // Simulate the initial capture
-    current_board.clear_square(initial_attacker_sq);
-    current_board.set_square(target_sq, attacker_piece_type, side_to_move);
-    current_board.update_occupancy();
+    clear_square(&mut current_board, initial_attacker_sq);
+    set_square(&mut current_board, target_sq, attacker_piece_type, side_to_move);
+    update_occupancy(&mut current_board);
     side_to_move = !side_to_move; // Switch sides
 
     loop {
@@ -64,11 +64,11 @@ pub fn see(board: &Board, move_gen: &MoveGen, target_sq: usize, initial_attacker
             break;
         }
 
-        attacker_piece_type = current_board.get_piece_type_on_sq(next_attacker_sq).unwrap();
+        attacker_piece_type = get_piece_type_on_sq(&current_board, next_attacker_sq).unwrap();
 
-        current_board.clear_square(next_attacker_sq);
-        current_board.set_square(target_sq, attacker_piece_type, side_to_move);
-        current_board.update_occupancy();
+        clear_square(&mut current_board, next_attacker_sq);
+        set_square(&mut current_board, target_sq, attacker_piece_type, side_to_move);
+        update_occupancy(&mut current_board);
         side_to_move = !side_to_move;
     }
 
@@ -91,4 +91,49 @@ fn find_least_valuable_attacker_sq(board: &Board, attackers_bb: u64, side: bool)
         }
     }
     64 // Indicate no attacker found (error condition)
+}
+
+/// Helper function to determine the piece type (if any) on a given square
+fn get_piece_type_on_sq(board: &Board, sq: usize) -> Option<usize> {
+    let sq_bb = 1u64 << sq;
+    
+    for color in 0..2 {
+        for piece_type in PAWN..=KING {
+            if (board.pieces[color][piece_type as usize] & sq_bb) != 0 {
+                return Some(piece_type as usize);
+            }
+        }
+    }
+    
+    None
+}
+
+/// Helper function to clear a square on the board
+fn clear_square(board: &mut Board, sq: usize) {
+    let sq_bb = 1u64 << sq;
+    let sq_bb_inv = !sq_bb;
+    
+    for color in 0..2 {
+        for piece_type in PAWN..=KING {
+            board.pieces[color][piece_type as usize] &= sq_bb_inv;
+        }
+    }
+}
+
+/// Helper function to set a piece on a square
+fn set_square(board: &mut Board, sq: usize, piece_type: usize, side: bool) {
+    let sq_bb = 1u64 << sq;
+    let color_index = side as usize;
+    
+    board.pieces[color_index][piece_type] |= sq_bb;
+}
+
+/// Helper function to update occupancy bitboards
+fn update_occupancy(board: &mut Board) {
+    for color in 0..2 {
+        board.pieces_occ[color] = 0;
+        for piece_type in PAWN..=KING {
+            board.pieces_occ[color] |= board.pieces[color][piece_type as usize];
+        }
+    }
 } 

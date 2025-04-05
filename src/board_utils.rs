@@ -333,6 +333,62 @@ pub fn get_rank_mask(rank: usize) -> u64 {
     RANK_MASKS[rank]
 }
 
+/// Get a bitboard containing all squares in front of a square on the same and adjacent files.
+/// Used for backward pawn detection and similar evaluations.
+pub fn get_front_span_mask(color: usize, sq: usize) -> u64 {
+    let file = sq_to_file(sq);
+    let rank = sq_to_rank(sq);
+    
+    let mut mask = 0;
+    
+    // Add the file mask
+    mask |= get_file_mask(file);
+    
+    // Add adjacent files if they exist
+    if file > 0 {
+        mask |= get_file_mask(file - 1);
+    }
+    if file < 7 {
+        mask |= get_file_mask(file + 1);
+    }
+    
+    // Filter to only include squares in front of the given square
+    if color == 0 { // WHITE
+        // Keep only ranks higher than the current rank (in front for White)
+        for r in (rank + 1)..8 {
+            mask &= !(0xFFu64 << (r * 8));
+        }
+    } else { // BLACK
+        // Keep only ranks lower than the current rank (in front for Black)
+        for r in 0..rank {
+            mask &= !(0xFFu64 << (r * 8));
+        }
+    }
+    
+    mask
+}
+
+/// Get a bitboard containing the king's attack zone (squares around the king).
+/// Used for king safety evaluations and detecting attacks against the king.
+pub fn get_king_attack_zone_mask(color: usize, king_sq: usize) -> u64 {
+    // The attack zone is all squares within distance 2 of the king
+    let mut mask = 0;
+    
+    let rank = sq_to_rank(king_sq);
+    let file = sq_to_file(king_sq);
+    
+    // Iterate over a 5x5 square centered on the king
+    for r in rank.saturating_sub(2)..=rank.saturating_add(2).min(7) {
+        for f in file.saturating_sub(2)..=file.saturating_add(2).min(7) {
+            mask |= 1u64 << (r * 8 + f);
+        }
+    }
+    
+    // Remove the king's square itself from the mask
+    mask &= !(1u64 << king_sq);
+    
+    mask
+}
 
 // TODO: Add functions to calculate attacks to a square if not using MoveGen directly in eval.
 // e.g., pub fn knight_attacks(sq: usize) -> u64 { ... }
