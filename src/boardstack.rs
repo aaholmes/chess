@@ -1,6 +1,6 @@
-use std::collections::{HashMap, VecDeque};
 use crate::board::Board;
 use crate::move_types::Move;
+use std::collections::{HashMap, VecDeque};
 
 /// Represents a stack of boards for undoing moves.
 pub struct BoardStack {
@@ -26,7 +26,6 @@ impl BoardStack {
 
     /// Generate a new boardstack whose starting board is given by the fen string
     pub fn new_from_fen(fen: &str) -> Self {
-
         let mut board = BoardStack::new();
         let fen_position = Board::new_from_fen(fen);
 
@@ -55,7 +54,10 @@ impl BoardStack {
         let new_board = self.current_state().apply_move_to_board(mv);
 
         // Update position history
-        *self.position_history.entry(new_board.zobrist_hash).or_insert(0) += 1;
+        *self
+            .position_history
+            .entry(new_board.zobrist_hash)
+            .or_insert(0) += 1;
 
         // Push the new board onto the stack
         self.state_stack.push_front(new_board);
@@ -132,22 +134,25 @@ impl BoardStack {
     }
 
     /// Makes a null move (passes the turn to the opponent)
-    /// 
+    ///
     /// This is used for null move pruning in the search algorithm.
     /// It doesn't change the board position except for the side to move.
     pub fn make_null_move(&mut self) {
         // Create a new board that's the same as the current one but with the side to move flipped
         let mut new_board = self.current_state().clone();
         new_board.w_to_move = !new_board.w_to_move;
-        
+
         // Reset en passant target if any
         new_board.en_passant = None;
-        
+
         // Update zobrist hash for the side to move change and en passant reset
         new_board.zobrist_hash = new_board.compute_zobrist_hash();
-        
+
         // Push the new board onto the stack and record a null move
-        *self.position_history.entry(new_board.zobrist_hash).or_insert(0) += 1;
+        *self
+            .position_history
+            .entry(new_board.zobrist_hash)
+            .or_insert(0) += 1;
         self.state_stack.push_front(new_board);
         self.move_stack.push_front(Move::null());
     }

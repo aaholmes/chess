@@ -5,7 +5,7 @@
 
 use crate::board_utils::{coords_to_sq_ind, sq_ind_to_algebraic, sq_ind_to_bit};
 use crate::move_types::Move;
-use crate::piece_types::{KNIGHT, BISHOP, ROOK, QUEEN};
+use crate::piece_types::{BISHOP, KNIGHT, QUEEN, ROOK};
 
 /// Print a u64 as an 8x8 chess board representation
 ///
@@ -57,7 +57,7 @@ pub fn print_move(the_move: &Move) -> String {
             n if n == BISHOP => promotion.push('B'),
             n if n == ROOK => promotion.push('R'),
             n if n == QUEEN => promotion.push('Q'),
-            _ => panic!("Invalid promotion piece")
+            _ => panic!("Invalid promotion piece"),
         }
     }
     format!("{}{}{}", from, to, promotion)

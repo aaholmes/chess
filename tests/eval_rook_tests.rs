@@ -1,16 +1,18 @@
 #[cfg(test)]
 mod tests {
+    use kingfisher::bits;
     use kingfisher::board::Board;
+    use kingfisher::board_utils;
     use kingfisher::eval::PestoEval;
     use kingfisher::eval_constants::{
-        ROOK_ON_SEVENTH_BONUS, // Keep for reference, though bonus is removed
+        DOUBLED_ROOKS_ON_SEVENTH_BONUS,
+        ROOK_BEHIND_ENEMY_PASSED_PAWN_BONUS,
         ROOK_BEHIND_PASSED_PAWN_BONUS,
-        DOUBLED_ROOKS_ON_SEVENTH_BONUS, ROOK_BEHIND_ENEMY_PASSED_PAWN_BONUS,
-        ROOK_OPEN_FILE_BONUS, ROOK_HALF_OPEN_FILE_BONUS
+        ROOK_HALF_OPEN_FILE_BONUS,
+        ROOK_ON_SEVENTH_BONUS, // Keep for reference, though bonus is removed
+        ROOK_OPEN_FILE_BONUS,
     };
-    use kingfisher::piece_types::{WHITE, BLACK, ROOK, PAWN};
-    use kingfisher::board_utils;
-    use kingfisher::bits;
+    use kingfisher::piece_types::{BLACK, PAWN, ROOK, WHITE};
 
     // Simplified function to get raw scores
     fn get_raw_scores(evaluator: &PestoEval, board: &Board) -> (i32, i32) {
@@ -36,32 +38,34 @@ mod tests {
             let friendly_pawns = board.get_piece_bitboard(color, PAWN);
             let enemy_pawns = board.get_piece_bitboard(enemy_color, PAWN);
             let friendly_rooks = board.get_piece_bitboard(color, ROOK);
-            
+
             // Check for doubled rooks on seventh
             let seventh_rank = if color == WHITE { 6 } else { 1 };
             let seventh_rank_mask = board_utils::get_rank_mask(seventh_rank);
             let rooks_on_seventh = friendly_rooks & seventh_rank_mask;
             let num_rooks_on_seventh = bits::popcnt(rooks_on_seventh);
-            
+
             if num_rooks_on_seventh >= 2 {
                 mg[color] += DOUBLED_ROOKS_ON_SEVENTH_BONUS[0];
                 eg[color] += DOUBLED_ROOKS_ON_SEVENTH_BONUS[1];
             }
-            
+
             // Process individual rooks
             for rook_sq in bits::bits(&friendly_rooks) {
                 let file = board_utils::sq_to_file(rook_sq);
                 let file_mask = board_utils::get_file_mask(file);
-                
+
                 // Rook on Open/Half-Open File
                 let friendly_pawns_on_file = friendly_pawns & file_mask;
                 let enemy_pawns_on_file = enemy_pawns & file_mask;
-                
+
                 if friendly_pawns_on_file == 0 {
-                    if enemy_pawns_on_file == 0 { // Open File
+                    if enemy_pawns_on_file == 0 {
+                        // Open File
                         mg[color] += ROOK_OPEN_FILE_BONUS[0];
                         eg[color] += ROOK_OPEN_FILE_BONUS[1];
-                    } else { // Half-Open File
+                    } else {
+                        // Half-Open File
                         mg[color] += ROOK_HALF_OPEN_FILE_BONUS[0];
                         eg[color] += ROOK_HALF_OPEN_FILE_BONUS[1];
                     }
@@ -89,8 +93,16 @@ mod tests {
         let pst_eg_w = evaluator.get_eg_score(WHITE, ROOK, d7_sq);
 
         // Check White score difference includes ONLY PST
-        assert_eq!(mg_w_r7 - mg_w_base, pst_mg_w, "White MG Rook on 7th PST mismatch (bonus should be removed)");
-        assert_eq!(eg_w_r7 - eg_w_base, pst_eg_w, "White EG Rook on 7th PST mismatch (bonus should be removed)");
+        assert_eq!(
+            mg_w_r7 - mg_w_base,
+            pst_mg_w,
+            "White MG Rook on 7th PST mismatch (bonus should be removed)"
+        );
+        assert_eq!(
+            eg_w_r7 - eg_w_base,
+            pst_eg_w,
+            "White EG Rook on 7th PST mismatch (bonus should be removed)"
+        );
     }
 
     #[test]
@@ -110,10 +122,17 @@ mod tests {
         let pst_eg = evaluator.get_eg_score(WHITE, ROOK, e7_sq);
 
         // Difference should be PST of 2nd rook + Doubled Rook Bonus
-        assert_eq!(mg_2r7 - mg_1r7, pst_mg + DOUBLED_ROOKS_ON_SEVENTH_BONUS[0], "White MG Doubled Rooks 7th mismatch");
-        assert_eq!(eg_2r7 - eg_1r7, pst_eg + DOUBLED_ROOKS_ON_SEVENTH_BONUS[1], "White EG Doubled Rooks 7th mismatch");
+        assert_eq!(
+            mg_2r7 - mg_1r7,
+            pst_mg + DOUBLED_ROOKS_ON_SEVENTH_BONUS[0],
+            "White MG Doubled Rooks 7th mismatch"
+        );
+        assert_eq!(
+            eg_2r7 - eg_1r7,
+            pst_eg + DOUBLED_ROOKS_ON_SEVENTH_BONUS[1],
+            "White EG Doubled Rooks 7th mismatch"
+        );
     }
-
 
     #[test]
     #[ignore] // Requires more complete evaluation function
@@ -141,12 +160,28 @@ mod tests {
         let pst_eg_b = evaluator.get_eg_score(BLACK, ROOK, d8_sq);
 
         // Check White score difference includes PST + Bonus
-        assert_eq!(mg_w_rpp - mg_w_base, pst_mg_w + ROOK_BEHIND_PASSED_PAWN_BONUS[0], "White MG Rook behind PP mismatch");
-        assert_eq!(eg_w_rpp - eg_w_base, pst_eg_w + ROOK_BEHIND_PASSED_PAWN_BONUS[1], "White EG Rook behind PP mismatch");
+        assert_eq!(
+            mg_w_rpp - mg_w_base,
+            pst_mg_w + ROOK_BEHIND_PASSED_PAWN_BONUS[0],
+            "White MG Rook behind PP mismatch"
+        );
+        assert_eq!(
+            eg_w_rpp - eg_w_base,
+            pst_eg_w + ROOK_BEHIND_PASSED_PAWN_BONUS[1],
+            "White EG Rook behind PP mismatch"
+        );
 
         // Check Black score difference includes PST + Bonus (W-B score)
-        assert_eq!(mg_b_rpp - mg_b_base, -(pst_mg_b + ROOK_BEHIND_PASSED_PAWN_BONUS[0]), "Black MG Rook behind PP mismatch");
-        assert_eq!(eg_b_rpp - eg_b_base, -(pst_eg_b + ROOK_BEHIND_PASSED_PAWN_BONUS[1]), "Black EG Rook behind PP mismatch");
+        assert_eq!(
+            mg_b_rpp - mg_b_base,
+            -(pst_mg_b + ROOK_BEHIND_PASSED_PAWN_BONUS[0]),
+            "Black MG Rook behind PP mismatch"
+        );
+        assert_eq!(
+            eg_b_rpp - eg_b_base,
+            -(pst_eg_b + ROOK_BEHIND_PASSED_PAWN_BONUS[1]),
+            "Black EG Rook behind PP mismatch"
+        );
     }
 
     #[test]
@@ -166,8 +201,16 @@ mod tests {
         let pst_eg_w = evaluator.get_eg_score(WHITE, ROOK, d1_sq);
 
         // Check White score difference includes PST + Bonus
-        assert_eq!(mg_w_rep - mg_w_base, pst_mg_w + ROOK_BEHIND_ENEMY_PASSED_PAWN_BONUS[0], "White MG Rook behind Enemy PP mismatch");
-        assert_eq!(eg_w_rep - eg_w_base, pst_eg_w + ROOK_BEHIND_ENEMY_PASSED_PAWN_BONUS[1], "White EG Rook behind Enemy PP mismatch");
+        assert_eq!(
+            mg_w_rep - mg_w_base,
+            pst_mg_w + ROOK_BEHIND_ENEMY_PASSED_PAWN_BONUS[0],
+            "White MG Rook behind Enemy PP mismatch"
+        );
+        assert_eq!(
+            eg_w_rep - eg_w_base,
+            pst_eg_w + ROOK_BEHIND_ENEMY_PASSED_PAWN_BONUS[1],
+            "White EG Rook behind Enemy PP mismatch"
+        );
     }
 
     #[test]
@@ -190,8 +233,16 @@ mod tests {
         let pst_eg = evaluator.get_eg_score(WHITE, ROOK, d1_sq);
 
         // Check Open file bonus
-        assert_eq!(mg_open - mg_base, pst_mg + ROOK_OPEN_FILE_BONUS[0], "White MG Rook Open File mismatch");
-        assert_eq!(eg_open - eg_base, pst_eg + ROOK_OPEN_FILE_BONUS[1], "White EG Rook Open File mismatch");
+        assert_eq!(
+            mg_open - mg_base,
+            pst_mg + ROOK_OPEN_FILE_BONUS[0],
+            "White MG Rook Open File mismatch"
+        );
+        assert_eq!(
+            eg_open - eg_base,
+            pst_eg + ROOK_OPEN_FILE_BONUS[1],
+            "White EG Rook Open File mismatch"
+        );
 
         // Check Half-Open file bonus
         // Need PST of black d7 pawn
@@ -199,7 +250,15 @@ mod tests {
         let pst_mg_bp = -evaluator.get_mg_score(BLACK, PAWN, d7_sq); // W-B score
         let pst_eg_bp = -evaluator.get_eg_score(BLACK, PAWN, d7_sq);
         // Score diff between half-open and base should be PST + HalfOpenBonus + BlackPawnPST
-        assert_eq!(mg_half - mg_base, pst_mg + ROOK_HALF_OPEN_FILE_BONUS[0] + pst_mg_bp, "White MG Rook Half-Open File mismatch");
-        assert_eq!(eg_half - eg_base, pst_eg + ROOK_HALF_OPEN_FILE_BONUS[1] + pst_eg_bp, "White EG Rook Half-Open File mismatch");
+        assert_eq!(
+            mg_half - mg_base,
+            pst_mg + ROOK_HALF_OPEN_FILE_BONUS[0] + pst_mg_bp,
+            "White MG Rook Half-Open File mismatch"
+        );
+        assert_eq!(
+            eg_half - eg_base,
+            pst_eg + ROOK_HALF_OPEN_FILE_BONUS[1] + pst_eg_bp,
+            "White EG Rook Half-Open File mismatch"
+        );
     }
 }

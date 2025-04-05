@@ -13,7 +13,7 @@ pub struct Arena<'a> {
     /// The maximum number of moves allowed in the game.
     max_moves: i32,
     /// The current state of the chess board.
-    pub boardstack: BoardStack
+    pub boardstack: BoardStack,
 }
 
 impl Arena<'_> {
@@ -28,12 +28,16 @@ impl Arena<'_> {
     /// # Returns
     ///
     /// A new `Arena` instance.
-    pub fn new<'a>(white_player: &'a dyn Agent, black_player: &'a dyn Agent, max_moves: i32) -> Arena<'a> {
+    pub fn new<'a>(
+        white_player: &'a dyn Agent,
+        black_player: &'a dyn Agent,
+        max_moves: i32,
+    ) -> Arena<'a> {
         Arena {
             white_player,
             black_player,
             max_moves,
-            boardstack: BoardStack::new()
+            boardstack: BoardStack::new(),
         }
     }
 

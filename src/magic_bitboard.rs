@@ -18,12 +18,11 @@
 // Note that non-captures can be pre-sorted, but captures require the piece value of the captured piece and so they have to be internally sorted, which may be just as fast as sorting the entire vector.
 // Note also that the pesto eval has 25 game modes, ranging from opening to endgame, so our non-capture move ordering should be different for each game mode.
 
-
-use crate::board_utils::sq_ind_to_bit;
 use crate::bits::bits;
+use crate::board_utils::sq_ind_to_bit;
+use crate::magic_constants::{B_BITS, B_MASKS, R_BITS, R_MASKS};
 use crate::move_types::Move;
-use crate::magic_constants::{R_BITS, B_BITS, R_MASKS, B_MASKS};
-use crate::piece_types::{KNIGHT, BISHOP, ROOK, QUEEN};
+use crate::piece_types::{BISHOP, KNIGHT, QUEEN, ROOK};
 
 const NOT_A_FILE: u64 = 0xfefefefefefefefe;
 const NOT_H_FILE: u64 = 0x7f7f7f7f7f7f7f7f;
@@ -35,7 +34,6 @@ const NOT_12_RANK: u64 = 0xffffffffffff0000;
 const NOT_78_RANK: u64 = 0x0000ffffffffffff;
 const RANK_2: u64 = 0x000000000000ff00;
 const RANK_7: u64 = 0x00ff000000000000;
-
 
 pub fn find_magic_numbers() -> ([u64; 64], [u64; 64]) {
     // Find magic numbers for magic bitboards.
@@ -89,12 +87,18 @@ pub fn find_magic_numbers() -> ([u64; 64], [u64; 64]) {
                 }
                 if *is_bishop {
                     if keys.len() == (1 << B_BITS[from_sq_ind]) {
-                        println!("Found bishop magic number for square {} with {} bits: {}", from_sq_ind, B_BITS[from_sq_ind], magic);
+                        println!(
+                            "Found bishop magic number for square {} with {} bits: {}",
+                            from_sq_ind, B_BITS[from_sq_ind], magic
+                        );
                         b_magics[from_sq_ind] = magic;
                         break;
                     }
                 } else if keys.len() == (1 << R_BITS[from_sq_ind]) {
-                    println!("Found rook magic number for square {} with {} bits: {}", from_sq_ind, R_BITS[from_sq_ind], magic);
+                    println!(
+                        "Found rook magic number for square {} with {} bits: {}",
+                        from_sq_ind, R_BITS[from_sq_ind], magic
+                    );
                     r_magics[from_sq_ind] = magic;
                     break;
                 }
@@ -197,7 +201,9 @@ pub fn init_knight_moves(from_sq_ind: usize) -> Vec<usize> {
 /// - White pawn promotions
 /// - Black pawn captures
 /// - Black pawn promotions
-pub fn init_pawn_captures_promotions(from_sq_ind: usize) -> (Vec<usize>, Vec<usize>, Vec<usize>, Vec<usize>) {
+pub fn init_pawn_captures_promotions(
+    from_sq_ind: usize,
+) -> (Vec<usize>, Vec<usize>, Vec<usize>, Vec<usize>) {
     // Initialize the pawn captures and promotions for a given square.
     // Separate for white and black.
     let from_bit: u64 = sq_ind_to_bit(from_sq_ind);
@@ -269,7 +275,9 @@ pub fn init_pawn_moves(from_sq_ind: usize) -> (Vec<usize>, Vec<usize>) {
 /// A tuple containing:
 /// - A vector of vectors of tuples, where each tuple contains two vectors of usize (for captures and moves).
 /// - A vector of vectors of u64 (bitboards).
-pub fn init_bishop_moves(b_magics: [u64; 64]) -> (Vec<Vec<(Vec<usize>, Vec<usize>)>>, Vec<Vec<u64>>) {
+pub fn init_bishop_moves(
+    b_magics: [u64; 64],
+) -> (Vec<Vec<(Vec<usize>, Vec<usize>)>>, Vec<Vec<u64>>) {
     let mut out1: Vec<Vec<(Vec<usize>, Vec<usize>)>> = Vec::new();
     let mut out2: Vec<Vec<u64>> = Vec::new();
     let mut blockers: u64;
@@ -295,7 +303,8 @@ pub fn init_bishop_moves(b_magics: [u64; 64]) -> (Vec<Vec<(Vec<usize>, Vec<usize
             }
 
             // Generate the key using a multiplication and right shift
-            key = ((blockers.wrapping_mul(b_magics[from_sq_ind])) >> (64 - B_BITS[from_sq_ind])) as usize;
+            key = ((blockers.wrapping_mul(b_magics[from_sq_ind])) >> (64 - B_BITS[from_sq_ind]))
+                as usize;
 
             // Assign the captures and moves for this blocker combination
             out1[from_sq_ind][key] = bishop_attacks(from_sq_ind, blockers);
@@ -344,7 +353,8 @@ pub fn init_rook_moves(r_magics: [u64; 64]) -> (Vec<Vec<(Vec<usize>, Vec<usize>)
             }
 
             // Generate the key using a multiplication and right shift
-            key = ((blockers.wrapping_mul(r_magics[from_sq_ind])) >> (64 - R_BITS[from_sq_ind])) as usize;
+            key = ((blockers.wrapping_mul(r_magics[from_sq_ind])) >> (64 - R_BITS[from_sq_ind]))
+                as usize;
 
             // Assign the captures and moves for this blocker combination
             out1[from_sq_ind][key] = rook_attacks(from_sq_ind, blockers);
@@ -379,7 +389,7 @@ pub fn rook_attacks(sq: usize, block: u64) -> (Vec<usize>, Vec<usize>) {
     let fl = sq % 8;
     let mut captures: Vec<usize> = Vec::new();
     let mut moves: Vec<usize> = Vec::new();
-    for r in rk + 1 .. 8 {
+    for r in rk + 1..8 {
         if r == 7 {
             captures.push(fl + r * 8);
             moves.push(fl + r * 8);
@@ -390,7 +400,7 @@ pub fn rook_attacks(sq: usize, block: u64) -> (Vec<usize>, Vec<usize>) {
             moves.push(fl + r * 8);
         }
     }
-    for r in (0 .. rk).rev() {
+    for r in (0..rk).rev() {
         if r == 0 {
             captures.push(fl + r * 8);
             moves.push(fl + r * 8);
@@ -401,7 +411,7 @@ pub fn rook_attacks(sq: usize, block: u64) -> (Vec<usize>, Vec<usize>) {
             moves.push(fl + r * 8);
         }
     }
-    for f in fl + 1 .. 8 {
+    for f in fl + 1..8 {
         if f == 7 {
             captures.push(f + rk * 8);
             moves.push(f + rk * 8);
@@ -412,7 +422,7 @@ pub fn rook_attacks(sq: usize, block: u64) -> (Vec<usize>, Vec<usize>) {
             moves.push(f + rk * 8);
         }
     }
-    for f in (0 .. fl).rev() {
+    for f in (0..fl).rev() {
         if f == 0 {
             captures.push(f + rk * 8);
             moves.push(f + rk * 8);
@@ -466,7 +476,7 @@ pub fn bishop_attacks(sq: usize, block: u64) -> (Vec<usize>, Vec<usize>) {
         }
     }
     if rk < 7 && fl > 0 {
-        for r in rk + 1 .. 8 {
+        for r in rk + 1..8 {
             f = fl + rk - r;
             if r == 7 || f == 0 {
                 captures.push(f + r * 8);
@@ -481,7 +491,7 @@ pub fn bishop_attacks(sq: usize, block: u64) -> (Vec<usize>, Vec<usize>) {
         }
     }
     if rk > 0 && fl > 0 {
-        for r in (0 .. rk).rev() {
+        for r in (0..rk).rev() {
             f = fl + r - rk;
             if r == 0 || f == 0 {
                 captures.push(f + r * 8);
@@ -524,7 +534,12 @@ pub fn bishop_attacks(sq: usize, block: u64) -> (Vec<usize>, Vec<usize>) {
 /// # Returns
 ///
 /// The number of promotion moves added.
-pub fn append_promotions(promotions: &mut Vec<Move>, from_sq_ind: usize, to_sq_ind: &usize, w_to_move: bool) {
+pub fn append_promotions(
+    promotions: &mut Vec<Move>,
+    from_sq_ind: usize,
+    to_sq_ind: &usize,
+    w_to_move: bool,
+) {
     if w_to_move {
         promotions.push(Move::new(from_sq_ind, *to_sq_ind, Some(QUEEN)));
         promotions.push(Move::new(from_sq_ind, *to_sq_ind, Some(ROOK)));

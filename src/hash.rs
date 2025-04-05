@@ -18,15 +18,15 @@
 //! that the same position will always hash to the same value within a
 //! single run of the program.
 
-use lazy_static::lazy_static;
-use rand::Rng;
 use crate::bits::bits;
 use crate::board::Board;
 use crate::boardstack::BoardStack;
-use crate::piece_types::{PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING, WHITE, BLACK};
+use crate::piece_types::{BISHOP, BLACK, KING, KNIGHT, PAWN, QUEEN, ROOK, WHITE};
+use lazy_static::lazy_static;
+use rand::Rng;
 
-const PIECE_TYPES: usize = 6;  // Pawn, Knight, Bishop, Rook, Queen, King
-const COLORS: usize = 2;       // White, Black
+const PIECE_TYPES: usize = 6; // Pawn, Knight, Bishop, Rook, Queen, King
+const COLORS: usize = 2; // White, Black
 const SQUARES: usize = 64;
 
 /// Represents a set of Zobrist keys used for hashing chess positions.
@@ -145,6 +145,7 @@ impl BoardStack {
     /// Add a position to the boardstack's position history
     pub fn add_to_position_history(&mut self) {
         let hash = self.current_state().zobrist_hash;
-        self.position_history.insert(hash, self.position_history.get(&hash).unwrap_or(&0) + 1);
+        self.position_history
+            .insert(hash, self.position_history.get(&hash).unwrap_or(&0) + 1);
     }
 }

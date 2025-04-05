@@ -3,7 +3,7 @@
 use crate::board_utils::{algebraic_to_sq_ind, bit_to_sq_ind, coords_to_sq_ind, sq_ind_to_bit};
 use crate::move_generation::MoveGen;
 use crate::move_types::CastlingRights;
-use crate::piece_types::{PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING, WHITE, BLACK};
+use crate::piece_types::{BISHOP, BLACK, KING, KNIGHT, PAWN, QUEEN, ROOK, WHITE};
 
 /// Represents the chess board using bitboards.
 ///
@@ -11,8 +11,8 @@ use crate::piece_types::{PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING, WHITE, BLACK};
 /// where each bit represents a square on the chess board.
 #[derive(Clone, Debug)]
 pub struct Board {
-    pub(crate) pieces: [[u64; 6]; 2],  // [Color as usize][PieceType as usize]
-    pub(crate) pieces_occ: [u64; 2],   // Total occupancy for each color
+    pub(crate) pieces: [[u64; 6]; 2], // [Color as usize][PieceType as usize]
+    pub(crate) pieces_occ: [u64; 2],  // Total occupancy for each color
     pub w_to_move: bool,
     pub(crate) en_passant: Option<u8>,
     pub castling_rights: CastlingRights,
@@ -111,7 +111,7 @@ impl Board {
                     'q' => board.pieces[BLACK][QUEEN] ^= bit,
                     'K' => board.pieces[WHITE][KING] ^= bit,
                     'k' => board.pieces[BLACK][KING] ^= bit,
-                    _ => panic!("Invalid FEN")
+                    _ => panic!("Invalid FEN"),
                 }
                 file += 1;
             }
@@ -119,7 +119,7 @@ impl Board {
         match parts[1] {
             "w" => board.w_to_move = true,
             "b" => board.w_to_move = false,
-            _ => panic!("Invalid FEN")
+            _ => panic!("Invalid FEN"),
         }
         match parts[2] {
             "-" => (),
@@ -130,7 +130,7 @@ impl Board {
                         'Q' => board.castling_rights.white_queenside = true,
                         'k' => board.castling_rights.black_kingside = true,
                         'q' => board.castling_rights.black_queenside = true,
-                        _ => panic!("Invalid FEN")
+                        _ => panic!("Invalid FEN"),
                     }
                 }
             }
@@ -349,7 +349,7 @@ impl Board {
                 }
             }
         }
-        
+
         // Check if any of the non-capture moves are legal
         if !moves.is_empty() {
             for m in moves {
@@ -364,9 +364,9 @@ impl Board {
         // Check if the current position is in check
         let is_check = self.is_check(move_gen);
         if is_check {
-            (true, false)  // Checkmate
+            (true, false) // Checkmate
         } else {
-            (false, true)  // Stalemate
+            (false, true) // Stalemate
         }
     }
 
@@ -412,11 +412,17 @@ impl Board {
         // Find out if the square is attacked by a given side (white if by_white is true, black if by_white is false).
         if by_white {
             // Can the king reach an enemy bishop or queen by a bishop move?
-            if (move_gen.gen_bishop_potential_captures(self, sq_ind) & (self.pieces[WHITE][BISHOP] | self.pieces[WHITE][QUEEN])) != 0 {
+            if (move_gen.gen_bishop_potential_captures(self, sq_ind)
+                & (self.pieces[WHITE][BISHOP] | self.pieces[WHITE][QUEEN]))
+                != 0
+            {
                 return true;
             }
             // Can the king reach an enemy rook or queen by a rook move?
-            if (move_gen.gen_rook_potential_captures(self, sq_ind) & (self.pieces[WHITE][ROOK] | self.pieces[WHITE][QUEEN])) != 0 {
+            if (move_gen.gen_rook_potential_captures(self, sq_ind)
+                & (self.pieces[WHITE][ROOK] | self.pieces[WHITE][QUEEN]))
+                != 0
+            {
                 return true;
             }
             // Can the king reach an enemy knight by a knight move?
@@ -434,11 +440,17 @@ impl Board {
             false
         } else {
             // Can the king reach an enemy bishop or queen by a bishop move?
-            if (move_gen.gen_bishop_potential_captures(self, sq_ind) & (self.pieces[BLACK][BISHOP] | self.pieces[BLACK][QUEEN])) != 0 {
+            if (move_gen.gen_bishop_potential_captures(self, sq_ind)
+                & (self.pieces[BLACK][BISHOP] | self.pieces[BLACK][QUEEN]))
+                != 0
+            {
                 return true;
             }
             // Can the king reach an enemy rook or queen by a rook move?
-            if (move_gen.gen_rook_potential_captures(self, sq_ind) & (self.pieces[BLACK][ROOK] | self.pieces[BLACK][QUEEN])) != 0 {
+            if (move_gen.gen_rook_potential_captures(self, sq_ind)
+                & (self.pieces[BLACK][ROOK] | self.pieces[BLACK][QUEEN]))
+                != 0
+            {
                 return true;
             }
             // Can the king reach an enemy knight by a knight move?

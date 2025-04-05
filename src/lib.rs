@@ -17,16 +17,17 @@
 
 pub mod agent;
 pub mod arena;
+pub mod bits;
 pub mod board;
 pub mod board_utils;
 pub mod boardstack;
-pub mod bits;
 pub mod eval;
 pub mod eval_constants;
 pub mod hash;
 pub mod magic_bitboard;
 pub mod magic_constants;
 pub mod make_move;
+pub mod mcts;
 pub mod move_generation;
 pub mod move_types;
 pub mod piece_types;
@@ -34,4 +35,3 @@ pub mod search;
 pub mod transposition;
 pub mod uci;
 pub mod utils;
-pub mod mcts;

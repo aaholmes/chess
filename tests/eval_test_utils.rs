@@ -3,19 +3,18 @@
 // Allow dead code for helper function not used in every test file
 #![allow(dead_code)]
 
+use kingfisher::bits;
 use kingfisher::board::Board;
+use kingfisher::board_utils;
 use kingfisher::eval::PestoEval;
 use kingfisher::eval_constants::{
-    TWO_BISHOPS_BONUS, PASSED_PAWN_BONUS_MG, PASSED_PAWN_BONUS_EG, KING_SAFETY_PAWN_SHIELD_BONUS,
-    ISOLATED_PAWN_PENALTY, PAWN_CHAIN_BONUS, PAWN_DUO_BONUS,
-    MOBILE_PAWN_DUO_BONUS_MG, MOBILE_PAWN_DUO_BONUS_EG,
-    ROOK_ON_SEVENTH_BONUS, ROOK_BEHIND_PASSED_PAWN_BONUS,
-    DOUBLED_ROOKS_ON_SEVENTH_BONUS, ROOK_BEHIND_ENEMY_PASSED_PAWN_BONUS, CASTLING_RIGHTS_BONUS,
-    ROOK_OPEN_FILE_BONUS, ROOK_HALF_OPEN_FILE_BONUS
+    CASTLING_RIGHTS_BONUS, DOUBLED_ROOKS_ON_SEVENTH_BONUS, ISOLATED_PAWN_PENALTY,
+    KING_SAFETY_PAWN_SHIELD_BONUS, MOBILE_PAWN_DUO_BONUS_EG, MOBILE_PAWN_DUO_BONUS_MG,
+    PASSED_PAWN_BONUS_EG, PASSED_PAWN_BONUS_MG, PAWN_CHAIN_BONUS, PAWN_DUO_BONUS,
+    ROOK_BEHIND_ENEMY_PASSED_PAWN_BONUS, ROOK_BEHIND_PASSED_PAWN_BONUS, ROOK_HALF_OPEN_FILE_BONUS,
+    ROOK_ON_SEVENTH_BONUS, ROOK_OPEN_FILE_BONUS, TWO_BISHOPS_BONUS,
 };
-use kingfisher::piece_types::{WHITE, BLACK, BISHOP, PAWN, KING, ROOK};
-use kingfisher::board_utils;
-use kingfisher::bits;
+use kingfisher::piece_types::{BISHOP, BLACK, KING, PAWN, ROOK, WHITE};
 
 // Helper to get the raw MG/EG scores *before* tapering and side-to-move adjustment
 // This allows testing the contribution of individual terms more easily.
@@ -38,8 +37,8 @@ pub fn get_raw_scores(evaluator: &PestoEval, board: &Board) -> (i32, i32) {
         }
     }
 
-     // --- Add Bonus Terms ---
-     for color in [WHITE, BLACK] {
+    // --- Add Bonus Terms ---
+    for color in [WHITE, BLACK] {
         let enemy_color = 1 - color;
 
         // 1. Two Bishops Bonus
@@ -83,13 +82,19 @@ pub fn get_raw_scores(evaluator: &PestoEval, board: &Board) -> (i32, i32) {
             };
 
             if let Some(defend1_sq) = defend1_sq_opt {
-                if defend1_sq < 64 && (sq % 2 == defend1_sq % 2) && (friendly_pawns & board_utils::sq_ind_to_bit(defend1_sq) != 0) {
+                if defend1_sq < 64
+                    && (sq % 2 == defend1_sq % 2)
+                    && (friendly_pawns & board_utils::sq_ind_to_bit(defend1_sq) != 0)
+                {
                     chain_bonus_mg += PAWN_CHAIN_BONUS[0];
                     chain_bonus_eg += PAWN_CHAIN_BONUS[1];
                 }
             }
-             if let Some(defend2_sq) = defend2_sq_opt {
-                if defend2_sq < 64 && (sq % 2 == defend2_sq % 2) && (friendly_pawns & board_utils::sq_ind_to_bit(defend2_sq) != 0) {
+            if let Some(defend2_sq) = defend2_sq_opt {
+                if defend2_sq < 64
+                    && (sq % 2 == defend2_sq % 2)
+                    && (friendly_pawns & board_utils::sq_ind_to_bit(defend2_sq) != 0)
+                {
                     chain_bonus_mg += PAWN_CHAIN_BONUS[0];
                     chain_bonus_eg += PAWN_CHAIN_BONUS[1];
                 }
@@ -107,7 +112,11 @@ pub fn get_raw_scores(evaluator: &PestoEval, board: &Board) -> (i32, i32) {
                     let front2_mask = board_utils::get_pawn_front_square_mask(color, neighbor_sq);
                     let occupied = board.get_all_occupancy();
                     if (front1_mask & occupied) == 0 && (front2_mask & occupied) == 0 {
-                        let bonus_sq = if color == WHITE { sq } else { board_utils::flip_sq_ind_vertically(sq) };
+                        let bonus_sq = if color == WHITE {
+                            sq
+                        } else {
+                            board_utils::flip_sq_ind_vertically(sq)
+                        };
                         mg[color] += MOBILE_PAWN_DUO_BONUS_MG[bonus_sq];
                         eg[color] += MOBILE_PAWN_DUO_BONUS_EG[bonus_sq];
                     }
@@ -119,10 +128,10 @@ pub fn get_raw_scores(evaluator: &PestoEval, board: &Board) -> (i32, i32) {
         mg[color] += duo_bonus_mg;
         eg[color] += duo_bonus_eg;
 
-
         // --- King Safety ---
         let king_bb = board.get_piece_bitboard(color, KING);
-        if king_bb != 0 { // Ensure king exists
+        if king_bb != 0 {
+            // Ensure king exists
             let king_sq = king_bb.trailing_zeros() as usize;
             // 3. Pawn Shield Bonus
             let shield_zone_mask = board_utils::get_king_shield_zone_mask(color, king_sq);
@@ -148,10 +157,12 @@ pub fn get_raw_scores(evaluator: &PestoEval, board: &Board) -> (i32, i32) {
             let enemy_pawns_on_file = enemy_pawns & file_mask;
 
             if friendly_pawns_on_file == 0 {
-                if enemy_pawns_on_file == 0 { // Open File
+                if enemy_pawns_on_file == 0 {
+                    // Open File
                     mg[color] += ROOK_OPEN_FILE_BONUS[0];
                     eg[color] += ROOK_OPEN_FILE_BONUS[1];
-                } else { // Half-Open File
+                } else {
+                    // Half-Open File
                     mg[color] += ROOK_HALF_OPEN_FILE_BONUS[0];
                     eg[color] += ROOK_HALF_OPEN_FILE_BONUS[1];
                 }
@@ -163,7 +174,8 @@ pub fn get_raw_scores(evaluator: &PestoEval, board: &Board) -> (i32, i32) {
                 let passed_mask = board_utils::get_passed_pawn_mask(color, pawn_sq);
                 if (passed_mask & enemy_pawns) == 0 {
                     let pawn_rank = board_utils::sq_to_rank(pawn_sq);
-                    if (color == WHITE && rank < pawn_rank) || (color == BLACK && rank > pawn_rank) {
+                    if (color == WHITE && rank < pawn_rank) || (color == BLACK && rank > pawn_rank)
+                    {
                         mg[color] += ROOK_BEHIND_PASSED_PAWN_BONUS[0];
                         eg[color] += ROOK_BEHIND_PASSED_PAWN_BONUS[1];
                         break;
@@ -173,11 +185,12 @@ pub fn get_raw_scores(evaluator: &PestoEval, board: &Board) -> (i32, i32) {
 
             // Rook behind enemy passed pawn
             let enemy_file_pawns = enemy_pawns & file_mask;
-             for pawn_sq in bits::bits(&enemy_file_pawns) {
+            for pawn_sq in bits::bits(&enemy_file_pawns) {
                 let passed_mask = board_utils::get_passed_pawn_mask(enemy_color, pawn_sq);
                 if (passed_mask & friendly_pawns) == 0 {
                     let pawn_rank = board_utils::sq_to_rank(pawn_sq);
-                    if (color == WHITE && rank > pawn_rank) || (color == BLACK && rank < pawn_rank) {
+                    if (color == WHITE && rank > pawn_rank) || (color == BLACK && rank < pawn_rank)
+                    {
                         mg[color] += ROOK_BEHIND_ENEMY_PASSED_PAWN_BONUS[0];
                         eg[color] += ROOK_BEHIND_ENEMY_PASSED_PAWN_BONUS[1];
                         break;
@@ -194,13 +207,21 @@ pub fn get_raw_scores(evaluator: &PestoEval, board: &Board) -> (i32, i32) {
 
         // --- Castling Rights Bonus ---
         if color == WHITE {
-            if board.castling_rights.white_kingside { mg[color] += CASTLING_RIGHTS_BONUS[0]; }
-            if board.castling_rights.white_queenside { mg[color] += CASTLING_RIGHTS_BONUS[0]; }
-        } else { // BLACK
-            if board.castling_rights.black_kingside { mg[color] += CASTLING_RIGHTS_BONUS[0]; }
-            if board.castling_rights.black_queenside { mg[color] += CASTLING_RIGHTS_BONUS[0]; }
+            if board.castling_rights.white_kingside {
+                mg[color] += CASTLING_RIGHTS_BONUS[0];
+            }
+            if board.castling_rights.white_queenside {
+                mg[color] += CASTLING_RIGHTS_BONUS[0];
+            }
+        } else {
+            // BLACK
+            if board.castling_rights.black_kingside {
+                mg[color] += CASTLING_RIGHTS_BONUS[0];
+            }
+            if board.castling_rights.black_queenside {
+                mg[color] += CASTLING_RIGHTS_BONUS[0];
+            }
         }
-
     } // End of loop through colors [WHITE, BLACK]
 
     (mg[WHITE] - mg[BLACK], eg[WHITE] - eg[BLACK]) // Return raw W-B score

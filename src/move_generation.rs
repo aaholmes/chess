@@ -13,15 +13,18 @@
 //! `gen_queen_moves`, and `gen_king_moves` functions generate moves for specific
 //! piece types.
 
-use crate::move_types::Move;
-use crate::board_utils::sq_ind_to_bit;
 use crate::bits::bits;
 use crate::board::Board;
-use crate::magic_constants::{R_MAGICS, B_MAGICS, R_BITS, B_BITS, R_MASKS, B_MASKS};
-use crate::magic_bitboard::{init_pawn_moves, init_knight_moves, init_bishop_moves, init_rook_moves, init_king_moves, init_pawn_captures_promotions, append_promotions};
+use crate::board_utils::sq_ind_to_bit;
+use crate::magic_bitboard::{
+    append_promotions, init_bishop_moves, init_king_moves, init_knight_moves,
+    init_pawn_captures_promotions, init_pawn_moves, init_rook_moves,
+};
+use crate::magic_constants::{B_BITS, B_MAGICS, B_MASKS, R_BITS, R_MAGICS, R_MASKS};
+use crate::move_types::Move;
 
 use crate::eval::PestoEval;
-use crate::piece_types::{PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING, WHITE, BLACK};
+use crate::piece_types::{BISHOP, BLACK, KING, KNIGHT, PAWN, QUEEN, ROOK, WHITE};
 use crate::search::HistoryTable;
 
 // Define mask constants for mobility calculations
@@ -69,7 +72,7 @@ const fn generate_diag_masks() -> [u64; 64] {
         let file = sq % 8;
         let rank = sq / 8;
         let mut mask = 0_u64;
-        
+
         // Add squares to the NW
         let mut f = file;
         let mut r = rank;
@@ -78,7 +81,7 @@ const fn generate_diag_masks() -> [u64; 64] {
             r -= 1;
             mask |= 1_u64 << (f + r * 8);
         }
-        
+
         // Add squares to the SE
         f = file;
         r = rank;
@@ -87,7 +90,7 @@ const fn generate_diag_masks() -> [u64; 64] {
             r += 1;
             mask |= 1_u64 << (f + r * 8);
         }
-        
+
         masks[sq] = mask;
         sq += 1;
     }
@@ -102,7 +105,7 @@ const fn generate_anti_diag_masks() -> [u64; 64] {
         let file = sq % 8;
         let rank = sq / 8;
         let mut mask = 0_u64;
-        
+
         // Add squares to the NE
         let mut f = file;
         let mut r = rank;
@@ -111,7 +114,7 @@ const fn generate_anti_diag_masks() -> [u64; 64] {
             r -= 1;
             mask |= 1_u64 << (f + r * 8);
         }
-        
+
         // Add squares to the SW
         f = file;
         r = rank;
@@ -120,7 +123,7 @@ const fn generate_anti_diag_masks() -> [u64; 64] {
             r += 1;
             mask |= 1_u64 << (f + r * 8);
         }
-        
+
         masks[sq] = mask;
         sq += 1;
     }
@@ -330,10 +333,15 @@ impl MoveGen {
     /// # Returns
     ///
     /// A tuple containing the sorted capture moves and sorted non-capture moves.
-    pub fn gen_pseudo_legal_moves_with_evals(&self, board: &Board, pesto: &PestoEval, history: Option<&HistoryTable>) -> (Vec<Move>, Vec<Move>) {
+    pub fn gen_pseudo_legal_moves_with_evals(
+        &self,
+        board: &Board,
+        pesto: &PestoEval,
+        history: Option<&HistoryTable>,
+    ) -> (Vec<Move>, Vec<Move>) {
         // Get all moves
         let (captures, non_captures) = self.gen_pseudo_legal_moves(board);
-        
+
         // Nothing to do if captures or non_captures are empty
         if captures.is_empty() && non_captures.is_empty() {
             return (captures, non_captures);
@@ -358,23 +366,33 @@ impl MoveGen {
                 (m.clone(), history_score, eval_score)
             })
             .collect();
-        
+
         // First sort by history score (unstable sort)
         if history.is_some() {
             non_captures_with_eval.sort_by(|a, b| b.1.cmp(&a.1));
         }
-        
+
         // Then sort by evaluation (stable sort)
         non_captures_with_eval.sort_by(|a, b| b.2.cmp(&a.2));
-        
-        let sorted_non_captures = non_captures_with_eval.into_iter().map(|(m, _, _)| m).collect();
+
+        let sorted_non_captures = non_captures_with_eval
+            .into_iter()
+            .map(|(m, _, _)| m)
+            .collect();
 
         (sorted_captures, sorted_non_captures)
     }
-    
+
     /// Backward-compatible version of gen_pseudo_legal_moves_with_evals that doesn't use history table
-    #[deprecated(since="0.2.0", note="Use gen_pseudo_legal_moves_with_evals with history parameter instead")]
-    pub fn gen_pseudo_legal_moves_with_evals_no_history(&self, board: &Board, pesto: &PestoEval) -> (Vec<Move>, Vec<Move>) {
+    #[deprecated(
+        since = "0.2.0",
+        note = "Use gen_pseudo_legal_moves_with_evals with history parameter instead"
+    )]
+    pub fn gen_pseudo_legal_moves_with_evals_no_history(
+        &self,
+        board: &Board,
+        pesto: &PestoEval,
+    ) -> (Vec<Move>, Vec<Move>) {
         self.gen_pseudo_legal_moves_with_evals(board, pesto, None)
     }
 
@@ -445,9 +463,16 @@ impl MoveGen {
 
                 // Handle captures and en passant
                 for to_sq_ind in &self.wp_captures[from_sq_ind] {
-                    if board.pieces_occ[BLACK] & (1u64 << to_sq_ind) != 0 || board.en_passant == Some(*to_sq_ind as u8) {
+                    if board.pieces_occ[BLACK] & (1u64 << to_sq_ind) != 0
+                        || board.en_passant == Some(*to_sq_ind as u8)
+                    {
                         if is_promotion_rank {
-                            append_promotions(&mut promotions, from_sq_ind, to_sq_ind, board.w_to_move);
+                            append_promotions(
+                                &mut promotions,
+                                from_sq_ind,
+                                to_sq_ind,
+                                board.w_to_move,
+                            );
                         } else {
                             captures.push(Move::new(from_sq_ind, *to_sq_ind, None));
                         }
@@ -458,10 +483,18 @@ impl MoveGen {
                 for to_sq_ind in &self.wp_moves[from_sq_ind] {
                     if board.get_piece(*to_sq_ind).is_none() {
                         if is_promotion_rank {
-                            append_promotions(&mut promotions, from_sq_ind, to_sq_ind, board.w_to_move);
+                            append_promotions(
+                                &mut promotions,
+                                from_sq_ind,
+                                to_sq_ind,
+                                board.w_to_move,
+                            );
                         } else if from_sq_ind > 7 && from_sq_ind < 16 {
                             // Double pawn push
-                            if (board.pieces_occ[BLACK] + board.pieces_occ[WHITE]) & (1u64 << (from_sq_ind + 8)) == 0 {
+                            if (board.pieces_occ[BLACK] + board.pieces_occ[WHITE])
+                                & (1u64 << (from_sq_ind + 8))
+                                == 0
+                            {
                                 moves.push(Move::new(from_sq_ind, *to_sq_ind, None));
                             }
                         } else {
@@ -477,9 +510,16 @@ impl MoveGen {
 
                 // Handle captures and en passant
                 for to_sq_ind in &self.bp_captures[from_sq_ind] {
-                    if board.pieces_occ[WHITE] & (1u64 << to_sq_ind) != 0 || board.en_passant == Some(*to_sq_ind as u8) {
+                    if board.pieces_occ[WHITE] & (1u64 << to_sq_ind) != 0
+                        || board.en_passant == Some(*to_sq_ind as u8)
+                    {
                         if is_promotion_rank {
-                            append_promotions(&mut promotions, from_sq_ind, to_sq_ind, board.w_to_move);
+                            append_promotions(
+                                &mut promotions,
+                                from_sq_ind,
+                                to_sq_ind,
+                                board.w_to_move,
+                            );
                         } else {
                             captures.push(Move::new(from_sq_ind, *to_sq_ind, None));
                         }
@@ -490,10 +530,18 @@ impl MoveGen {
                 for to_sq_ind in &self.bp_moves[from_sq_ind] {
                     if board.get_piece(*to_sq_ind).is_none() {
                         if is_promotion_rank {
-                            append_promotions(&mut promotions, from_sq_ind, to_sq_ind, board.w_to_move);
+                            append_promotions(
+                                &mut promotions,
+                                from_sq_ind,
+                                to_sq_ind,
+                                board.w_to_move,
+                            );
                         } else if from_sq_ind > 47 && from_sq_ind < 56 {
                             // Double pawn push
-                            if (board.pieces_occ[WHITE] + board.pieces_occ[BLACK]) & (1u64 << (from_sq_ind - 8)) == 0 {
+                            if (board.pieces_occ[WHITE] + board.pieces_occ[BLACK])
+                                & (1u64 << (from_sq_ind - 8))
+                                == 0
+                            {
                                 moves.push(Move::new(from_sq_ind, *to_sq_ind, None));
                             }
                         } else {
@@ -572,21 +620,27 @@ impl MoveGen {
             // White to move
             if board.castling_rights.white_kingside {
                 // Make sure a rook is there because it could have been captured
-                if board.pieces[WHITE][ROOK] & (1u64 << 7) != 0 &&
-                    (board.pieces_occ[WHITE] | board.pieces_occ[BLACK]) & ((1u64 << 5) | (1u64 << 6)) == 0 &&
-                    !board.is_square_attacked(4, false, self) &&
-                    !board.is_square_attacked(5, false, self) &&
-                    !board.is_square_attacked(6, false, self) {
+                if board.pieces[WHITE][ROOK] & (1u64 << 7) != 0
+                    && (board.pieces_occ[WHITE] | board.pieces_occ[BLACK])
+                        & ((1u64 << 5) | (1u64 << 6))
+                        == 0
+                    && !board.is_square_attacked(4, false, self)
+                    && !board.is_square_attacked(5, false, self)
+                    && !board.is_square_attacked(6, false, self)
+                {
                     moves.push(Move::new(4, 6, None));
                 }
             }
             if board.castling_rights.white_queenside {
                 // Make sure a rook is there because it could have been captured
-                if board.pieces[WHITE][ROOK] & (1u64 << 0) != 0 &&
-                    (board.pieces_occ[WHITE] | board.pieces_occ[BLACK]) & ((1u64 << 1) | (1u64 << 2) | (1u64 << 3)) == 0 &&
-                    !board.is_square_attacked(4, false, self) &&
-                    !board.is_square_attacked(3, false, self) &&
-                    !board.is_square_attacked(2, false, self) {
+                if board.pieces[WHITE][ROOK] & (1u64 << 0) != 0
+                    && (board.pieces_occ[WHITE] | board.pieces_occ[BLACK])
+                        & ((1u64 << 1) | (1u64 << 2) | (1u64 << 3))
+                        == 0
+                    && !board.is_square_attacked(4, false, self)
+                    && !board.is_square_attacked(3, false, self)
+                    && !board.is_square_attacked(2, false, self)
+                {
                     moves.push(Move::new(4, 2, None));
                 }
             }
@@ -603,21 +657,27 @@ impl MoveGen {
             // Black to move
             if board.castling_rights.black_kingside {
                 // Make sure a rook is there because it could have been captured
-                if board.pieces[BLACK][ROOK] & (1u64 << 63) != 0 &&
-                    (board.pieces_occ[WHITE] | board.pieces_occ[BLACK]) & ((1u64 << 61) | (1u64 << 62)) == 0 &&
-                    !board.is_square_attacked(60, true, self) &&
-                    !board.is_square_attacked(61, true, self) &&
-                    !board.is_square_attacked(62, true, self) {
+                if board.pieces[BLACK][ROOK] & (1u64 << 63) != 0
+                    && (board.pieces_occ[WHITE] | board.pieces_occ[BLACK])
+                        & ((1u64 << 61) | (1u64 << 62))
+                        == 0
+                    && !board.is_square_attacked(60, true, self)
+                    && !board.is_square_attacked(61, true, self)
+                    && !board.is_square_attacked(62, true, self)
+                {
                     moves.push(Move::new(60, 62, None));
                 }
             }
             if board.castling_rights.black_queenside {
                 // Make sure a rook is there because it could have been captured
-                if board.pieces[BLACK][ROOK] & (1u64 << 56) != 0 &&
-                    (board.pieces_occ[BLACK] | board.pieces_occ[WHITE]) & ((1u64 << 57) | (1u64 << 58) | (1u64 << 59)) == 0 &&
-                    !board.is_square_attacked(60, true, self) &&
-                    !board.is_square_attacked(59, true, self) &&
-                    !board.is_square_attacked(58, true, self) {
+                if board.pieces[BLACK][ROOK] & (1u64 << 56) != 0
+                    && (board.pieces_occ[BLACK] | board.pieces_occ[WHITE])
+                        & ((1u64 << 57) | (1u64 << 58) | (1u64 << 59))
+                        == 0
+                    && !board.is_square_attacked(60, true, self)
+                    && !board.is_square_attacked(59, true, self)
+                    && !board.is_square_attacked(58, true, self)
+                {
                     moves.push(Move::new(60, 58, None));
                 }
             }
@@ -658,10 +718,12 @@ impl MoveGen {
             // White to move
             for from_sq_ind in bits(&board.pieces[WHITE][ROOK]) {
                 // Mask blockers
-                blockers = (board.pieces_occ[BLACK] | board.pieces_occ[WHITE]) & R_MASKS[from_sq_ind];
+                blockers =
+                    (board.pieces_occ[BLACK] | board.pieces_occ[WHITE]) & R_MASKS[from_sq_ind];
 
                 // Generate the key using a multiplication and right shift
-                key = ((blockers.wrapping_mul(self.r_magics[from_sq_ind])) >> (64 - R_BITS[from_sq_ind])) as usize;
+                key = ((blockers.wrapping_mul(self.r_magics[from_sq_ind]))
+                    >> (64 - R_BITS[from_sq_ind])) as usize;
 
                 // Return the preinitialized attack set bitboard from the table
                 for to_sq_ind in &self.r_moves[from_sq_ind][key].0 {
@@ -680,10 +742,12 @@ impl MoveGen {
             // Black to move
             for from_sq_ind in bits(&board.pieces[BLACK][ROOK]) {
                 // Mask blockers
-                blockers = (board.pieces_occ[BLACK] | board.pieces_occ[WHITE]) & R_MASKS[from_sq_ind];
+                blockers =
+                    (board.pieces_occ[BLACK] | board.pieces_occ[WHITE]) & R_MASKS[from_sq_ind];
 
                 // Generate the key using a multiplication and right shift
-                key = ((blockers.wrapping_mul(self.r_magics[from_sq_ind])) >> (64 - R_BITS[from_sq_ind])) as usize;
+                key = ((blockers.wrapping_mul(self.r_magics[from_sq_ind]))
+                    >> (64 - R_BITS[from_sq_ind])) as usize;
 
                 // Return the preinitialized attack set bitboard from the table
                 for to_sq_ind in &self.r_moves[from_sq_ind][key].0 {
@@ -707,10 +771,12 @@ impl MoveGen {
         // Used to determine whether a king is in check.
 
         // Mask blockers
-        let blockers: u64 = (board.pieces_occ[BLACK] | board.pieces_occ[WHITE]) & B_MASKS[from_sq_ind];
+        let blockers: u64 =
+            (board.pieces_occ[BLACK] | board.pieces_occ[WHITE]) & B_MASKS[from_sq_ind];
 
         // Generate the key using a multiplication and right shift
-        let key: usize = ((blockers.wrapping_mul(self.b_magics[from_sq_ind])) >> (64 - B_BITS[from_sq_ind])) as usize;
+        let key: usize = ((blockers.wrapping_mul(self.b_magics[from_sq_ind]))
+            >> (64 - B_BITS[from_sq_ind])) as usize;
 
         // Return the preinitialized capture set bitboard from the table
         self.b_move_bitboard[from_sq_ind][key]
@@ -721,10 +787,12 @@ impl MoveGen {
         // Used to determine whether a king is in check.
 
         // Mask blockers
-        let blockers: u64 = (board.pieces_occ[BLACK] | board.pieces_occ[WHITE]) & R_MASKS[from_sq_ind];
+        let blockers: u64 =
+            (board.pieces_occ[BLACK] | board.pieces_occ[WHITE]) & R_MASKS[from_sq_ind];
 
         // Generate the key using a multiplication and right shift
-        let key: usize = ((blockers.wrapping_mul(self.r_magics[from_sq_ind])) >> (64 - R_BITS[from_sq_ind])) as usize;
+        let key: usize = ((blockers.wrapping_mul(self.r_magics[from_sq_ind]))
+            >> (64 - R_BITS[from_sq_ind])) as usize;
 
         // Return the preinitialized capture set bitboard from the table
         self.r_move_bitboard[from_sq_ind][key]
@@ -754,10 +822,12 @@ impl MoveGen {
             // White to move
             for from_sq_ind in bits(&board.pieces[WHITE][BISHOP]) {
                 // Mask blockers
-                blockers = (board.pieces_occ[BLACK] | board.pieces_occ[WHITE]) & B_MASKS[from_sq_ind];
+                blockers =
+                    (board.pieces_occ[BLACK] | board.pieces_occ[WHITE]) & B_MASKS[from_sq_ind];
 
                 // Generate the key using a multiplication and right shift
-                key = ((blockers.wrapping_mul(self.b_magics[from_sq_ind])) >> (64 - B_BITS[from_sq_ind])) as usize;
+                key = ((blockers.wrapping_mul(self.b_magics[from_sq_ind]))
+                    >> (64 - B_BITS[from_sq_ind])) as usize;
 
                 // Return the preinitialized attack set bitboard from the table
                 for to_sq_ind in &self.b_moves[from_sq_ind][key].0 {
@@ -776,10 +846,12 @@ impl MoveGen {
             // Black to move
             for from_sq_ind in bits(&board.pieces[BLACK][BISHOP]) {
                 // Mask blockers
-                blockers = (board.pieces_occ[BLACK] | board.pieces_occ[WHITE]) & B_MASKS[from_sq_ind];
+                blockers =
+                    (board.pieces_occ[BLACK] | board.pieces_occ[WHITE]) & B_MASKS[from_sq_ind];
 
                 // Generate the key using a multiplication and right shift
-                key = ((blockers.wrapping_mul(self.b_magics[from_sq_ind])) >> (64 - B_BITS[from_sq_ind])) as usize;
+                key = ((blockers.wrapping_mul(self.b_magics[from_sq_ind]))
+                    >> (64 - B_BITS[from_sq_ind])) as usize;
 
                 // Return the preinitialized attack set bitboard from the table
                 for to_sq_ind in &self.b_moves[from_sq_ind][key].0 {
@@ -822,10 +894,12 @@ impl MoveGen {
             // White to move
             for from_sq_ind in bits(&board.pieces[WHITE][QUEEN]) {
                 // Mask blockers
-                blockers = (board.pieces_occ[BLACK] | board.pieces_occ[WHITE]) & R_MASKS[from_sq_ind];
+                blockers =
+                    (board.pieces_occ[BLACK] | board.pieces_occ[WHITE]) & R_MASKS[from_sq_ind];
 
                 // Generate the key using a multiplication and right shift
-                key = ((blockers.wrapping_mul(self.r_magics[from_sq_ind])) >> (64 - R_BITS[from_sq_ind])) as usize;
+                key = ((blockers.wrapping_mul(self.r_magics[from_sq_ind]))
+                    >> (64 - R_BITS[from_sq_ind])) as usize;
 
                 // Return the preinitialized attack set bitboard from the table
                 for to_sq_ind in &self.r_moves[from_sq_ind][key].0 {
@@ -840,10 +914,12 @@ impl MoveGen {
                     }
                 }
                 // Mask blockers
-                blockers = (board.pieces_occ[BLACK] | board.pieces_occ[WHITE]) & B_MASKS[from_sq_ind];
+                blockers =
+                    (board.pieces_occ[BLACK] | board.pieces_occ[WHITE]) & B_MASKS[from_sq_ind];
 
                 // Generate the key using a multiplication and right shift
-                key = ((blockers.wrapping_mul(self.b_magics[from_sq_ind])) >> (64 - B_BITS[from_sq_ind])) as usize;
+                key = ((blockers.wrapping_mul(self.b_magics[from_sq_ind]))
+                    >> (64 - B_BITS[from_sq_ind])) as usize;
 
                 // Return the preinitialized attack set bitboard from the table
                 for to_sq_ind in &self.b_moves[from_sq_ind][key].0 {
@@ -862,10 +938,12 @@ impl MoveGen {
             // Black to move
             for from_sq_ind in bits(&board.pieces[BLACK][QUEEN]) {
                 // Mask blockers
-                blockers = (board.pieces_occ[BLACK] | board.pieces_occ[WHITE]) & R_MASKS[from_sq_ind];
+                blockers =
+                    (board.pieces_occ[BLACK] | board.pieces_occ[WHITE]) & R_MASKS[from_sq_ind];
 
                 // Generate the key using a multiplication and right shift
-                key = ((blockers.wrapping_mul(self.r_magics[from_sq_ind])) >> (64 - R_BITS[from_sq_ind])) as usize;
+                key = ((blockers.wrapping_mul(self.r_magics[from_sq_ind]))
+                    >> (64 - R_BITS[from_sq_ind])) as usize;
 
                 // Return the preinitialized attack set bitboard from the table
                 for to_sq_ind in &self.r_moves[from_sq_ind][key].0 {
@@ -880,10 +958,12 @@ impl MoveGen {
                     }
                 }
                 // Mask blockers
-                blockers = (board.pieces_occ[BLACK] | board.pieces_occ[WHITE]) & B_MASKS[from_sq_ind];
+                blockers =
+                    (board.pieces_occ[BLACK] | board.pieces_occ[WHITE]) & B_MASKS[from_sq_ind];
 
                 // Generate the key using a multiplication and right shift
-                key = ((blockers.wrapping_mul(self.b_magics[from_sq_ind])) >> (64 - B_BITS[from_sq_ind])) as usize;
+                key = ((blockers.wrapping_mul(self.b_magics[from_sq_ind]))
+                    >> (64 - B_BITS[from_sq_ind])) as usize;
 
                 // Return the preinitialized attack set bitboard from the table
                 for to_sq_ind in &self.b_moves[from_sq_ind][key].0 {
@@ -917,19 +997,25 @@ impl MoveGen {
         let _enemy_color_index = !side as usize; // Needed for pawn captures
 
         // Pawns (check captures from the target square's perspective)
-        if side_idx == 0 { // White attackers
-            if sq > 8 && sq % 8 != 0 { // Can be attacked from sq - 9 (black pawn on sq-9 attacks sq)
-                 attackers |= board.pieces[side_idx][PAWN] & sq_ind_to_bit(sq - 9);
+        if side_idx == 0 {
+            // White attackers
+            if sq > 8 && sq % 8 != 0 {
+                // Can be attacked from sq - 9 (black pawn on sq-9 attacks sq)
+                attackers |= board.pieces[side_idx][PAWN] & sq_ind_to_bit(sq - 9);
             }
-            if sq > 7 && sq % 8 != 7 { // Can be attacked from sq - 7 (black pawn on sq-7 attacks sq)
-                 attackers |= board.pieces[side_idx][PAWN] & sq_ind_to_bit(sq - 7);
+            if sq > 7 && sq % 8 != 7 {
+                // Can be attacked from sq - 7 (black pawn on sq-7 attacks sq)
+                attackers |= board.pieces[side_idx][PAWN] & sq_ind_to_bit(sq - 7);
             }
-        } else { // Black attackers
-             if sq < 55 && sq % 8 != 0 { // Can be attacked from sq + 7 (white pawn on sq+7 attacks sq)
-                 attackers |= board.pieces[side_idx][PAWN] & sq_ind_to_bit(sq + 7);
+        } else {
+            // Black attackers
+            if sq < 55 && sq % 8 != 0 {
+                // Can be attacked from sq + 7 (white pawn on sq+7 attacks sq)
+                attackers |= board.pieces[side_idx][PAWN] & sq_ind_to_bit(sq + 7);
             }
-             if sq < 56 && sq % 8 != 7 { // Can be attacked from sq + 9 (white pawn on sq+9 attacks sq)
-                 attackers |= board.pieces[side_idx][PAWN] & sq_ind_to_bit(sq + 9);
+            if sq < 56 && sq % 8 != 7 {
+                // Can be attacked from sq + 9 (white pawn on sq+9 attacks sq)
+                attackers |= board.pieces[side_idx][PAWN] & sq_ind_to_bit(sq + 9);
             }
         }
 
@@ -941,7 +1027,8 @@ impl MoveGen {
 
         // Bishops and Queens (diagonal)
         let bishop_attacks = self.gen_bishop_potential_captures(board, sq);
-        attackers |= bishop_attacks & (board.pieces[side_idx][BISHOP] | board.pieces[side_idx][QUEEN]);
+        attackers |=
+            bishop_attacks & (board.pieces[side_idx][BISHOP] | board.pieces[side_idx][QUEEN]);
 
         // Rooks and Queens (horizontal/vertical)
         let rook_attacks = self.gen_rook_potential_captures(board, sq);
@@ -950,37 +1037,44 @@ impl MoveGen {
         attackers
     }
 
-     /// Finds the square index of the least valuable attacker from a bitboard of attackers.
-     /// Returns 64 if no attacker is found (should not happen if attackers_bb > 0).
-     ///
-     /// # Arguments
-     /// * `board` - The current board state.
-     /// * `attackers_bb` - A bitboard of pieces attacking a square.
-     /// * `side` - The side whose attackers we are considering.
-     ///
-     /// # Returns
-     /// The square index (0-63) of the least valuable attacker, or 64 if none found.
-     pub fn least_valuable_attacker_sq(&self, board: &Board, attackers_bb: u64, side: bool) -> usize {
-         let color_index = side as usize;
-         for piece_type_idx in PAWN..=KING { // Iterate from Pawn (least valuable) to King
-             let piece_bb = board.pieces[color_index][piece_type_idx as usize];
-             let intersection = attackers_bb & piece_bb;
-             if intersection != 0 {
-                 return intersection.trailing_zeros() as usize; // Return square of the first found attacker of this type
-             }
-         }
-         64 // Indicate no attacker found (error condition)
-     }
+    /// Finds the square index of the least valuable attacker from a bitboard of attackers.
+    /// Returns 64 if no attacker is found (should not happen if attackers_bb > 0).
+    ///
+    /// # Arguments
+    /// * `board` - The current board state.
+    /// * `attackers_bb` - A bitboard of pieces attacking a square.
+    /// * `side` - The side whose attackers we are considering.
+    ///
+    /// # Returns
+    /// The square index (0-63) of the least valuable attacker, or 64 if none found.
+    pub fn least_valuable_attacker_sq(
+        &self,
+        board: &Board,
+        attackers_bb: u64,
+        side: bool,
+    ) -> usize {
+        let color_index = side as usize;
+        for piece_type_idx in PAWN..=KING {
+            // Iterate from Pawn (least valuable) to King
+            let piece_bb = board.pieces[color_index][piece_type_idx as usize];
+            let intersection = attackers_bb & piece_bb;
+            if intersection != 0 {
+                return intersection.trailing_zeros() as usize; // Return square of the first found attacker of this type
+            }
+        }
+        64 // Indicate no attacker found (error condition)
+    }
 
     /// Get diagonal moves from a specific square, given an occupied bitboard.
     /// Helper method for get_bishop_moves.
     fn get_diag_moves(&self, from_sq_ind: usize, occupied: u64) -> u64 {
         // Get blocker mask for diagonals
         let blockers = occupied & DIAG_MASKS[from_sq_ind];
-        
+
         // Calculate index for magic bitboard lookup
-        let key = ((blockers.wrapping_mul(self.b_magics[from_sq_ind])) >> (64 - B_BITS[from_sq_ind])) as usize;
-        
+        let key = ((blockers.wrapping_mul(self.b_magics[from_sq_ind]))
+            >> (64 - B_BITS[from_sq_ind])) as usize;
+
         // Get the diagonal component from the bishop moves
         let diag_mask = DIAG_MASKS[from_sq_ind];
         self.b_move_bitboard[from_sq_ind][key] & diag_mask
@@ -991,10 +1085,11 @@ impl MoveGen {
     fn get_anti_diag_moves(&self, from_sq_ind: usize, occupied: u64) -> u64 {
         // Get blocker mask for anti-diagonals
         let blockers = occupied & ANTI_DIAG_MASKS[from_sq_ind];
-        
+
         // Calculate index for magic bitboard lookup
-        let key = ((blockers.wrapping_mul(self.b_magics[from_sq_ind])) >> (64 - B_BITS[from_sq_ind])) as usize;
-        
+        let key = ((blockers.wrapping_mul(self.b_magics[from_sq_ind]))
+            >> (64 - B_BITS[from_sq_ind])) as usize;
+
         // Get the anti-diagonal component from the bishop moves
         let anti_diag_mask = ANTI_DIAG_MASKS[from_sq_ind];
         self.b_move_bitboard[from_sq_ind][key] & anti_diag_mask
@@ -1005,10 +1100,11 @@ impl MoveGen {
     fn get_file_moves(&self, from_sq_ind: usize, occupied: u64) -> u64 {
         // Get blocker mask for files
         let blockers = occupied & FILE_MASKS[from_sq_ind];
-        
+
         // Calculate index for magic bitboard lookup
-        let key = ((blockers.wrapping_mul(self.r_magics[from_sq_ind])) >> (64 - R_BITS[from_sq_ind])) as usize;
-        
+        let key = ((blockers.wrapping_mul(self.r_magics[from_sq_ind]))
+            >> (64 - R_BITS[from_sq_ind])) as usize;
+
         // Get the file component from the rook moves
         let file_mask = FILE_MASKS[from_sq_ind];
         self.r_move_bitboard[from_sq_ind][key] & file_mask
@@ -1019,10 +1115,11 @@ impl MoveGen {
     fn get_rank_moves(&self, from_sq_ind: usize, occupied: u64) -> u64 {
         // Get blocker mask for ranks
         let blockers = occupied & RANK_MASKS[from_sq_ind];
-        
+
         // Calculate index for magic bitboard lookup
-        let key = ((blockers.wrapping_mul(self.r_magics[from_sq_ind])) >> (64 - R_BITS[from_sq_ind])) as usize;
-        
+        let key = ((blockers.wrapping_mul(self.r_magics[from_sq_ind]))
+            >> (64 - R_BITS[from_sq_ind])) as usize;
+
         // Get the rank component from the rook moves
         let rank_mask = RANK_MASKS[from_sq_ind];
         self.r_move_bitboard[from_sq_ind][key] & rank_mask

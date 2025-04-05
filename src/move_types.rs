@@ -3,9 +3,9 @@
 //! This module provides the core `Move` type used throughout the chess engine
 //! to represent and manipulate chess moves.
 
-use std::fmt;
 use crate::board_utils::sq_ind_to_algebraic;
-use crate::piece_types::{KNIGHT, BISHOP, ROOK, QUEEN};
+use crate::piece_types::{BISHOP, KNIGHT, QUEEN, ROOK};
+use std::fmt;
 
 /// Represents a chess move.
 ///
@@ -19,7 +19,7 @@ pub struct Move {
     pub to: usize,
     /// The type of piece to promote to, if this move results in a promotion.
     /// `None` if the move does not result in a promotion.
-    pub promotion: Option<usize>
+    pub promotion: Option<usize>,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -42,7 +42,11 @@ impl CastlingRights {
 }
 
 /// A constant representing a null move, used in search algorithms
-pub const NULL_MOVE: Move = Move { from: 0, to: 0, promotion: None };
+pub const NULL_MOVE: Move = Move {
+    from: 0,
+    to: 0,
+    promotion: None,
+};
 
 impl Move {
     /// Creates a new `Move` instance.
@@ -61,7 +65,7 @@ impl Move {
         Move {
             from,
             to,
-            promotion
+            promotion,
         }
     }
 
@@ -116,7 +120,11 @@ impl Move {
             None
         };
 
-        Some(Move { from, to, promotion })
+        Some(Move {
+            from,
+            to,
+            promotion,
+        })
     }
 
     /// Creates a null move.
@@ -134,7 +142,7 @@ impl Move {
         Move {
             from: 0,
             to: 0,
-            promotion: None
+            promotion: None,
         }
     }
 
@@ -150,7 +158,7 @@ impl Move {
                 n if n == BISHOP => promotion.push('B'),
                 n if n == ROOK => promotion.push('R'),
                 n if n == QUEEN => promotion.push('Q'),
-                _ => panic!("Invalid promotion piece")
+                _ => panic!("Invalid promotion piece"),
             }
         }
         format!("{}{}{}", from, to, promotion)
@@ -169,10 +177,38 @@ mod tests {
 
     #[test]
     fn test_move_from_uci() {
-        assert_eq!(Move::from_uci("e2e4"), Some(Move { from: 12, to: 28, promotion: None }));
-        assert_eq!(Move::from_uci("a7a8q"), Some(Move { from: 48, to: 56, promotion: Some(QUEEN) }));
-        assert_eq!(Move::from_uci("h2h1n"), Some(Move { from: 15, to: 7, promotion: Some(KNIGHT) }));
-        assert_eq!(Move::from_uci("e1g1"), Some(Move { from: 4, to: 6, promotion: None })); // Castling
+        assert_eq!(
+            Move::from_uci("e2e4"),
+            Some(Move {
+                from: 12,
+                to: 28,
+                promotion: None
+            })
+        );
+        assert_eq!(
+            Move::from_uci("a7a8q"),
+            Some(Move {
+                from: 48,
+                to: 56,
+                promotion: Some(QUEEN)
+            })
+        );
+        assert_eq!(
+            Move::from_uci("h2h1n"),
+            Some(Move {
+                from: 15,
+                to: 7,
+                promotion: Some(KNIGHT)
+            })
+        );
+        assert_eq!(
+            Move::from_uci("e1g1"),
+            Some(Move {
+                from: 4,
+                to: 6,
+                promotion: None
+            })
+        ); // Castling
         assert_eq!(Move::from_uci("invalid"), None);
         assert_eq!(Move::from_uci("e2e9"), None); // Invalid square
         assert_eq!(Move::from_uci("e2e4q"), None); // Invalid promotion (not on last rank)

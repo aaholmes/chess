@@ -1,13 +1,13 @@
 #[cfg(test)]
 mod tests {
     use kingfisher::board::Board;
+    use kingfisher::board_utils;
     use kingfisher::eval::PestoEval;
     use kingfisher::eval_constants::{
-        PASSED_PAWN_BONUS_MG, PASSED_PAWN_BONUS_EG, ISOLATED_PAWN_PENALTY,
-        PAWN_CHAIN_BONUS, PAWN_DUO_BONUS, MOBILE_PAWN_DUO_BONUS_MG, MOBILE_PAWN_DUO_BONUS_EG
+        ISOLATED_PAWN_PENALTY, MOBILE_PAWN_DUO_BONUS_EG, MOBILE_PAWN_DUO_BONUS_MG,
+        PASSED_PAWN_BONUS_EG, PASSED_PAWN_BONUS_MG, PAWN_CHAIN_BONUS, PAWN_DUO_BONUS,
     };
-    use kingfisher::piece_types::{WHITE, BLACK, PAWN};
-    use kingfisher::board_utils;
+    use kingfisher::piece_types::{BLACK, PAWN, WHITE};
 
     // Simplified function to get raw scores
     fn get_raw_scores(evaluator: &PestoEval, board: &Board) -> (i32, i32) {
@@ -50,8 +50,16 @@ mod tests {
 
         // Check White score difference includes PST + Passed Pawn Bonus
         // For a pawn on rank 5 (bonus_rank = 4)
-        assert_eq!(mg_w_passed - mg_base, pst_mg_w + PASSED_PAWN_BONUS_MG[4], "White MG Passed Pawn bonus mismatch");
-        assert_eq!(eg_w_passed - eg_base, pst_eg_w + PASSED_PAWN_BONUS_EG[4], "White EG Passed Pawn bonus mismatch");
+        assert_eq!(
+            mg_w_passed - mg_base,
+            pst_mg_w + PASSED_PAWN_BONUS_MG[4],
+            "White MG Passed Pawn bonus mismatch"
+        );
+        assert_eq!(
+            eg_w_passed - eg_base,
+            pst_eg_w + PASSED_PAWN_BONUS_EG[4],
+            "White EG Passed Pawn bonus mismatch"
+        );
     }
 
     #[test]
@@ -62,20 +70,28 @@ mod tests {
         let board_w_isolated = Board::new_from_fen("k7/8/8/8/4P3/8/8/K7 w - - 0 1");
         // White connected pawns on d4, e4
         let board_w_connected = Board::new_from_fen("k7/8/8/8/3PP3/8/8/K7 w - - 0 1");
-        
+
         let (mg_isolated, eg_isolated) = get_raw_scores(&evaluator, &board_w_isolated);
         let (mg_connected, eg_connected) = get_raw_scores(&evaluator, &board_w_connected);
-        
+
         // Calculate difference between isolated and connected positions
         // Isolated pawn gets a penalty, while connected doesn't
         // Need to account for PST of d4 pawn in the connected position
         let d4_sq = board_utils::algebraic_to_sq_ind("d4");
         let pst_mg_d4 = evaluator.get_mg_score(WHITE, PAWN, d4_sq);
         let pst_eg_d4 = evaluator.get_eg_score(WHITE, PAWN, d4_sq);
-        
+
         // Difference should be: connected - isolated = pst_d4 - ISOLATED_PENALTY
-        assert_eq!(mg_connected - mg_isolated, pst_mg_d4 - ISOLATED_PAWN_PENALTY[0], "Isolated pawn penalty MG mismatch");
-        assert_eq!(eg_connected - eg_isolated, pst_eg_d4 - ISOLATED_PAWN_PENALTY[1], "Isolated pawn penalty EG mismatch");
+        assert_eq!(
+            mg_connected - mg_isolated,
+            pst_mg_d4 - ISOLATED_PAWN_PENALTY[0],
+            "Isolated pawn penalty MG mismatch"
+        );
+        assert_eq!(
+            eg_connected - eg_isolated,
+            pst_eg_d4 - ISOLATED_PAWN_PENALTY[1],
+            "Isolated pawn penalty EG mismatch"
+        );
     }
 
     #[test]
@@ -86,20 +102,30 @@ mod tests {
         let board_w_chain = Board::new_from_fen("k7/8/8/8/4P3/3P4/8/K7 w - - 0 1");
         // White pawns not in chain: e4, a3
         let board_w_no_chain = Board::new_from_fen("k7/8/8/8/4P3/P7/8/K7 w - - 0 1");
-        
+
         let (mg_chain, eg_chain) = get_raw_scores(&evaluator, &board_w_chain);
         let (mg_no_chain, eg_no_chain) = get_raw_scores(&evaluator, &board_w_no_chain);
-        
+
         // Calculate difference between chain and no-chain positions
         // Need to account for PST differences (d3 vs a3)
         let d3_sq = board_utils::algebraic_to_sq_ind("d3");
         let a3_sq = board_utils::algebraic_to_sq_ind("a3");
-        let pst_mg_diff = evaluator.get_mg_score(WHITE, PAWN, d3_sq) - evaluator.get_mg_score(WHITE, PAWN, a3_sq);
-        let pst_eg_diff = evaluator.get_eg_score(WHITE, PAWN, d3_sq) - evaluator.get_eg_score(WHITE, PAWN, a3_sq);
-        
+        let pst_mg_diff =
+            evaluator.get_mg_score(WHITE, PAWN, d3_sq) - evaluator.get_mg_score(WHITE, PAWN, a3_sq);
+        let pst_eg_diff =
+            evaluator.get_eg_score(WHITE, PAWN, d3_sq) - evaluator.get_eg_score(WHITE, PAWN, a3_sq);
+
         // Chain position should have PAWN_CHAIN_BONUS more than no-chain position
-        assert_eq!(mg_chain - mg_no_chain, pst_mg_diff + PAWN_CHAIN_BONUS[0], "Pawn chain bonus MG mismatch");
-        assert_eq!(eg_chain - eg_no_chain, pst_eg_diff + PAWN_CHAIN_BONUS[1], "Pawn chain bonus EG mismatch");
+        assert_eq!(
+            mg_chain - mg_no_chain,
+            pst_mg_diff + PAWN_CHAIN_BONUS[0],
+            "Pawn chain bonus MG mismatch"
+        );
+        assert_eq!(
+            eg_chain - eg_no_chain,
+            pst_eg_diff + PAWN_CHAIN_BONUS[1],
+            "Pawn chain bonus EG mismatch"
+        );
     }
 
     #[test]
@@ -122,8 +148,16 @@ mod tests {
         let expected_bonus_mg = PAWN_DUO_BONUS[0];
         let expected_bonus_eg = PAWN_DUO_BONUS[1];
 
-        assert_eq!(mg_duo - mg_base, pst_mg + expected_bonus_mg, "White MG pawn duo mismatch");
-        assert_eq!(eg_duo - eg_base, pst_eg + expected_bonus_eg, "White EG pawn duo mismatch");
+        assert_eq!(
+            mg_duo - mg_base,
+            pst_mg + expected_bonus_mg,
+            "White MG pawn duo mismatch"
+        );
+        assert_eq!(
+            eg_duo - eg_base,
+            pst_eg + expected_bonus_eg,
+            "White EG pawn duo mismatch"
+        );
     }
 
     #[test]
@@ -150,7 +184,15 @@ mod tests {
         let pst_diff_eg = -evaluator.get_eg_score(BLACK, PAWN, d5_sq);
 
         // Difference between mobile and blocked should be the mobile bonus + PST of blocking pawn
-        assert_eq!(mg_mobile - mg_blocked, expected_bonus_mg - pst_diff_mg, "White MG mobile duo mismatch");
-        assert_eq!(eg_mobile - eg_blocked, expected_bonus_eg - pst_diff_eg, "White EG mobile duo mismatch");
+        assert_eq!(
+            mg_mobile - mg_blocked,
+            expected_bonus_mg - pst_diff_mg,
+            "White MG mobile duo mismatch"
+        );
+        assert_eq!(
+            eg_mobile - eg_blocked,
+            expected_bonus_eg - pst_diff_eg,
+            "White EG mobile duo mismatch"
+        );
     }
 }

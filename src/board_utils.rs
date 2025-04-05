@@ -144,14 +144,14 @@ pub fn flip_sq_ind_vertically(sq_ind: usize) -> usize {
 ///
 /// The vertically flipped bitboard
 pub fn flip_vertically(bit: u64) -> u64 {
-    ( (bit << 56)                    ) |
-        ( (bit << 40) & (0x00ff000000000000) ) |
-        ( (bit << 24) & (0x0000ff0000000000) ) |
-        ( (bit <<  8) & (0x000000ff00000000) ) |
-        ( (bit >>  8) & (0x00000000ff000000) ) |
-        ( (bit >> 24) & (0x0000000000ff0000) ) |
-        ( (bit >> 40) & (0x000000000000ff00) ) |
-        ( (bit >> 56) )
+    (bit << 56)
+        | ((bit << 40) & (0x00ff000000000000))
+        | ((bit << 24) & (0x0000ff0000000000))
+        | ((bit << 8) & (0x000000ff00000000))
+        | ((bit >> 8) & (0x00000000ff000000))
+        | ((bit >> 24) & (0x0000000000ff0000))
+        | ((bit >> 40) & (0x000000000000ff00))
+        | (bit >> 56)
 }
 
 /// Returns the rank (0-7) of a given square index.
@@ -165,8 +165,8 @@ pub fn sq_to_file(sq_ind: usize) -> usize {
 }
 
 // --- Masks for Evaluation ---
+use crate::piece_types::{BLACK, WHITE};
 use lazy_static::lazy_static;
-use crate::piece_types::{WHITE, BLACK};
 
 // Precomputed masks for determining passed pawns.
 // For a given square `sq`, `PASSED_MASKS[color][sq]` contains a mask of squares
@@ -344,12 +344,12 @@ pub fn get_rank_mask(rank: usize) -> u64 {
 pub fn get_front_span_mask(color: usize, sq: usize) -> u64 {
     let file = sq_to_file(sq);
     let rank = sq_to_rank(sq);
-    
+
     let mut mask = 0;
-    
+
     // Add the file mask
     mask |= get_file_mask(file);
-    
+
     // Add adjacent files if they exist
     if file > 0 {
         mask |= get_file_mask(file - 1);
@@ -357,20 +357,22 @@ pub fn get_front_span_mask(color: usize, sq: usize) -> u64 {
     if file < 7 {
         mask |= get_file_mask(file + 1);
     }
-    
+
     // Filter to only include squares in front of the given square
-    if color == 0 { // WHITE
+    if color == 0 {
+        // WHITE
         // Keep only ranks higher than the current rank (in front for White)
         for r in (rank + 1)..8 {
             mask &= !(0xFFu64 << (r * 8));
         }
-    } else { // BLACK
+    } else {
+        // BLACK
         // Keep only ranks lower than the current rank (in front for Black)
         for r in 0..rank {
             mask &= !(0xFFu64 << (r * 8));
         }
     }
-    
+
     mask
 }
 
@@ -379,20 +381,20 @@ pub fn get_front_span_mask(color: usize, sq: usize) -> u64 {
 pub fn get_king_attack_zone_mask(_color: usize, king_sq: usize) -> u64 {
     // The attack zone is all squares within distance 2 of the king
     let mut mask = 0;
-    
+
     let rank = sq_to_rank(king_sq);
     let file = sq_to_file(king_sq);
-    
+
     // Iterate over a 5x5 square centered on the king
     for r in rank.saturating_sub(2)..=rank.saturating_add(2).min(7) {
         for f in file.saturating_sub(2)..=file.saturating_add(2).min(7) {
             mask |= 1u64 << (r * 8 + f);
         }
     }
-    
+
     // Remove the king's square itself from the mask
     mask &= !(1u64 << king_sq);
-    
+
     mask
 }
 

@@ -1,10 +1,10 @@
 #[cfg(test)]
 mod tests {
     use kingfisher::board::Board;
-    use kingfisher::eval::PestoEval;
-    use kingfisher::eval_constants::{TWO_BISHOPS_BONUS, KING_SAFETY_PAWN_SHIELD_BONUS};
-    use kingfisher::piece_types::{WHITE, BLACK, BISHOP, PAWN, KNIGHT}; // Added KNIGHT
     use kingfisher::board_utils;
+    use kingfisher::eval::PestoEval;
+    use kingfisher::eval_constants::{KING_SAFETY_PAWN_SHIELD_BONUS, TWO_BISHOPS_BONUS};
+    use kingfisher::piece_types::{BISHOP, BLACK, KNIGHT, PAWN, WHITE}; // Added KNIGHT
 
     // Simplified function to get raw scores
     fn get_raw_scores(evaluator: &PestoEval, board: &Board) -> (i32, i32) {
@@ -53,8 +53,10 @@ mod tests {
     fn test_two_bishops_bonus() {
         let evaluator = PestoEval::new();
         // Position with White having two bishops, Black having one knight/one bishop
-        let board_base = Board::new_from_fen("rnbqkb1r/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
-        let board_w_2b = Board::new_from_fen("rnbqkb1r/pppppppp/8/8/8/5B2/PPPPPPPP/RNBQK1NR w KQkq - 0 1");
+        let board_base =
+            Board::new_from_fen("rnbqkb1r/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
+        let board_w_2b =
+            Board::new_from_fen("rnbqkb1r/pppppppp/8/8/8/5B2/PPPPPPPP/RNBQK1NR w KQkq - 0 1");
 
         let (mg_base, eg_base) = get_raw_scores(&evaluator, &board_base);
         let (mg_w_2b, eg_w_2b) = get_raw_scores(&evaluator, &board_w_2b);
@@ -63,29 +65,51 @@ mod tests {
         // Note: Adding a bishop also adds its PST value, so we check the *difference* matches the bonus + PST diff
         let f3_sq = board_utils::algebraic_to_sq_ind("f3");
         let g1_sq = board_utils::algebraic_to_sq_ind("g1");
-        let pst_diff_mg = evaluator.get_mg_score(WHITE, BISHOP, f3_sq) - evaluator.get_mg_score(WHITE, KNIGHT, g1_sq);
-        let pst_diff_eg = evaluator.get_eg_score(WHITE, BISHOP, f3_sq) - evaluator.get_eg_score(WHITE, KNIGHT, g1_sq);
+        let pst_diff_mg = evaluator.get_mg_score(WHITE, BISHOP, f3_sq)
+            - evaluator.get_mg_score(WHITE, KNIGHT, g1_sq);
+        let pst_diff_eg = evaluator.get_eg_score(WHITE, BISHOP, f3_sq)
+            - evaluator.get_eg_score(WHITE, KNIGHT, g1_sq);
 
-        assert_eq!(mg_w_2b - mg_base, pst_diff_mg + TWO_BISHOPS_BONUS[0], "MG Two Bishops Bonus mismatch");
-        assert_eq!(eg_w_2b - eg_base, pst_diff_eg + TWO_BISHOPS_BONUS[1], "EG Two Bishops Bonus mismatch");
+        assert_eq!(
+            mg_w_2b - mg_base,
+            pst_diff_mg + TWO_BISHOPS_BONUS[0],
+            "MG Two Bishops Bonus mismatch"
+        );
+        assert_eq!(
+            eg_w_2b - eg_base,
+            pst_diff_eg + TWO_BISHOPS_BONUS[1],
+            "EG Two Bishops Bonus mismatch"
+        );
 
         // Test case where black has two bishops
         // Use a pre-configured position rather than trying to manually manipulate the board
-        let board_b_1b = Board::new_from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKB1R b KQkq - 0 1");
-        let board_b_2b = Board::new_from_fen("rnbqkbbr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKB1R b KQkq - 0 1"); // Black has two bishops and no knights
+        let board_b_1b =
+            Board::new_from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKB1R b KQkq - 0 1");
+        let board_b_2b =
+            Board::new_from_fen("rnbqkbbr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKB1R b KQkq - 0 1"); // Black has two bishops and no knights
 
         let (mg_b_1b, eg_b_1b) = get_raw_scores(&evaluator, &board_b_1b);
         let (mg_b_2b, eg_b_2b) = get_raw_scores(&evaluator, &board_b_2b);
 
         // Calculate PST difference for Black bishop vs knight
-        let g8_sq = board_utils::algebraic_to_sq_ind("g8"); 
+        let g8_sq = board_utils::algebraic_to_sq_ind("g8");
         let h8_sq = board_utils::algebraic_to_sq_ind("h8");
-        let pst_diff_b_mg = evaluator.get_mg_score(BLACK, BISHOP, h8_sq) - evaluator.get_mg_score(BLACK, KNIGHT, g8_sq);
-        let pst_diff_b_eg = evaluator.get_eg_score(BLACK, BISHOP, h8_sq) - evaluator.get_eg_score(BLACK, KNIGHT, g8_sq);
+        let pst_diff_b_mg = evaluator.get_mg_score(BLACK, BISHOP, h8_sq)
+            - evaluator.get_mg_score(BLACK, KNIGHT, g8_sq);
+        let pst_diff_b_eg = evaluator.get_eg_score(BLACK, BISHOP, h8_sq)
+            - evaluator.get_eg_score(BLACK, KNIGHT, g8_sq);
 
         // Black's score (W-B) should decrease by (PST diff + Bonus)
-        assert_eq!(mg_b_2b - mg_b_1b, -(pst_diff_b_mg + TWO_BISHOPS_BONUS[0]), "MG Black Two Bishops Bonus mismatch");
-        assert_eq!(eg_b_2b - eg_b_1b, -(pst_diff_b_eg + TWO_BISHOPS_BONUS[1]), "EG Black Two Bishops Bonus mismatch");
+        assert_eq!(
+            mg_b_2b - mg_b_1b,
+            -(pst_diff_b_mg + TWO_BISHOPS_BONUS[0]),
+            "MG Black Two Bishops Bonus mismatch"
+        );
+        assert_eq!(
+            eg_b_2b - eg_b_1b,
+            -(pst_diff_b_eg + TWO_BISHOPS_BONUS[1]),
+            "EG Black Two Bishops Bonus mismatch"
+        );
     }
 
     #[test]
@@ -93,9 +117,11 @@ mod tests {
     fn test_king_safety_pawn_shield() {
         let evaluator = PestoEval::new();
         // White king on g1, pawns on f2, g2, h2 (good shield - 3 pawns in zone f2,g2,h2)
-        let board_w_safe = Board::new_from_fen("rnbqkb1r/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
+        let board_w_safe =
+            Board::new_from_fen("rnbqkb1r/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
         // White king on g1, pawns on f3, g2, h2 (weaker shield - 1 pawn g2 in zone)
-        let board_w_less_safe = Board::new_from_fen("rnbqkb1r/pppppppp/8/8/8/5P2/PPPP1PPP/RNBQKBNR w KQkq - 0 1");
+        let board_w_less_safe =
+            Board::new_from_fen("rnbqkb1r/pppppppp/8/8/8/5P2/PPPP1PPP/RNBQKBNR w KQkq - 0 1");
 
         let (mg_safe, eg_safe) = get_raw_scores(&evaluator, &board_w_safe);
         let (mg_less, eg_less) = get_raw_scores(&evaluator, &board_w_less_safe);
@@ -106,14 +132,24 @@ mod tests {
         // Diff = (2 * bonus) + (PST(f2) - PST(f3))
         let f2_sq = board_utils::algebraic_to_sq_ind("f2");
         let f3_sq = board_utils::algebraic_to_sq_ind("f3");
-        let pst_diff_mg = evaluator.get_mg_score(WHITE, PAWN, f2_sq) - evaluator.get_mg_score(WHITE, PAWN, f3_sq);
-        let pst_diff_eg = evaluator.get_eg_score(WHITE, PAWN, f2_sq) - evaluator.get_eg_score(WHITE, PAWN, f3_sq);
+        let pst_diff_mg =
+            evaluator.get_mg_score(WHITE, PAWN, f2_sq) - evaluator.get_mg_score(WHITE, PAWN, f3_sq);
+        let pst_diff_eg =
+            evaluator.get_eg_score(WHITE, PAWN, f2_sq) - evaluator.get_eg_score(WHITE, PAWN, f3_sq);
 
         let expected_diff_mg = 2 * KING_SAFETY_PAWN_SHIELD_BONUS[0] + pst_diff_mg;
         let expected_diff_eg = 2 * KING_SAFETY_PAWN_SHIELD_BONUS[1] + pst_diff_eg;
 
         // Need to account for the PST change of the moved pawn f2->f3
-        assert_eq!(mg_safe - mg_less, expected_diff_mg, "MG King Safety difference mismatch");
-        assert_eq!(eg_safe - eg_less, expected_diff_eg, "EG King Safety difference mismatch");
+        assert_eq!(
+            mg_safe - mg_less,
+            expected_diff_mg,
+            "MG King Safety difference mismatch"
+        );
+        assert_eq!(
+            eg_safe - eg_less,
+            expected_diff_eg,
+            "EG King Safety difference mismatch"
+        );
     }
 }

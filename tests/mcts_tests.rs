@@ -1,22 +1,24 @@
 #[cfg(test)]
 mod mcts_tests {
-    use std::rc::Rc;
     use std::cell::RefCell;
     use std::collections::HashMap;
     use std::hash::{Hash, Hasher};
+    use std::rc::Rc;
     use std::time::Duration;
 
     use kingfisher::board::Board;
     use kingfisher::eval::PestoEval; // Needed for PestoPolicy example
-    use kingfisher::move_generation::MoveGen;
-    use kingfisher::mcts::policy::{PolicyNetwork, PestoPolicy}; // Import policy trait and example
-    // Updated imports for MCTS components
-    use kingfisher::mcts::{MctsNode, mcts_search, select_leaf_for_expansion, backpropagate, MoveCategory};
-    use kingfisher::mcts::simulation::simulate_random_playout; // Keep for simulation tests
-    use kingfisher::move_types::{Move, NULL_MOVE};
+    use kingfisher::mcts::policy::{PestoPolicy, PolicyNetwork};
+    use kingfisher::move_generation::MoveGen; // Import policy trait and example
+                                              // Updated imports for MCTS components
     use kingfisher::board_utils;
-    use kingfisher::search::mate_search; // Needed for mate search context
-    use kingfisher::boardstack::BoardStack; // Needed for mate search context
+    use kingfisher::boardstack::BoardStack;
+    use kingfisher::mcts::simulation::simulate_random_playout; // Keep for simulation tests
+    use kingfisher::mcts::{
+        backpropagate, mcts_search, select_leaf_for_expansion, MctsNode, MoveCategory,
+    };
+    use kingfisher::move_types::{Move, NULL_MOVE};
+    use kingfisher::search::mate_search; // Needed for mate search context // Needed for mate search context
 
     // Helper to create basic setup
     fn setup() -> MoveGen {
@@ -45,23 +47,30 @@ mod mcts_tests {
 
     impl PartialEq for HashableMove {
         fn eq(&self, other: &Self) -> bool {
-            self.0.from == other.0.from &&
-            self.0.to == other.0.to &&
-            self.0.promotion == other.0.promotion
+            self.0.from == other.0.from
+                && self.0.to == other.0.to
+                && self.0.promotion == other.0.promotion
         }
     }
 
     impl Eq for HashableMove {}
-
 
     // Mock Policy Network that returns predictable values/priors and tracks calls
     struct MockPolicy {
         eval_called: std::cell::Cell<bool>, // Track if evaluate was called
     }
     impl MockPolicy {
-        fn new() -> Self { MockPolicy { eval_called: std::cell::Cell::new(false) } }
-        fn was_evaluate_called(&self) -> bool { self.eval_called.get() }
-        fn reset_eval_called(&self) { self.eval_called.set(false); }
+        fn new() -> Self {
+            MockPolicy {
+                eval_called: std::cell::Cell::new(false),
+            }
+        }
+        fn was_evaluate_called(&self) -> bool {
+            self.eval_called.get()
+        }
+        fn reset_eval_called(&self) {
+            self.eval_called.set(false);
+        }
     }
     impl PolicyNetwork for MockPolicy {
         fn evaluate(&self, board: &Board) -> (HashMap<Move, f64>, f64) {
@@ -71,7 +80,10 @@ mod mcts_tests {
             let legal_moves = MctsNode::get_legal_moves(board, &move_gen);
             let n = legal_moves.len();
             let priors = if n > 0 {
-                legal_moves.into_iter().map(|m| (m, 1.0 / n as f64)).collect()
+                legal_moves
+                    .into_iter()
+                    .map(|m| (m, 1.0 / n as f64))
+                    .collect()
             } else {
                 HashMap::new()
             };
@@ -101,11 +113,13 @@ mod mcts_tests {
         assert!(root_node.terminal_or_mate_value.is_none());
     }
 
-     #[test]
+    #[test]
     fn test_node_new_root_terminal() {
         let move_gen = setup();
         // Fool's Mate position (Black checkmated)
-        let board = Board::new_from_fen("rnb1kbnr/pppp1ppp/8/4p3/6Pq/5P2/PPPPP2P/RNBQKBNR w KQkq - 0 3").expect("FEN");
+        let board =
+            Board::new_from_fen("rnb1kbnr/pppp1ppp/8/4p3/6Pq/5P2/PPPPP2P/RNBQKBNR w KQkq - 0 3")
+                .expect("FEN");
         let root_node_rc = MctsNode::new_root(board.clone(), &move_gen);
         let root_node = root_node_rc.borrow();
 
@@ -128,26 +142,29 @@ mod mcts_tests {
     // #[test]
     // fn test_node_backpropagate() { ... }
 
-
     // --- Simulation Tests --- (Keep existing Simulation tests)
 
     #[test]
     fn test_simulation_immediate_white_win() {
         let move_gen = setup();
         // Fool's Mate position (Black checkmated, White to move - White won)
-        let board = Board::new_from_fen("rnb1kbnr/pppp1ppp/8/4p3/6Pq/5P2/PPPPP2P/RNBQKBNR w KQkq - 0 3").expect("FEN");
+        let board =
+            Board::new_from_fen("rnb1kbnr/pppp1ppp/8/4p3/6Pq/5P2/PPPPP2P/RNBQKBNR w KQkq - 0 3")
+                .expect("FEN");
         let result = simulate_random_playout(&board, &move_gen);
         // White is checkmated, Black wins. Result is from White's perspective.
         assert_eq!(result, 0.0);
     }
 
-     #[test]
+    #[test]
     fn test_simulation_immediate_black_win() {
         let move_gen = setup();
         // Position where White is checkmated, Black to move (Black won)
-        let board = Board::new_from_fen("rnbqkbnr/ppppp2p/5p2/6pQ/4P3/8/PPPP1PPP/RNB1KBNR b KQkq - 0 3").expect("FEN");
+        let board =
+            Board::new_from_fen("rnbqkbnr/ppppp2p/5p2/6pQ/4P3/8/PPPP1PPP/RNB1KBNR b KQkq - 0 3")
+                .expect("FEN");
         let result = simulate_random_playout(&board, &move_gen);
-         // Black is checkmated, White wins. Result is from White's perspective.
+        // Black is checkmated, White wins. Result is from White's perspective.
         assert_eq!(result, 1.0); // Corrected expected result
     }
 
@@ -170,9 +187,19 @@ mod mcts_tests {
         let iterations = 100;
         let mate_depth = 0; // Disable mate search for this basic test
 
-        let best_move_opt = mcts_search(board, &move_gen, &policy, mate_depth, Some(iterations), None);
+        let best_move_opt = mcts_search(
+            board,
+            &move_gen,
+            &policy,
+            mate_depth,
+            Some(iterations),
+            None,
+        );
 
-        assert!(best_move_opt.is_some(), "MCTS should return a move from the initial position");
+        assert!(
+            best_move_opt.is_some(),
+            "MCTS should return a move from the initial position"
+        );
         let found_move = best_move_opt.unwrap();
         assert!(found_move.from < 64);
         assert!(found_move.to < 64);
@@ -201,7 +228,10 @@ mod mcts_tests {
     fn test_mcts_search_forced_mate_in_1() {
         let move_gen = setup();
         // White to move, mate in 1 (Qh5#)
-        let board = Board::new_from_fen("r1bqkbnr/pppp1ppp/2n5/4p2Q/2B1P3/8/PPPP1PPP/RNB1K1NR w KQkq - 0 3").expect("FEN");
+        let board = Board::new_from_fen(
+            "r1bqkbnr/pppp1ppp/2n5/4p2Q/2B1P3/8/PPPP1PPP/RNB1K1NR w KQkq - 0 3",
+        )
+        .expect("FEN");
         let iterations = 1000; // More iterations to increase chance of finding mate quickly
 
         let policy = MockPolicy::new();
@@ -209,7 +239,11 @@ mod mcts_tests {
         let expected_move = create_move("h5", "f7"); // Qh5xf7#
 
         assert!(best_move_opt.is_some());
-        assert_eq!(best_move_opt.unwrap(), expected_move, "MCTS failed to find mate in 1");
+        assert_eq!(
+            best_move_opt.unwrap(),
+            expected_move,
+            "MCTS failed to find mate in 1"
+        );
     }
 
     #[test]
@@ -242,7 +276,10 @@ mod mcts_tests {
         let e2e4 = create_move("e2", "e4");
         let mut move_evals = HashMap::new();
         move_evals.insert(HashableMove(e2e4), (0.9, 0.7)); // High prior, good value
-        let _policy = PredictablePolicy { move_evals, default_value: 0.4 };
+        let _policy = PredictablePolicy {
+            move_evals,
+            default_value: 0.4,
+        };
 
         // This test would need the policy-based mcts_search implementation
         // Test logic would continue here
@@ -269,20 +306,33 @@ mod mcts_tests {
         let move_gen = setup();
         let policy = MockPolicy::new();
         // White to move, mate in 1 (Qh5#)
-        let board = Board::new_from_fen("r1bqkbnr/pppp1ppp/2n5/4p2Q/2B1P3/8/PPPP1PPP/RNB1K1NR w KQkq - 0 3").expect("Valid FEN");
+        let board = Board::new_from_fen(
+            "r1bqkbnr/pppp1ppp/2n5/4p2Q/2B1P3/8/PPPP1PPP/RNB1K1NR w KQkq - 0 3",
+        )
+        .expect("Valid FEN");
         let iterations = 10; // Few iterations needed if mate search works
         let mate_depth = 1; // M1 depth
 
         policy.reset_eval_called();
         // Ensure mcts_search signature matches the one in mod.rs
-        let _best_move_opt = mcts_search(board, &move_gen, &policy, mate_depth, Some(iterations), None);
+        let _best_move_opt = mcts_search(
+            board,
+            &move_gen,
+            &policy,
+            mate_depth,
+            Some(iterations),
+            None,
+        );
 
         // Assert that the policy network's evaluate function was *never* called,
         // because the mate search should have found the result.
-        assert!(!policy.was_evaluate_called(), "Policy network evaluate() was called unexpectedly when mate was found by mate_search");
+        assert!(
+            !policy.was_evaluate_called(),
+            "Policy network evaluate() was called unexpectedly when mate was found by mate_search"
+        );
     }
 
-     #[test]
+    #[test]
     fn test_mcts_eval_used_when_no_mate() {
         let move_gen = setup();
         let policy = MockPolicy::new();
@@ -292,11 +342,21 @@ mod mcts_tests {
         let mate_depth = 1; // Shallow mate search will fail
 
         policy.reset_eval_called();
-        let _best_move_opt = mcts_search(board, &move_gen, &policy, mate_depth, Some(iterations), None);
+        let _best_move_opt = mcts_search(
+            board,
+            &move_gen,
+            &policy,
+            mate_depth,
+            Some(iterations),
+            None,
+        );
 
         // Assert that the policy network's evaluate function *was* called,
         // because the mate search should have failed to find a mate.
-        assert!(policy.was_evaluate_called(), "Policy network evaluate() was not called when mate search found no mate");
+        assert!(
+            policy.was_evaluate_called(),
+            "Policy network evaluate() was not called when mate search found no mate"
+        );
     }
 
     #[test]
@@ -304,33 +364,53 @@ mod mcts_tests {
         let move_gen = setup();
         let policy = MockPolicy::new();
         // White to move, mate in 1 (Qh5#)
-        let board = Board::new_from_fen("r1bqkbnr/pppp1ppp/2n5/4p2Q/2B1P3/8/PPPP1PPP/RNB1K1NR w KQkq - 0 3").expect("Valid FEN");
+        let board = Board::new_from_fen(
+            "r1bqkbnr/pppp1ppp/2n5/4p2Q/2B1P3/8/PPPP1PPP/RNB1K1NR w KQkq - 0 3",
+        )
+        .expect("Valid FEN");
         let iterations = 1; // Run only one iteration
         let mate_depth = 1;
 
         // Need access to the root node *after* search to check its stats
         // Modify mcts_search to return root node for testing? Or use interior mutability?
         // For now, let's assume the logic is correct and test the outcome (best move).
-        let best_move_opt = mcts_search(board, &move_gen, &policy, mate_depth, Some(iterations), None);
+        let best_move_opt = mcts_search(
+            board,
+            &move_gen,
+            &policy,
+            mate_depth,
+            Some(iterations),
+            None,
+        );
         assert!(best_move_opt.is_some());
         assert_eq!(best_move_opt.unwrap(), create_move("h5", "f7"));
         // We cannot easily assert root_node.total_value == 1.0 without modifying mcts_search.
         // However, finding the correct mate move strongly implies the 1.0 value was found and prioritized.
     }
 
-     #[test]
+    #[test]
     fn test_mcts_backprop_uses_eval_value() {
         let move_gen = setup();
         let policy = MockPolicy::new(); // Returns 0.5 value
-        // Standard opening position, no mate
+                                        // Standard opening position, no mate
         let board = Board::new();
         let iterations = 1;
         let mate_depth = 1; // Mate search will fail
 
         // Similar limitation as above. We check that eval was called.
         policy.reset_eval_called();
-        let _best_move_opt = mcts_search(board, &move_gen, &policy, mate_depth, Some(iterations), None);
-        assert!(policy.was_evaluate_called(), "Policy evaluate() should be called when no mate found");
+        let _best_move_opt = mcts_search(
+            board,
+            &move_gen,
+            &policy,
+            mate_depth,
+            Some(iterations),
+            None,
+        );
+        assert!(
+            policy.was_evaluate_called(),
+            "Policy evaluate() should be called when no mate found"
+        );
         // We cannot easily assert root_node.total_value == 0.5 without modifying mcts_search.
     }
 

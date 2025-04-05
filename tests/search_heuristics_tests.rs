@@ -5,13 +5,13 @@ mod tests {
     // mod eval_test_utils;
 
     use kingfisher::board::Board;
+    use kingfisher::boardstack::BoardStack;
     use kingfisher::eval::PestoEval;
     use kingfisher::move_generation::MoveGen;
-    use kingfisher::search::{alpha_beta_search, quiescence_search, see}; // Make `see` public or use internal access for testing
-    use kingfisher::boardstack::BoardStack;
-    use kingfisher::transposition::TranspositionTable;
     use kingfisher::move_types::{Move, NULL_MOVE};
-    use kingfisher::search::SEE_PIECE_VALUES; // Make public or test indirectly
+    use kingfisher::search::SEE_PIECE_VALUES;
+    use kingfisher::search::{alpha_beta_search, quiescence_search, see}; // Make `see` public or use internal access for testing
+    use kingfisher::transposition::TranspositionTable; // Make public or test indirectly
 
     const MAX_PLY: usize = 64; // Match search module
 
@@ -35,7 +35,11 @@ mod tests {
         // pxR -> gain[1] = 500 - gain[0] = 500 - 975 = -475
         // Sequence ends. Propagate back: gain[0] = -max(-gain[0], gain[1]) = -max(-975, -475) = -(-475) = 475
         let score = see(&board, &move_gen, target_sq, attacker_sq);
-        assert_eq!(score, SEE_PIECE_VALUES[4] - SEE_PIECE_VALUES[3], "SEE RxQ, pxR failed"); // 975 - 500
+        assert_eq!(
+            score,
+            SEE_PIECE_VALUES[4] - SEE_PIECE_VALUES[3],
+            "SEE RxQ, pxR failed"
+        ); // 975 - 500
     }
 
     #[test]
@@ -53,10 +57,14 @@ mod tests {
         // QxQ -> gain[1] = 975 - gain[0] = 975 - 100 = 875
         // Sequence ends. Propagate back: gain[0] = -max(-gain[0], gain[1]) = -max(-100, 875) = -(875) = -875
         let score = see(&board, &move_gen, target_sq, attacker_sq);
-         assert_eq!(score, SEE_PIECE_VALUES[0] - SEE_PIECE_VALUES[4], "SEE QxP, QxQ failed"); // 100 - 975
+        assert_eq!(
+            score,
+            SEE_PIECE_VALUES[0] - SEE_PIECE_VALUES[4],
+            "SEE QxP, QxQ failed"
+        ); // 100 - 975
     }
 
-     #[test]
+    #[test]
     fn test_see_break_even() {
         let (move_gen, _pesto) = setup();
         // White RxR on d5, rook defended by rook d8
@@ -81,7 +89,9 @@ mod tests {
         // 2r1k3/1p1n4/2B5/8/8/8/8/K7 w - - 0 1
         let board = Board::new_from_fen("2r1k3/1p1n4/2B5/8/8/8/8/K7 w - - 0 1").expect("Valid FEN");
         let target_sq = kingfisher::board_utils::algebraic_to_sq_ind("c6");
-        let attacker_sq = board.pieces[kingfisher::piece_types::WHITE][kingfisher::piece_types::BISHOP].trailing_zeros() as usize; // Find bishop
+        let attacker_sq = board.pieces[kingfisher::piece_types::WHITE]
+            [kingfisher::piece_types::BISHOP]
+            .trailing_zeros() as usize; // Find bishop
 
         // Attackers: White B(c6). Black P(b7), R(d8).
         // Sequence: BxN (gain N=320), pxB (gain B=330), RxP (gain P=100)
@@ -93,7 +103,11 @@ mod tests {
         // gain[1] = -max(-gain[1], gain[2]) = -max(-10, 90) = -90
         // gain[0] = -max(-gain[0], gain[1]) = -max(-320, -90) = -(-90) = 90
         let score = see(&board, &move_gen, target_sq, attacker_sq);
-        assert_eq!(score, SEE_PIECE_VALUES[1] - (SEE_PIECE_VALUES[3] - SEE_PIECE_VALUES[0]), "SEE BxN, pxB, RxP failed"); // N - (R - P) is not quite right, let's use expected value
+        assert_eq!(
+            score,
+            SEE_PIECE_VALUES[1] - (SEE_PIECE_VALUES[3] - SEE_PIECE_VALUES[0]),
+            "SEE BxN, pxB, RxP failed"
+        ); // N - (R - P) is not quite right, let's use expected value
         assert_eq!(score, 90, "SEE BxN, pxB, RxP expected 90");
     }
 
@@ -111,15 +125,26 @@ mod tests {
         // Run quiescence search. With SEE pruning active, it should not explore Qxb2.
         // The result should be the stand-pat evaluation, as there are no other captures/checks.
         // Use a high q_search_max_depth just in case, though it shouldn't be needed.
-        let (q_eval, _nodes) = quiescence_search(&mut board_stack, &move_gen, &pesto, -100000, 100000, 5, false);
+        let (q_eval, _nodes) = quiescence_search(
+            &mut board_stack,
+            &move_gen,
+            &pesto,
+            -100000,
+            100000,
+            5,
+            false,
+        );
 
         // Assert that the quiescence search result equals the stand-pat eval,
         // implying the losing capture was pruned by SEE.
         // Note: This assumes the SEE function and its integration in qsearch are correct.
-        assert_eq!(q_eval, stand_pat_eval, "QSearch did not prune losing SEE capture");
+        assert_eq!(
+            q_eval, stand_pat_eval,
+            "QSearch did not prune losing SEE capture"
+        );
     }
 
-     #[test]
+    #[test]
     fn test_nmp_zugzwang_refinement() {
         let (move_gen, pesto) = setup();
         let mut board_stack = BoardStack::new();
@@ -131,19 +156,37 @@ mod tests {
         // Only legal move is h7+, which leads to stalemate after Kh8 h8=Q+ KxQ.
         // Passing would be best. NMP should be OFF.
         let fen_zugzwang = "6k1/8/6KP/8/8/8/8/8 w - - 0 1";
-        board_stack.set_fen(&move_gen, fen_zugzwang).expect("Valid FEN");
+        board_stack
+            .set_fen(&move_gen, fen_zugzwang)
+            .expect("Valid FEN");
 
         // Search the Zugzwang position. Expect a draw score (0).
         // If NMP was *not* disabled, the null move search might return a high score (incorrectly assuming passing is good),
         // potentially leading to a beta cutoff and an inaccurate final evaluation.
         let (eval_zw, _, _, _) = alpha_beta_search(
-            &mut board_stack, &move_gen, &pesto, &mut tt, &mut killers, &mut history, 0,
-            6, -100000, 100000, 5, false, None, None // Depth 6 search
+            &mut board_stack,
+            &move_gen,
+            &pesto,
+            &mut tt,
+            &mut killers,
+            &mut history,
+            0,
+            6,
+            -100000,
+            100000,
+            5,
+            false,
+            None,
+            None, // Depth 6 search
         );
 
         // Assert that the evaluation is exactly 0 (stalemate score).
         // A significantly positive score would suggest NMP might have fired incorrectly.
-        assert_eq!(eval_zw, 0, "NMP likely not disabled correctly in Zugzwang; eval should be 0, got: {}", eval_zw);
+        assert_eq!(
+            eval_zw, 0,
+            "NMP likely not disabled correctly in Zugzwang; eval should be 0, got: {}",
+            eval_zw
+        );
     }
 
     #[test]
@@ -151,7 +194,8 @@ mod tests {
         let (move_gen, _pesto) = setup();
         // White NxN on d5. N defended by B(c6), P(e6). White N attacked by B(c4), Q(d8), R(d1)
         // FEN: 3q1rk1/8/2p1p1n1/3n4/2B5/8/8/K2R4 w - - 0 1
-        let board = Board::new_from_fen("3q1rk1/8/2p1p1n1/3n4/2B5/8/8/K2R4 w - - 0 1").expect("Valid FEN");
+        let board =
+            Board::new_from_fen("3q1rk1/8/2p1p1n1/3n4/2B5/8/8/K2R4 w - - 0 1").expect("Valid FEN");
         let target_sq = kingfisher::board_utils::algebraic_to_sq_ind("d5"); // Black Knight
         let attacker_sq = kingfisher::board_utils::algebraic_to_sq_ind("f6"); // White Knight
 
@@ -196,20 +240,36 @@ mod tests {
         // We use iterative_deepening up to depth 2 to ensure the mate is found.
         // A depth 1 search might be too shallow even with extension depending on qsearch.
         let (depth_searched, eval, best_move, _nodes) = iterative_deepening_ab_search(
-            &mut board_stack, &move_gen, &pesto, &mut tt,
+            &mut board_stack,
+            &move_gen,
+            &pesto,
+            &mut tt,
             2, // Max depth 2 should be enough with extension
             5, // Q-search depth
-            None, false // No time limit, not verbose
+            None,
+            false, // No time limit, not verbose
         );
 
-        let expected_move = Move::new_from_algebraic("a1a2", &board_stack.current_state(), &move_gen).expect("Qa1+ should be valid"); // Corrected algebraic notation Qa1+ -> a1a2
-        
+        let expected_move =
+            Move::new_from_algebraic("a1a2", &board_stack.current_state(), &move_gen)
+                .expect("Qa1+ should be valid"); // Corrected algebraic notation Qa1+ -> a1a2
+
         // Assert that the best move found is the checking move Qa1+
-        assert_eq!(best_move, expected_move, "Check extension failed: Did not find Qa1+ leading to mate");
+        assert_eq!(
+            best_move, expected_move,
+            "Check extension failed: Did not find Qa1+ leading to mate"
+        );
         // Assert that the evaluation reflects a forced mate (or very high score)
         // Note: Mate scores are often represented as LARGE_NUM - ply
-        assert!(eval > 900000, "Check extension failed: Evaluation ({}) doesn't reflect forced mate", eval);
-         assert!(depth_searched >= 1, "Search did not complete at least depth 1"); // Sanity check
+        assert!(
+            eval > 900000,
+            "Check extension failed: Evaluation ({}) doesn't reflect forced mate",
+            eval
+        );
+        assert!(
+            depth_searched >= 1,
+            "Search did not complete at least depth 1"
+        ); // Sanity check
     }
 
     // TODO: Add tests for Killer/History (potentially indirect, e.g., node count comparison)

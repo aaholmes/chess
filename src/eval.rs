@@ -6,43 +6,44 @@
 //! TODO: Add pawn structure and king safety, possibly using a sum of over all pairs of adjacent pawns
 //! and counting pieces and pawns in front of the king.
 
-use std::cmp::min;
-use crate::board_utils::flip_sq_ind_vertically;
-use crate::bits::{popcnt, bits};
+use crate::bits::{bits, popcnt};
 use crate::board::Board;
+use crate::board_utils::flip_sq_ind_vertically;
 use crate::board_utils::{
-    sq_to_rank, sq_to_file, get_passed_pawn_mask, get_king_shield_zone_mask,
-    get_adjacent_files_mask, sq_ind_to_bit, get_rank_mask, get_file_mask,
-    get_front_span_mask, get_king_attack_zone_mask,
+    get_adjacent_files_mask, get_file_mask, get_front_span_mask, get_king_attack_zone_mask,
+    get_king_shield_zone_mask, get_passed_pawn_mask, get_rank_mask, sq_ind_to_bit, sq_to_file,
+    sq_to_rank,
+};
+use crate::eval_constants::{
+    EvalWeights, EG_PESTO_TABLE, EG_VALUE, GAMEPHASE_INC, MG_PESTO_TABLE, MG_VALUE,
 };
 use crate::move_generation::MoveGen;
-use crate::piece_types::{PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING, WHITE, BLACK};
-use crate::eval_constants::{
-    MG_VALUE, MG_PESTO_TABLE, EG_VALUE, EG_PESTO_TABLE, GAMEPHASE_INC, EvalWeights
-};
+use crate::piece_types::{BISHOP, BLACK, KING, KNIGHT, PAWN, QUEEN, ROOK, WHITE};
+use std::cmp::min;
 
 /// Struct representing the Pesto evaluation function
 #[derive(Clone, Debug)] // Add Debug derive
 pub struct PestoEval {
     mg_table: [[[i32; 64]; 6]; 2], // Precomputed PSTs + Base Values
     eg_table: [[[i32; 64]; 6]; 2], // Precomputed PSTs + Base Values
-    pub weights: EvalWeights, // Store the tunable weights
+    pub weights: EvalWeights,      // Store the tunable weights
 }
 
 impl PestoEval {
     /// Creates a new PestoEval instance
     ///
     /// Initializes the middlegame and endgame tables for all piece types
-    pub fn new() -> PestoEval
-    {
+    pub fn new() -> PestoEval {
         let mut mg_table = [[[0; 64]; 6]; 2];
         let mut eg_table = [[[0; 64]; 6]; 2];
 
         // Initialize the piece square tables, flipping the board if necessary
         for p in 0..6 {
             for sq in 0..64 {
-                mg_table[WHITE][p][sq] = MG_VALUE[p] + MG_PESTO_TABLE[p][flip_sq_ind_vertically(sq)];
-                eg_table[WHITE][p][sq] = EG_VALUE[p] + EG_PESTO_TABLE[p][flip_sq_ind_vertically(sq)];
+                mg_table[WHITE][p][sq] =
+                    MG_VALUE[p] + MG_PESTO_TABLE[p][flip_sq_ind_vertically(sq)];
+                eg_table[WHITE][p][sq] =
+                    EG_VALUE[p] + EG_PESTO_TABLE[p][flip_sq_ind_vertically(sq)];
                 mg_table[BLACK][p][sq] = MG_VALUE[p] + MG_PESTO_TABLE[p][sq];
                 eg_table[BLACK][p][sq] = EG_VALUE[p] + EG_PESTO_TABLE[p][sq];
             }
@@ -60,7 +61,7 @@ impl PestoEval {
     /// Gets the middle game score for a piece at a square
     ///
     /// # Arguments
-    /// 
+    ///
     /// * `color` - The color of the piece (WHITE or BLACK)
     /// * `piece` - The piece type (PAWN, KNIGHT, etc.)
     /// * `square` - The square index (0-63)
@@ -99,7 +100,8 @@ impl PestoEval {
     /// (eval, game_phase)
     // Note: Added move_gen parameter
     // Pass MoveGen explicitly now as it's needed for king attack calculation
-    fn eval_plus_game_phase(&self, board: &Board, move_gen: &MoveGen) -> (i32, i32) { // Use move_gen now
+    fn eval_plus_game_phase(&self, board: &Board, move_gen: &MoveGen) -> (i32, i32) {
+        // Use move_gen now
 
         let mut mg: [i32; 2] = [0, 0];
         let mut eg: [i32; 2] = [0, 0];
@@ -165,14 +167,20 @@ impl PestoEval {
 
                 if let Some(defend1_sq) = defend1_sq_opt {
                     // Check bounds and if squares are actually diagonal (same color squares) and on board
-                    if defend1_sq < 64 && (sq % 2 == defend1_sq % 2) && (friendly_pawns & sq_ind_to_bit(defend1_sq) != 0) {
+                    if defend1_sq < 64
+                        && (sq % 2 == defend1_sq % 2)
+                        && (friendly_pawns & sq_ind_to_bit(defend1_sq) != 0)
+                    {
                         chain_bonus_mg += self.weights.pawn_chain_bonus[0];
                         chain_bonus_eg += self.weights.pawn_chain_bonus[1];
                     }
                 }
-                 if let Some(defend2_sq) = defend2_sq_opt {
+                if let Some(defend2_sq) = defend2_sq_opt {
                     // Check bounds and if squares are actually diagonal (same color squares) and on board
-                    if defend2_sq < 64 && (sq % 2 == defend2_sq % 2) && (friendly_pawns & sq_ind_to_bit(defend2_sq) != 0) {
+                    if defend2_sq < 64
+                        && (sq % 2 == defend2_sq % 2)
+                        && (friendly_pawns & sq_ind_to_bit(defend2_sq) != 0)
+                    {
                         chain_bonus_mg += self.weights.pawn_chain_bonus[0];
                         chain_bonus_eg += self.weights.pawn_chain_bonus[1];
                     }
@@ -198,30 +206,35 @@ impl PestoEval {
             let mut backward_penalty_mg = 0;
             let mut backward_penalty_eg = 0;
             for sq in bits(&friendly_pawns) {
-                 let adjacent_mask = get_adjacent_files_mask(sq);
-                 let front_span = get_front_span_mask(color, sq); // Mask of squares in front on same/adjacent files
-                 let stop_sq = if color == WHITE { sq + 8 } else { sq.wrapping_sub(8) }; // Square directly in front
+                let adjacent_mask = get_adjacent_files_mask(sq);
+                let front_span = get_front_span_mask(color, sq); // Mask of squares in front on same/adjacent files
+                let stop_sq = if color == WHITE {
+                    sq + 8
+                } else {
+                    sq.wrapping_sub(8)
+                }; // Square directly in front
 
-                 // Check if no friendly pawns on adjacent files are in front or on the same rank
-                 let no_adjacent_support = (friendly_pawns & adjacent_mask & front_span) == 0;
+                // Check if no friendly pawns on adjacent files are in front or on the same rank
+                let no_adjacent_support = (friendly_pawns & adjacent_mask & front_span) == 0;
 
-                 if no_adjacent_support && stop_sq < 64 {
-                     // Check if the square in front is attacked by an enemy pawn
-                     // TODO: Ensure move_gen.is_sq_attacked_by_pawn exists and is efficient
-                     // if _move_gen.is_sq_attacked_by_pawn(stop_sq, enemy_color, &enemy_pawns) {
-                     // Simplified check: Is front square occupied by enemy pawn? (Less accurate but avoids MoveGen dependency here)
-                     if (enemy_pawns & sq_ind_to_bit(stop_sq)) != 0 {
-                         backward_penalty_mg += self.weights.backward_pawn_penalty[0];
-                         backward_penalty_eg += self.weights.backward_pawn_penalty[1];
-                     }
-                 }
+                if no_adjacent_support && stop_sq < 64 {
+                    // Check if the square in front is attacked by an enemy pawn
+                    // TODO: Ensure move_gen.is_sq_attacked_by_pawn exists and is efficient
+                    // if _move_gen.is_sq_attacked_by_pawn(stop_sq, enemy_color, &enemy_pawns) {
+                    // Simplified check: Is front square occupied by enemy pawn? (Less accurate but avoids MoveGen dependency here)
+                    if (enemy_pawns & sq_ind_to_bit(stop_sq)) != 0 {
+                        backward_penalty_mg += self.weights.backward_pawn_penalty[0];
+                        backward_penalty_eg += self.weights.backward_pawn_penalty[1];
+                    }
+                }
             }
             mg[color] += backward_penalty_mg;
             eg[color] += backward_penalty_eg;
 
             // --- King Safety ---
             let king_sq = board.pieces[color][KING].trailing_zeros() as usize; // Keep only one definition
-            if king_sq < 64 { // Ensure king exists
+            if king_sq < 64 {
+                // Ensure king exists
                 // 3. Pawn Shield Bonus
                 let shield_zone_mask = get_king_shield_zone_mask(color, king_sq);
                 let shield_pawns = popcnt(shield_zone_mask & friendly_pawns);
@@ -231,7 +244,8 @@ impl PestoEval {
                 // 8. King Attack Score (Refined: Sum weights of pieces attacking the king zone)
                 // Applied only in middlegame for now
                 let enemy_king_sq = board.pieces[enemy_color][KING].trailing_zeros() as usize;
-                if enemy_king_sq < 64 { // Check if enemy king exists
+                if enemy_king_sq < 64 {
+                    // Check if enemy king exists
                     let attack_zone = get_king_attack_zone_mask(enemy_color, enemy_king_sq);
                     let mut total_attack_weight = 0;
 
@@ -269,10 +283,12 @@ impl PestoEval {
                 let enemy_pawns_on_file = enemy_pawns & file_mask;
 
                 if friendly_pawns_on_file == 0 {
-                    if enemy_pawns_on_file == 0 { // Open File
+                    if enemy_pawns_on_file == 0 {
+                        // Open File
                         mg[color] += self.weights.rook_open_file_bonus[0];
                         eg[color] += self.weights.rook_open_file_bonus[1];
-                    } else { // Half-Open File (for this rook's color)
+                    } else {
+                        // Half-Open File (for this rook's color)
                         mg[color] += self.weights.rook_half_open_file_bonus[0];
                         eg[color] += self.weights.rook_half_open_file_bonus[1];
                     }
@@ -282,9 +298,13 @@ impl PestoEval {
                 let friendly_file_pawns = friendly_pawns & get_file_mask(file);
                 for pawn_sq in bits(&friendly_file_pawns) {
                     let passed_mask = get_passed_pawn_mask(color, pawn_sq);
-                    if (passed_mask & enemy_pawns) == 0 { // Is pawn passed?
+                    if (passed_mask & enemy_pawns) == 0 {
+                        // Is pawn passed?
                         let pawn_rank = sq_to_rank(pawn_sq);
-                        if (color == WHITE && rank < pawn_rank) || (color == BLACK && rank > pawn_rank) { // Is rook behind?
+                        if (color == WHITE && rank < pawn_rank)
+                            || (color == BLACK && rank > pawn_rank)
+                        {
+                            // Is rook behind?
                             mg[color] += self.weights.rook_behind_passed_pawn_bonus[0];
                             eg[color] += self.weights.rook_behind_passed_pawn_bonus[1];
                             break; // Only once per rook
@@ -294,12 +314,15 @@ impl PestoEval {
 
                 // Rook behind enemy passed pawn
                 let enemy_file_pawns = enemy_pawns & get_file_mask(file);
-                 for pawn_sq in bits(&enemy_file_pawns) {
+                for pawn_sq in bits(&enemy_file_pawns) {
                     let passed_mask = get_passed_pawn_mask(enemy_color, pawn_sq);
-                    if (passed_mask & friendly_pawns) == 0 { // Is enemy pawn passed?
+                    if (passed_mask & friendly_pawns) == 0 {
+                        // Is enemy pawn passed?
                         let pawn_rank = sq_to_rank(pawn_sq);
-                         // Is rook behind enemy pawn (relative to enemy pawn direction)?
-                        if (color == WHITE && rank > pawn_rank) || (color == BLACK && rank < pawn_rank) {
+                        // Is rook behind enemy pawn (relative to enemy pawn direction)?
+                        if (color == WHITE && rank > pawn_rank)
+                            || (color == BLACK && rank < pawn_rank)
+                        {
                             mg[color] += self.weights.rook_behind_enemy_passed_pawn_bonus[0];
                             eg[color] += self.weights.rook_behind_enemy_passed_pawn_bonus[1];
                             break; // Only once per rook
@@ -317,15 +340,22 @@ impl PestoEval {
             // --- Castling Rights Bonus ---
             // Small bonus for retaining castling rights, mainly in middlegame
             if color == WHITE {
-                if board.castling_rights.white_kingside { mg[color] += self.weights.castling_rights_bonus[0]; }
-                if board.castling_rights.white_queenside { mg[color] += self.weights.castling_rights_bonus[0]; }
-            } else { // BLACK
-                if board.castling_rights.black_kingside { mg[color] += self.weights.castling_rights_bonus[0]; }
-                if board.castling_rights.black_queenside { mg[color] += self.weights.castling_rights_bonus[0]; }
+                if board.castling_rights.white_kingside {
+                    mg[color] += self.weights.castling_rights_bonus[0];
+                }
+                if board.castling_rights.white_queenside {
+                    mg[color] += self.weights.castling_rights_bonus[0];
+                }
+            } else {
+                // BLACK
+                if board.castling_rights.black_kingside {
+                    mg[color] += self.weights.castling_rights_bonus[0];
+                }
+                if board.castling_rights.black_queenside {
+                    mg[color] += self.weights.castling_rights_bonus[0];
+                }
             }
-
         } // End of loop through colors [WHITE, BLACK]
-
 
         // --- Mobility Bonus ---
         // Calculate weighted mobility score based on pseudo-legal moves
@@ -449,7 +479,13 @@ impl PestoEval {
     /// # Returns
     ///
     /// An i32 representing the evaluation of the move in centipawns
-    pub fn move_eval(&self, board: &Board, move_gen: &MoveGen, from_sq_ind: usize, to_sq_ind: usize) -> i32 {
+    pub fn move_eval(
+        &self,
+        board: &Board,
+        move_gen: &MoveGen,
+        from_sq_ind: usize,
+        to_sq_ind: usize,
+    ) -> i32 {
         // Evaluate the move (in centipawns) according to the Pesto evaluation function
         // Since Pesto only depends on piece square tables, we can just use the change in value of the moved piece
         // We don't include captures here, since we will use MVV-LVA for that instead
@@ -463,42 +499,72 @@ impl PestoEval {
 
         // Pawn forks
         if piece == (WHITE, PAWN) {
-            if move_gen.wp_capture_bitboard[to_sq_ind] & board.pieces[BLACK][KING] != 0 && move_gen.wp_capture_bitboard[to_sq_ind] & board.pieces[BLACK][QUEEN] != 0 {
+            if move_gen.wp_capture_bitboard[to_sq_ind] & board.pieces[BLACK][KING] != 0
+                && move_gen.wp_capture_bitboard[to_sq_ind] & board.pieces[BLACK][QUEEN] != 0
+            {
                 // Fork king and queen
                 return 1000;
-            } else if move_gen.wp_capture_bitboard[to_sq_ind] & board.pieces[BLACK][KING] != 0 && move_gen.wp_capture_bitboard[to_sq_ind] & board.pieces[BLACK][ROOK] != 0 {
+            } else if move_gen.wp_capture_bitboard[to_sq_ind] & board.pieces[BLACK][KING] != 0
+                && move_gen.wp_capture_bitboard[to_sq_ind] & board.pieces[BLACK][ROOK] != 0
+            {
                 // Fork king and rook
                 return 900;
-            } else if popcnt(move_gen.wp_capture_bitboard[to_sq_ind] & board.pieces[BLACK][QUEEN]) == 2 {
+            } else if popcnt(move_gen.wp_capture_bitboard[to_sq_ind] & board.pieces[BLACK][QUEEN])
+                == 2
+            {
                 // Fork two queens
                 return 850;
-            } else if move_gen.wp_capture_bitboard[to_sq_ind] & board.pieces[BLACK][QUEEN] != 0 && move_gen.wp_capture_bitboard[to_sq_ind] & board.pieces[BLACK][ROOK] != 0 {
+            } else if move_gen.wp_capture_bitboard[to_sq_ind] & board.pieces[BLACK][QUEEN] != 0
+                && move_gen.wp_capture_bitboard[to_sq_ind] & board.pieces[BLACK][ROOK] != 0
+            {
                 // Fork queen and rook
                 return 800;
-            } else if popcnt(move_gen.wp_capture_bitboard[to_sq_ind] & board.pieces[BLACK][ROOK]) == 2 {
+            } else if popcnt(move_gen.wp_capture_bitboard[to_sq_ind] & board.pieces[BLACK][ROOK])
+                == 2
+            {
                 // Fork two rooks
                 return 700;
-            } else if popcnt(move_gen.wp_capture_bitboard[to_sq_ind] & board.pieces_occ[BLACK] & !board.pieces[BLACK][PAWN]) == 2 {
+            } else if popcnt(
+                move_gen.wp_capture_bitboard[to_sq_ind]
+                    & board.pieces_occ[BLACK]
+                    & !board.pieces[BLACK][PAWN],
+            ) == 2
+            {
                 // Fork two non-pawn pieces
                 return 600;
             }
         } else if piece == (BLACK, PAWN) {
-            if move_gen.bp_capture_bitboard[to_sq_ind] & board.pieces[WHITE][KING] != 0 && move_gen.bp_capture_bitboard[to_sq_ind] & board.pieces[WHITE][QUEEN] != 0 {
+            if move_gen.bp_capture_bitboard[to_sq_ind] & board.pieces[WHITE][KING] != 0
+                && move_gen.bp_capture_bitboard[to_sq_ind] & board.pieces[WHITE][QUEEN] != 0
+            {
                 // Fork king and queen
                 return 1000;
-            } else if move_gen.bp_capture_bitboard[to_sq_ind] & board.pieces[WHITE][KING] != 0 && move_gen.bp_capture_bitboard[to_sq_ind] & board.pieces[WHITE][ROOK] != 0 {
+            } else if move_gen.bp_capture_bitboard[to_sq_ind] & board.pieces[WHITE][KING] != 0
+                && move_gen.bp_capture_bitboard[to_sq_ind] & board.pieces[WHITE][ROOK] != 0
+            {
                 // Fork king and rook
                 return 900;
-            } else if popcnt(move_gen.bp_capture_bitboard[to_sq_ind] & board.pieces[WHITE][QUEEN]) == 2 {
+            } else if popcnt(move_gen.bp_capture_bitboard[to_sq_ind] & board.pieces[WHITE][QUEEN])
+                == 2
+            {
                 // Fork two queens
                 return 850;
-            } else if move_gen.bp_capture_bitboard[to_sq_ind] & board.pieces[WHITE][QUEEN] != 0 && move_gen.bp_capture_bitboard[to_sq_ind] & board.pieces[WHITE][ROOK] != 0 {
+            } else if move_gen.bp_capture_bitboard[to_sq_ind] & board.pieces[WHITE][QUEEN] != 0
+                && move_gen.bp_capture_bitboard[to_sq_ind] & board.pieces[WHITE][ROOK] != 0
+            {
                 // Fork queen and rook
                 return 800;
-            } else if popcnt(move_gen.bp_capture_bitboard[to_sq_ind] & board.pieces[WHITE][ROOK]) == 2 {
+            } else if popcnt(move_gen.bp_capture_bitboard[to_sq_ind] & board.pieces[WHITE][ROOK])
+                == 2
+            {
                 // Fork two rooks
                 return 700;
-            } else if popcnt(move_gen.bp_capture_bitboard[to_sq_ind] & board.pieces_occ[WHITE] & !board.pieces[WHITE][PAWN]) == 2 {
+            } else if popcnt(
+                move_gen.bp_capture_bitboard[to_sq_ind]
+                    & board.pieces_occ[WHITE]
+                    & !board.pieces[WHITE][PAWN],
+            ) == 2
+            {
                 // Fork two non-pawn pieces
                 return 600;
             }
@@ -506,16 +572,23 @@ impl PestoEval {
 
         // Knight forks
         if piece == (WHITE, KNIGHT) {
-            if move_gen.n_move_bitboard[to_sq_ind] & board.pieces[BLACK][KING] != 0 && move_gen.n_move_bitboard[to_sq_ind] & board.pieces[BLACK][QUEEN] != 0 {
+            if move_gen.n_move_bitboard[to_sq_ind] & board.pieces[BLACK][KING] != 0
+                && move_gen.n_move_bitboard[to_sq_ind] & board.pieces[BLACK][QUEEN] != 0
+            {
                 // Fork king and queen
                 return 975;
-            } else if move_gen.n_move_bitboard[to_sq_ind] & board.pieces[BLACK][KING] != 0 && move_gen.n_move_bitboard[to_sq_ind] & board.pieces[BLACK][ROOK] != 0 {
+            } else if move_gen.n_move_bitboard[to_sq_ind] & board.pieces[BLACK][KING] != 0
+                && move_gen.n_move_bitboard[to_sq_ind] & board.pieces[BLACK][ROOK] != 0
+            {
                 // Fork king and rook
                 return 875;
-            } else if popcnt(move_gen.n_move_bitboard[to_sq_ind] & board.pieces[BLACK][QUEEN]) == 2 {
+            } else if popcnt(move_gen.n_move_bitboard[to_sq_ind] & board.pieces[BLACK][QUEEN]) == 2
+            {
                 // Fork two queens
                 return 825;
-            } else if move_gen.n_move_bitboard[to_sq_ind] & board.pieces[BLACK][QUEEN] != 0 && move_gen.n_move_bitboard[to_sq_ind] & board.pieces[BLACK][ROOK] != 0 {
+            } else if move_gen.n_move_bitboard[to_sq_ind] & board.pieces[BLACK][QUEEN] != 0
+                && move_gen.n_move_bitboard[to_sq_ind] & board.pieces[BLACK][ROOK] != 0
+            {
                 // Fork queen and rook
                 return 775;
             } else if popcnt(move_gen.n_move_bitboard[to_sq_ind] & board.pieces[BLACK][ROOK]) == 2 {
@@ -523,16 +596,23 @@ impl PestoEval {
                 return 675;
             }
         } else if piece == (BLACK, KNIGHT) {
-            if move_gen.n_move_bitboard[to_sq_ind] & board.pieces[WHITE][KING] != 0 && move_gen.n_move_bitboard[to_sq_ind] & board.pieces[WHITE][QUEEN] != 0 {
+            if move_gen.n_move_bitboard[to_sq_ind] & board.pieces[WHITE][KING] != 0
+                && move_gen.n_move_bitboard[to_sq_ind] & board.pieces[WHITE][QUEEN] != 0
+            {
                 // Fork king and queen
                 return 975;
-            } else if move_gen.n_move_bitboard[to_sq_ind] & board.pieces[WHITE][KING] != 0 && move_gen.n_move_bitboard[to_sq_ind] & board.pieces[WHITE][ROOK] != 0 {
+            } else if move_gen.n_move_bitboard[to_sq_ind] & board.pieces[WHITE][KING] != 0
+                && move_gen.n_move_bitboard[to_sq_ind] & board.pieces[WHITE][ROOK] != 0
+            {
                 // Fork king and rook
                 return 875;
-            } else if popcnt(move_gen.n_move_bitboard[to_sq_ind] & board.pieces[WHITE][QUEEN]) == 2 {
+            } else if popcnt(move_gen.n_move_bitboard[to_sq_ind] & board.pieces[WHITE][QUEEN]) == 2
+            {
                 // Fork two queens
                 return 825;
-            } else if move_gen.n_move_bitboard[to_sq_ind] & board.pieces[WHITE][QUEEN] != 0 && move_gen.n_move_bitboard[to_sq_ind] & board.pieces[WHITE][ROOK] != 0 {
+            } else if move_gen.n_move_bitboard[to_sq_ind] & board.pieces[WHITE][QUEEN] != 0
+                && move_gen.n_move_bitboard[to_sq_ind] & board.pieces[WHITE][ROOK] != 0
+            {
                 // Fork queen and rook
                 return 775;
             } else if popcnt(move_gen.n_move_bitboard[to_sq_ind] & board.pieces[WHITE][ROOK]) == 2 {
@@ -541,20 +621,26 @@ impl PestoEval {
             }
         }
 
-        let mut mg_score: i32 = self.mg_table[piece.0][piece.1][to_sq_ind] - self.mg_table[piece.0][piece.1][from_sq_ind];
-        let eg_score: i32 = self.eg_table[piece.0][piece.1][to_sq_ind] - self.eg_table[piece.0][piece.1][from_sq_ind];
+        let mut mg_score: i32 = self.mg_table[piece.0][piece.1][to_sq_ind]
+            - self.mg_table[piece.0][piece.1][from_sq_ind];
+        let eg_score: i32 = self.eg_table[piece.0][piece.1][to_sq_ind]
+            - self.eg_table[piece.0][piece.1][from_sq_ind];
 
         // Castling
         if piece == (WHITE, KING) && from_sq_ind == 4 {
-            if to_sq_ind == 6 { // White kingside castle
+            if to_sq_ind == 6 {
+                // White kingside castle
                 mg_score += self.mg_table[WHITE][ROOK][5] - self.mg_table[WHITE][ROOK][7];
-            } else if to_sq_ind == 2 { // White queenside castle
+            } else if to_sq_ind == 2 {
+                // White queenside castle
                 mg_score += self.mg_table[WHITE][ROOK][3] - self.mg_table[WHITE][ROOK][0];
             }
         } else if piece == (BLACK, KING) && from_sq_ind == 60 {
-            if to_sq_ind == 62 { // Black kingside castle
+            if to_sq_ind == 62 {
+                // Black kingside castle
                 mg_score += self.mg_table[BLACK][ROOK][61] - self.mg_table[BLACK][ROOK][63];
-            } else if to_sq_ind == 58 { // Black queenside castle
+            } else if to_sq_ind == 58 {
+                // Black queenside castle
                 mg_score += self.mg_table[BLACK][ROOK][59] - self.mg_table[BLACK][ROOK][56];
             }
         }

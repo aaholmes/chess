@@ -2,8 +2,8 @@
 
 use crate::boardstack::BoardStack;
 use crate::eval::PestoEval;
-use crate::move_types::Move;
 use crate::move_generation::MoveGen;
+use crate::move_types::Move;
 use crate::search::{iterative_deepening_ab_search, mate_search};
 use crate::transposition::TranspositionTable;
 
@@ -34,7 +34,7 @@ pub struct SimpleAgent<'a> {
     /// Reference to the move generator.
     pub move_gen: &'a MoveGen,
     /// Reference to the Pesto evaluation function.
-    pub pesto: &'a PestoEval
+    pub pesto: &'a PestoEval,
 }
 
 impl SimpleAgent<'_> {
@@ -52,14 +52,21 @@ impl SimpleAgent<'_> {
     /// # Returns
     ///
     /// A new `SimpleAgent` with the specified parameters.
-    pub fn new<'a>(mate_search_depth: i32, ab_search_depth: i32, q_search_max_depth: i32, verbose: bool, move_gen: &'a MoveGen, pesto: &'a PestoEval) -> SimpleAgent<'a> {
+    pub fn new<'a>(
+        mate_search_depth: i32,
+        ab_search_depth: i32,
+        q_search_max_depth: i32,
+        verbose: bool,
+        move_gen: &'a MoveGen,
+        pesto: &'a PestoEval,
+    ) -> SimpleAgent<'a> {
         SimpleAgent {
             mate_search_depth,
             ab_search_depth,
             q_search_max_depth,
             verbose,
             move_gen,
-            pesto
+            pesto,
         }
     }
 }
@@ -67,7 +74,8 @@ impl SimpleAgent<'_> {
 impl Agent for SimpleAgent<'_> {
     fn get_move(&self, board: &mut BoardStack) -> Move {
         // First, perform mate search
-        let (eval, m, nodes) = mate_search(board, self.move_gen, self.mate_search_depth, self.verbose);
+        let (eval, m, nodes) =
+            mate_search(board, self.move_gen, self.mate_search_depth, self.verbose);
         if eval == 1000000 {
             println!("Found checkmate after searching {} nodes!", nodes);
             return m;
@@ -77,7 +85,16 @@ impl Agent for SimpleAgent<'_> {
         let mut tt = TranspositionTable::new();
 
         // If no mate found, perform iterative deepening search
-        let (depth, eval, m, n) = iterative_deepening_ab_search(board, self.move_gen, self.pesto, &mut tt, self.ab_search_depth, self.q_search_max_depth, None, self.verbose);
+        let (depth, eval, m, n) = iterative_deepening_ab_search(
+            board,
+            self.move_gen,
+            self.pesto,
+            &mut tt,
+            self.ab_search_depth,
+            self.q_search_max_depth,
+            None,
+            self.verbose,
+        );
         println!("Mate search searched {} nodes, iterative deepening search searched another {} nodes at a depth of {} ({} total nodes). Eval: {}", nodes, n, depth, nodes + n, eval);
         m
     }

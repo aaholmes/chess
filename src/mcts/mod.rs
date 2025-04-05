@@ -1,41 +1,47 @@
 //! Monte Carlo Tree Search (MCTS) module.
 
 pub mod node;
-pub mod simulation; // Keep for testing/alternative use
 pub mod policy;
+pub mod simulation; // Keep for testing/alternative use
 
 use crate::board::Board;
+use crate::boardstack::BoardStack; // Needed for mate_search
+use crate::mcts::policy::PolicyNetwork;
 use crate::move_generation::MoveGen;
 use crate::move_types::Move;
-use std::rc::Rc;
+use crate::search::mate_search; // Import mate_search function
 use std::cell::RefCell;
-use std::time::{Duration, Instant};
+use std::rc::Rc;
+use std::time::{Duration, Instant}; // Use trait from submodule
 
 // Import necessary components from submodules
-pub use self::node::{MctsNode, select_leaf_for_expansion, MoveCategory};
-// Don't re-export PolicyNetwork to avoid name conflicts
-// pub use self::simulation::simulate_random_playout; // Don't export by default
+pub use self::node::{select_leaf_for_expansion, MctsNode, MoveCategory};
+pub use self::policy::PolicyNetwork; // Re-export trait
+                                     // pub use self::simulation::simulate_random_playout; // Don't export by default
 
 // Constants
 const EXPLORATION_CONSTANT: f64 = 1.414; // sqrt(2), a common value for UCT/PUCT
+const PESSIMISTIC_FACTOR: f64 = 1.0; // Factor 'k' for pessimistic value calculation (Q - k * std_err)
 
 /// Backpropagates an evaluation result through the tree.
-/// Updates visits and total_value for each node from the given leaf to the root.
+/// Updates visits, total_value, and total_value_squared for each node.
 /// Assumes 'value' is from White's perspective [0.0, 1.0].
 fn backpropagate(node: Rc<RefCell<MctsNode>>, value: f64) {
     let mut current_node_opt = Some(node);
     while let Some(current_node_rc) = current_node_opt {
-        { // Borrow scope
+        {
+            // Borrow scope
             let mut current_node = current_node_rc.borrow_mut();
             current_node.visits += 1;
             // Add value relative to the player whose turn it *was* in the parent
-            // (i.e., the player who made the move *into* current_node)
             let reward_to_add = if current_node.state.w_to_move {
-                 1.0 - value // Black just moved to get here, add Black's score (1 - White's score)
+                1.0 - value // Black just moved to get here, add Black's score
             } else {
-                 value // White just moved to get here, add White's score
+                value // White just moved to get here, add White's score
             };
             current_node.total_value += reward_to_add;
+            current_node.total_value_squared += reward_to_add.powi(2); // Accumulate squared reward
+            current_node.total_value_squared += reward_to_add.powi(2); // Accumulate squared reward
         } // End borrow scope
 
         // Move to parent
@@ -50,48 +56,38 @@ fn backpropagate(node: Rc<RefCell<MctsNode>>, value: f64) {
     }
 }
 
-/// Performs Monte Carlo Tree Search on a given position.
+/// Performs MCTS search using Policy/Value evaluation and Mate Search First strategy.
 ///
 /// # Arguments
 /// * `root_state` - The initial board state.
 /// * `move_gen` - The move generator.
+/// * `policy_network` - Implementation of the PolicyNetwork trait.
+/// * `mate_search_depth` - Depth for the classical mate search check. Set <= 0 to disable.
 /// * `iterations` - Optional number of MCTS iterations to run.
 /// * `time_limit` - Optional time duration limit for the search.
 ///
 /// # Returns
-/// The best move found for the root state. Returns None if no legal moves from root.
-pub fn mcts_search(
+/// The best move found for the root state based on visit counts. Returns None if no legal moves from root.
+pub fn mcts_search<P: PolicyNetwork>(
     root_state: Board,
     move_gen: &MoveGen,
+    policy_network: &P,
+    mate_search_depth: i32,
     iterations: Option<u32>,
     time_limit: Option<Duration>,
 ) -> Option<Move> {
     if iterations.is_none() && time_limit.is_none() {
         panic!("MCTS search requires either iterations or time_limit to be set.");
     }
+    if mate_search_depth < 0 {
+        panic!("Mate search depth cannot be negative.");
+    }
 
     let start_time = Instant::now();
     let root_node_rc = MctsNode::new_root(root_state, move_gen);
-    
-    // Initialize unexplored moves for the root
-    {
-        let mut root_node = root_node_rc.borrow_mut();
-        if !root_node.is_terminal {
-            // Generate all legal moves for the root
-            let legal_moves = MctsNode::get_legal_moves(&root_node.state, move_gen);
-            
-            // Store them in the unexplored_moves_by_cat map
-            if !legal_moves.is_empty() {
-                // For simplicity, just use Quiet category for all moves
-                let cat = MoveCategory::Quiet;
-                root_node.unexplored_moves_by_cat.insert(cat, legal_moves);
-                root_node.current_priority_category = Some(cat);
-            }
-        }
-    }
 
-    // Handle case where root node is already terminal or has no legal moves
-    if root_node_rc.borrow().is_terminal || root_node_rc.borrow().unexplored_moves_by_cat.is_empty() {
+    // Handle case where root node is already terminal
+    if root_node_rc.borrow().is_terminal {
         return None; // No moves possible
     }
 
@@ -105,104 +101,152 @@ pub fn mcts_search(
             }
         }
         if let Some(limit) = time_limit {
-            // Check time limit more frequently if iterations are high or time limit is short
-            // Simple check every iteration for now:
-            if start_time.elapsed() >= limit {
+            if (iteration_count & 63) == 0 && start_time.elapsed() >= limit {
+                // Check time periodically
                 break;
             }
         }
 
         // --- MCTS Cycle ---
         // 1. Selection: Find a leaf node suitable for expansion/evaluation.
-        let leaf_node_rc = node::select_leaf_for_expansion(root_node_rc.clone(), EXPLORATION_CONSTANT);
+        let leaf_node_rc = select_leaf_for_expansion(root_node_rc.clone(), EXPLORATION_CONSTANT);
 
-        // --- 2. Simulation and Backpropagation ---
-        let node_to_backprop_rc: Rc<RefCell<MctsNode>>;
-        let value_to_backprop: f64; // Value relative to White [0.0, 1.0]
+        // --- 2. Mate Check / Evaluation / Expansion ---
+        let mut node_to_propagate_from: Rc<RefCell<MctsNode>>;
+        let mut value_to_propagate: f64; // Value relative to White [0.0, 1.0]
 
-        { // Scope for borrowing leaf_node
+        {
+            // Scope for borrowing leaf_node
             let mut leaf_node = leaf_node_rc.borrow_mut();
 
-            // Check if the node is terminal
-            if leaf_node.is_terminal {
-                // Terminal state, use stored value
-                if leaf_node.state.w_to_move {
-                    // White's turn and is checkmate = white loss (0.0)
-                    // White's turn and is stalemate = draw (0.5)
-                    value_to_backprop = if leaf_node.is_game_terminal() { 0.0 } else { 0.5 };
+            // --- 2a. Check Terminal/Mate Status (only once per node) ---
+            if leaf_node.terminal_or_mate_value.is_none() {
+                let (is_mate, is_stalemate) = leaf_node.state.is_checkmate_or_stalemate(move_gen);
+                if is_stalemate {
+                    leaf_node.terminal_or_mate_value = Some(0.5);
+                } else if is_mate {
+                    leaf_node.terminal_or_mate_value =
+                        Some(if leaf_node.state.w_to_move { 0.0 } else { 1.0 });
+                // White's perspective
+                } else if mate_search_depth > 0 {
+                    // Not terminal, run mate search
+                    let mut mate_search_stack = BoardStack::with_board(leaf_node.state.clone());
+                    let (mate_score, _, _) =
+                        mate_search(&mut mate_search_stack, move_gen, mate_search_depth, false);
+                    if mate_score >= 1_000_000 {
+                        // Mate found for current player
+                        leaf_node.terminal_or_mate_value =
+                            Some(if leaf_node.state.w_to_move { 1.0 } else { 0.0 });
+                    } else if mate_score <= -1_000_000 {
+                        // Mated
+                        leaf_node.terminal_or_mate_value =
+                            Some(if leaf_node.state.w_to_move { 0.0 } else { 1.0 });
+                    } else {
+                        leaf_node.terminal_or_mate_value = Some(-999.0); // Sentinel: No mate found
+                    }
                 } else {
-                    // Black's turn and is checkmate = white win (1.0)
-                    // Black's turn and is stalemate = draw (0.5)
-                    value_to_backprop = if leaf_node.is_game_terminal() { 1.0 } else { 0.5 };
+                    leaf_node.terminal_or_mate_value = Some(-999.0); // Mate search disabled
                 }
-                node_to_backprop_rc = leaf_node_rc.clone(); // Backpropagate from leaf
-            } else if leaf_node.children.is_empty() {
-                // Leaf node that needs expansion
-                
-                // Initialize unexplored moves if needed
-                if leaf_node.unexplored_moves_by_cat.is_empty() {
-                    // Generate all legal moves for this node
-                    let legal_moves = MctsNode::get_legal_moves(&leaf_node.state, move_gen);
-                    
-                    // Store them in the unexplored_moves_by_cat map
-                    if !legal_moves.is_empty() {
-                        // For simplicity, just use Quiet category for all moves
-                        let cat = MoveCategory::Quiet;
-                        leaf_node.unexplored_moves_by_cat.insert(cat, legal_moves);
-                        leaf_node.current_priority_category = Some(cat);
+            }
+
+            // --- 2b. Decide Value and Node for Backpropagation ---
+            if let Some(exact_value) = leaf_node.terminal_or_mate_value {
+                if exact_value >= 0.0 {
+                    // Mate found or terminal state (0.0, 0.5, 1.0)
+                    value_to_propagate = exact_value;
+                    node_to_propagate_from = leaf_node_rc.clone(); // Backpropagate exact value from leaf
+                } else {
+                    // No mate found (sentinel -999.0), proceed to evaluate/expand
+                    // --- 2c. Evaluate Leaf (if not already done) ---
+                    if leaf_node.nn_value.is_none() {
+                        let (priors, value_current_player) =
+                            policy_network.evaluate(&leaf_node.state);
+                        let value_white_pov = if leaf_node.state.w_to_move {
+                            value_current_player
+                        } else {
+                            1.0 - value_current_player
+                        };
+                        leaf_node.nn_value = Some(value_white_pov);
+                        leaf_node.store_priors_and_categorize_moves(priors, move_gen); // Now categorize moves
+                        value_to_propagate = value_white_pov;
+                        node_to_propagate_from = leaf_node_rc.clone(); // Backpropagate evaluated value from leaf
+                    } else {
+                        // --- 2d. Expand Leaf ---
+                        if let Some(action_to_expand) = leaf_node.get_best_unexplored_move() {
+                            let next_state = leaf_node.state.apply_move_to_board(action_to_expand);
+                            let parent_weak = Rc::downgrade(&leaf_node_rc);
+                            let new_child_rc = MctsNode::new_child(
+                                parent_weak,
+                                action_to_expand,
+                                next_state,
+                                move_gen,
+                            );
+                            leaf_node.children.push(new_child_rc); // Add child
+
+                            // Backpropagate the *parent's* stored NN value when expanding (AlphaZero style)
+                            value_to_propagate = leaf_node.nn_value.unwrap();
+                            node_to_propagate_from = leaf_node_rc.clone(); // Start backprop from parent of new child
+                        } else {
+                            // Node evaluated but fully explored. This can happen.
+                            // Backpropagate the known value again to reinforce parent nodes.
+                            value_to_propagate = leaf_node.nn_value.unwrap();
+                            node_to_propagate_from = leaf_node_rc.clone();
+                        }
                     }
                 }
-                
-                // If it has unexplored moves, expand one
-                if let Some(action_to_expand) = leaf_node.get_best_unexplored_move() {
-                    let next_state = leaf_node.state.apply_move_to_board(action_to_expand);
-                    let is_white_to_move = next_state.w_to_move; // Save this before moving next_state
-                    let parent_weak = Rc::downgrade(&leaf_node_rc);
-                    
-                    // Clone next_state before passing ownership to new_child
-                    let new_child_rc = MctsNode::new_child(parent_weak, action_to_expand, next_state.clone(), move_gen);
-                    
-                    // Perform simulation on the new node
-                    let simulation_result = simulation::simulate_random_playout(&next_state, move_gen);
-                    
-                    // Transform result to white's perspective if needed
-                    value_to_backprop = if is_white_to_move {
-                        simulation_result
-                    } else {
-                        1.0 - simulation_result
-                    };
-                    
-                    leaf_node.children.push(new_child_rc.clone());
-                    node_to_backprop_rc = leaf_node_rc.clone(); // Backpropagate from parent
-                } else {
-                    // No more unexplored moves - this can happen if all moves are illegal
-                    value_to_backprop = 0.5; // Default to draw
-                    node_to_backprop_rc = leaf_node_rc.clone();
-                }
             } else {
-                // Should not happen with properly implemented selection
-                value_to_backprop = 0.5; // Default to draw
-                node_to_backprop_rc = leaf_node_rc.clone();
+                panic!("Node terminal/mate status should have been determined");
             }
         } // End borrow scope for leaf_node
 
         // --- 3. Backpropagation ---
-        backpropagate(node_to_backprop_rc, value_to_backprop);
+        backpropagate(node_to_propagate_from, value_to_propagate);
 
         iteration_count += 1;
     }
 
-    // --- Select Best Move ---
-    // Choose the child of the root with the highest visit count (most robust).
-    // Save the result before returning to avoid lifetime issues
+    // --- Select Best Move --- (Using Pessimistic Value: Q - k * StdErr)
     let best_move = {
         let root_node = root_node_rc.borrow();
-        root_node
-            .children
-            .iter()
-            .max_by_key(|child| child.borrow().visits)
+        root_node.children.iter()
+            .filter(|child_rc| child_rc.borrow().visits > 0) // Only consider visited children
+            .max_by(|a_rc, b_rc| {
+                let a = a_rc.borrow();
+                let b = b_rc.borrow();
+                let visits_a = a.visits as f64;
+                let visits_b = b.visits as f64;
+
+                // Calculate Q (average value from White's perspective)
+                let q_a = a.total_value / visits_a;
+                let q_b = b.total_value / visits_b;
+
+                // Calculate Standard Error = sqrt(Var(X) / N) = sqrt( (E[X^2] - E[X]^2) / N )
+                let var_a = (a.total_value_squared / visits_a) - q_a.powi(2);
+                let var_b = (b.total_value_squared / visits_b) - q_b.powi(2);
+                // Ensure variance is non-negative due to potential floating point inaccuracies
+                let std_err_a = (var_a.max(0.0) / visits_a).sqrt();
+                let std_err_b = (var_b.max(0.0) / visits_b).sqrt();
+
+                // Calculate Pessimistic Score (Lower Confidence Bound from White's perspective)
+                let pessimistic_a = q_a - PESSIMISTIC_FACTOR * std_err_a;
+                let pessimistic_b = q_b - PESSIMISTIC_FACTOR * std_err_b;
+
+                // Compare based on whose turn it is at the root
+                if root_node.state.w_to_move {
+                    // White wants to maximize the pessimistic score
+                    pessimistic_a.partial_cmp(&pessimistic_b).unwrap_or(std::cmp::Ordering::Equal)
+                } else {
+                    // Black wants to minimize White's pessimistic score
+                    // This is equivalent to maximizing Black's pessimistic score: (1-Q) - k*StdErr
+                    // Or minimizing White's Upper Confidence Bound: Q + k*StdErr
+                    let ucb_a = q_a + PESSIMISTIC_FACTOR * std_err_a;
+                    let ucb_b = q_b + PESSIMISTIC_FACTOR * std_err_b;
+                    // Black chooses the move with the *lowest* UCB for White
+                    ucb_b.partial_cmp(&ucb_a).unwrap_or(std::cmp::Ordering::Equal)
+                }
+            })
             .map(|best_child| best_child.borrow().action.expect("Child node must have an action"))
     };
-    
+
     best_move
 }

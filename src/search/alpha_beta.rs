@@ -1,13 +1,13 @@
-use std::time::{Duration, Instant};
-use crate::boardstack::BoardStack;
-use crate::move_generation::MoveGen;
-use crate::eval::PestoEval;
-use crate::move_types::{Move, NULL_MOVE};
-use crate::transposition::{TranspositionTable};
-use crate::board::Board;
 use super::history::HistoryTable;
 use super::history::MAX_PLY;
 use super::quiescence::quiescence_search;
+use crate::board::Board;
+use crate::boardstack::BoardStack;
+use crate::eval::PestoEval;
+use crate::move_generation::MoveGen;
+use crate::move_types::{Move, NULL_MOVE};
+use crate::transposition::TranspositionTable;
+use std::time::{Duration, Instant};
 
 /// Perform alpha-beta search from the given position
 ///
@@ -46,7 +46,7 @@ pub fn alpha_beta_search(
     q_search_max_depth: i32,
     verbose: bool,
     start_time: Option<Instant>,
-    time_limit: Option<Duration>
+    time_limit: Option<Duration>,
 ) -> (i32, Move, i32, bool) {
     let mut best_move: Move = NULL_MOVE;
     let mut alpha: i32 = alpha_init;
@@ -78,7 +78,11 @@ pub fn alpha_beta_search(
     }
 
     // Generate and combine captures and regular moves
-    let (mut captures, moves) = move_gen.gen_pseudo_legal_moves_with_evals(&mut board.current_state(), pesto, Some(history));
+    let (mut captures, moves) = move_gen.gen_pseudo_legal_moves_with_evals(
+        &mut board.current_state(),
+        pesto,
+        Some(history),
+    );
     captures.extend(moves);
 
     // Print the list of captures
@@ -109,7 +113,7 @@ pub fn alpha_beta_search(
             -beta,
             -alpha,
             q_search_max_depth,
-            verbose
+            verbose,
         );
         eval = -search_eval;
         n += nodes;
@@ -119,9 +123,16 @@ pub fn alpha_beta_search(
         }
 
         if verbose {
-            println!("Just checked move {}, current best move is {}", m, best_move);
+            println!(
+                "Just checked move {}, current best move is {}",
+                m, best_move
+            );
             if let Some(start_time) = start_time {
-                println!("Current time: {:?}, time limit: {:?}", start_time.elapsed(), time_limit);
+                println!(
+                    "Current time: {:?}, time limit: {:?}",
+                    start_time.elapsed(),
+                    time_limit
+                );
             }
         }
 
@@ -151,7 +162,10 @@ pub fn alpha_beta_search(
     }
 
     if verbose {
-        println!("Alpha beta search at depth {} searched {} nodes. Best eval and move are {} {}", depth, n, alpha, best_move);
+        println!(
+            "Alpha beta search at depth {} searched {} nodes. Best eval and move are {} {}",
+            depth, n, alpha, best_move
+        );
     }
 
     // Store the result in the transposition table
@@ -172,17 +186,29 @@ fn alpha_beta_recursive(
     mut alpha: i32,
     beta: i32,
     q_search_max_depth: i32,
-    verbose: bool
+    verbose: bool,
 ) -> (i32, i32) {
     if depth <= 0 {
-        return quiescence_search(board, move_gen, pesto, alpha, beta, q_search_max_depth, verbose);
+        return quiescence_search(
+            board,
+            move_gen,
+            pesto,
+            alpha,
+            beta,
+            q_search_max_depth,
+            verbose,
+        );
     }
 
     let mut best_eval: i32 = -1000000;
     let mut n: i32 = 0;
 
     // Generate and combine captures and regular moves
-    let (mut captures, moves) = move_gen.gen_pseudo_legal_moves_with_evals(&mut board.current_state(), pesto, Some(history));
+    let (mut captures, moves) = move_gen.gen_pseudo_legal_moves_with_evals(
+        &mut board.current_state(),
+        pesto,
+        Some(history),
+    );
     captures.extend(moves);
 
     // Iterate through all moves
@@ -192,7 +218,7 @@ fn alpha_beta_recursive(
             board.undo_move();
             continue;
         }
-        
+
         // --- Check Extension ---
         // Extend search if the move 'm' results in check for the opponent
         let mut extension = 0;
@@ -202,7 +228,19 @@ fn alpha_beta_recursive(
         }
         let new_depth = depth - 1 + extension;
 
-        let (mut eval, nodes) = alpha_beta_recursive(board, move_gen, pesto, tt, killers, history, new_depth, -beta, -alpha, q_search_max_depth, verbose);
+        let (mut eval, nodes) = alpha_beta_recursive(
+            board,
+            move_gen,
+            pesto,
+            tt,
+            killers,
+            history,
+            new_depth,
+            -beta,
+            -alpha,
+            q_search_max_depth,
+            verbose,
+        );
         eval = -eval;
         n += nodes;
 
@@ -231,7 +269,7 @@ fn alpha_beta_recursive(
 fn is_capture(board: &Board, mv: &Move) -> bool {
     let target_square_bb = 1u64 << mv.to;
     let opponent_color = !board.w_to_move as usize;
-    
+
     // Check if the target square is occupied by an opponent's piece
     (board.pieces_occ[opponent_color] & target_square_bb) != 0
-} 
+}

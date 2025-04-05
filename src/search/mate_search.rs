@@ -20,7 +20,12 @@ use crate::move_types::Move;
 /// * The evaluation: 1000000 for checkmate, -1000000 for checkmate against, or 0 for neither
 /// * The best move to play from the current position
 /// * The number of nodes searched
-pub fn mate_search(board: &mut BoardStack, move_gen: &MoveGen, max_depth: i32, verbose: bool) -> (i32, Move, i32) {
+pub fn mate_search(
+    board: &mut BoardStack,
+    move_gen: &MoveGen,
+    max_depth: i32,
+    verbose: bool,
+) -> (i32, Move, i32) {
     let mut eval: i32 = 0;
     let mut best_move = Move::new(0, 0, None);
     let mut n: i32 = 0;
@@ -49,7 +54,8 @@ pub fn mate_search(board: &mut BoardStack, move_gen: &MoveGen, max_depth: i32, v
                 board.undo_move();
                 continue;
             }
-            let (score, nodes) = mate_search_recursive(board, move_gen, depth - 1, -beta, -alpha, false);
+            let (score, nodes) =
+                mate_search_recursive(board, move_gen, depth - 1, -beta, -alpha, false);
             eval = -score;
             n += nodes;
             if eval > alpha {
@@ -62,7 +68,10 @@ pub fn mate_search(board: &mut BoardStack, move_gen: &MoveGen, max_depth: i32, v
             }
         }
         if verbose {
-            println!("At depth {} ply, searched {} nodes. best eval {}", depth, n, eval);
+            println!(
+                "At depth {} ply, searched {} nodes. best eval {}",
+                depth, n, eval
+            );
         }
         // If checkmate found, stop searching
         if eval == 1000000 {
@@ -94,7 +103,14 @@ pub fn mate_search(board: &mut BoardStack, move_gen: &MoveGen, max_depth: i32, v
 /// A tuple containing:
 /// * The evaluation: -1000000 for checkmate, 0 for no mate found
 /// * The number of nodes searched
-fn mate_search_recursive(board: &mut BoardStack, move_gen: &MoveGen, depth: i32, mut alpha: i32, beta: i32, side_to_move: bool) -> (i32, i32) {
+fn mate_search_recursive(
+    board: &mut BoardStack,
+    move_gen: &MoveGen,
+    depth: i32,
+    mut alpha: i32,
+    beta: i32,
+    side_to_move: bool,
+) -> (i32, i32) {
     // Private recursive function used for mate search
     // External functions should call mate_search instead
     // Returns the eval (in centipawns) of the final position
@@ -125,7 +141,8 @@ fn mate_search_recursive(board: &mut BoardStack, move_gen: &MoveGen, depth: i32,
             board.undo_move();
             continue;
         }
-        let (mut eval, nodes) = mate_search_recursive(board, move_gen, depth - 1, -beta, -alpha, !side_to_move);
+        let (mut eval, nodes) =
+            mate_search_recursive(board, move_gen, depth - 1, -beta, -alpha, !side_to_move);
         eval = -eval;
         n += nodes;
         if eval > alpha {
@@ -137,4 +154,4 @@ fn mate_search_recursive(board: &mut BoardStack, move_gen: &MoveGen, depth: i32,
         }
     }
     (alpha, n)
-} 
+}

@@ -5,7 +5,7 @@
 use crate::board::Board;
 use crate::board_utils::sq_ind_to_bit;
 use crate::move_types::Move;
-use crate::piece_types::{PAWN, ROOK, KING, WHITE, BLACK};
+use crate::piece_types::{BLACK, KING, PAWN, ROOK, WHITE};
 
 impl Board {
     /// Makes a move on the board, returning a new board with the move applied
@@ -47,7 +47,9 @@ impl Board {
 
         if from_piece.unwrap().1 == PAWN {
             // En passant
-            if new_board.en_passant.is_some() && the_move.to == new_board.en_passant.unwrap() as usize {
+            if new_board.en_passant.is_some()
+                && the_move.to == new_board.en_passant.unwrap() as usize
+            {
                 // Capture the pawn.
                 if new_board.w_to_move {
                     new_board.pieces[BLACK][PAWN] ^= sq_ind_to_bit(the_move.to - 8);
@@ -111,7 +113,7 @@ impl Board {
             if from_piece.unwrap().0 == WHITE {
                 // White rook
                 if the_move.from == 0 {
-                    new_board.castling_rights.white_queenside= false;
+                    new_board.castling_rights.white_queenside = false;
                 } else if the_move.from == 7 {
                     new_board.castling_rights.white_kingside = false;
                 }

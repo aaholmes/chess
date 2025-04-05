@@ -1,10 +1,10 @@
 #[cfg(test)]
 mod tests {
-    use std::time::{Duration, Instant};
     use kingfisher::boardstack::BoardStack;
     use kingfisher::eval::PestoEval;
     use kingfisher::move_generation::MoveGen;
     use kingfisher::search::iterative_deepening_ab_search;
+    use std::time::{Duration, Instant};
 
     #[test]
     fn test_time_management_short_duration() {
@@ -16,12 +16,24 @@ mod tests {
         let time_limit = Some(Duration::from_millis(50)); // Very short time limit
 
         let start = Instant::now();
-        let (depth, _, _, _) = iterative_deepening_ab_search(&mut board, &move_gen, &pesto, max_depth, q_search_max_depth, time_limit, false);
+        let (depth, _, _, _) = iterative_deepening_ab_search(
+            &mut board,
+            &move_gen,
+            &pesto,
+            max_depth,
+            q_search_max_depth,
+            time_limit,
+            false,
+        );
         let elapsed = start.elapsed();
 
         println!("Searched depth: {}", depth);
 
-        assert!(elapsed <= (12 * time_limit.unwrap()) / 10, "Search took too long: {:?}", elapsed);
+        assert!(
+            elapsed <= (12 * time_limit.unwrap()) / 10,
+            "Search took too long: {:?}",
+            elapsed
+        );
     }
 
     #[test]
@@ -34,11 +46,23 @@ mod tests {
         let time_limit = Some(Duration::from_secs(2));
 
         let start = Instant::now();
-        let (depth, _, _, _) = iterative_deepening_ab_search(&mut board, &move_gen, &pesto, max_depth, q_search_max_depth, time_limit, false);
+        let (depth, _, _, _) = iterative_deepening_ab_search(
+            &mut board,
+            &move_gen,
+            &pesto,
+            max_depth,
+            q_search_max_depth,
+            time_limit,
+            false,
+        );
         let elapsed = start.elapsed();
 
         println!("Searched depth: {}", depth);
-        assert!(elapsed <= (12 * time_limit.unwrap()) / 10, "Search took too long: {:?}", elapsed);
+        assert!(
+            elapsed <= (12 * time_limit.unwrap()) / 10,
+            "Search took too long: {:?}",
+            elapsed
+        );
     }
 
     #[test]
@@ -50,7 +74,15 @@ mod tests {
         let q_search_max_depth = 3;
         let time_limit = Some(Duration::from_secs(10)); // Generous time limit
 
-        let (depth, _, _, nodes) = iterative_deepening_ab_search(&mut board, &move_gen, &pesto, max_depth, q_search_max_depth, time_limit, false);
+        let (depth, _, _, nodes) = iterative_deepening_ab_search(
+            &mut board,
+            &move_gen,
+            &pesto,
+            max_depth,
+            q_search_max_depth,
+            time_limit,
+            false,
+        );
 
         println!("Searched depth: {}", depth);
 
@@ -68,11 +100,23 @@ mod tests {
         let time_limit = Some(Duration::from_secs(1));
 
         let start = Instant::now();
-        let (depth, _, _, _) = iterative_deepening_ab_search(&mut board, &move_gen, &pesto, max_depth, q_search_max_depth, time_limit, false);
+        let (depth, _, _, _) = iterative_deepening_ab_search(
+            &mut board,
+            &move_gen,
+            &pesto,
+            max_depth,
+            q_search_max_depth,
+            time_limit,
+            false,
+        );
         let elapsed = start.elapsed();
 
         println!("Searched depth: {}", depth);
 
-        assert!(elapsed >= (9 * time_limit.unwrap()) / 10, "Search finished too quickly: {:?}", elapsed);
+        assert!(
+            elapsed >= (9 * time_limit.unwrap()) / 10,
+            "Search finished too quickly: {:?}",
+            elapsed
+        );
     }
 }

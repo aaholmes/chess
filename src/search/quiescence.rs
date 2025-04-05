@@ -1,7 +1,7 @@
-use crate::boardstack::BoardStack;
-use crate::move_generation::MoveGen;
-use crate::eval::PestoEval;
 use super::see::see;
+use crate::boardstack::BoardStack;
+use crate::eval::PestoEval;
+use crate::move_generation::MoveGen;
 
 /// Performs a quiescence search to evaluate tactical sequences and avoid the horizon effect.
 pub fn quiescence_search(
@@ -11,7 +11,7 @@ pub fn quiescence_search(
     mut alpha: i32,
     beta: i32,
     max_depth: i32, // Remaining depth
-    verbose: bool
+    verbose: bool,
 ) -> (i32, i32) {
     let mut nodes = 1;
 
@@ -55,7 +55,15 @@ pub fn quiescence_search(
         }
 
         // Recursive call
-        let (mut score, n) = quiescence_search(board, move_gen, pesto, -beta, -alpha, max_depth - 1, verbose);
+        let (mut score, n) = quiescence_search(
+            board,
+            move_gen,
+            pesto,
+            -beta,
+            -alpha,
+            max_depth - 1,
+            verbose,
+        );
         score = -score; // Negamax adjustment
         nodes += n;
 
@@ -71,4 +79,4 @@ pub fn quiescence_search(
     }
 
     (alpha, nodes) // Return the best score found within the alpha-beta bounds
-} 
+}

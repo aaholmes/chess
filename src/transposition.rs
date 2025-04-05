@@ -3,9 +3,9 @@
 //! This module implements a transposition table, which is used to cache and retrieve
 //! information about previously analyzed chess positions, improving search efficiency.
 
-use std::collections::HashMap;
 use crate::board::Board;
 use crate::move_types::Move;
+use std::collections::HashMap;
 
 /// Represents an entry in the transposition table.
 #[derive(PartialEq)]
@@ -27,7 +27,9 @@ pub struct TranspositionTable {
 impl TranspositionTable {
     /// Creates a new transposition table.
     pub fn new() -> Self {
-        TranspositionTable { table: HashMap::new() }
+        TranspositionTable {
+            table: HashMap::new(),
+        }
     }
 
     /// Checks the table for a given board position and search depth.
@@ -70,11 +72,25 @@ impl TranspositionTable {
         // If the position already exists, update it if the depth is greater
         let entry = self.table.get(&board.zobrist_hash);
         if entry == None {
-            self.table.insert(board.zobrist_hash, TranspositionEntry {depth, score, best_move});
+            self.table.insert(
+                board.zobrist_hash,
+                TranspositionEntry {
+                    depth,
+                    score,
+                    best_move,
+                },
+            );
         } else {
             let entry = entry.unwrap();
             if depth > entry.depth {
-                self.table.insert(board.zobrist_hash, TranspositionEntry {depth, score, best_move});
+                self.table.insert(
+                    board.zobrist_hash,
+                    TranspositionEntry {
+                        depth,
+                        score,
+                        best_move,
+                    },
+                );
             }
         }
     }
