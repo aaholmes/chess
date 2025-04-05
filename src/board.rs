@@ -9,7 +9,7 @@ use crate::piece_types::{PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING, WHITE, BLACK};
 ///
 /// Each piece type and color has its own 64-bit unsigned integer,
 /// where each bit represents a square on the chess board.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Board {
     pub(crate) pieces: [[u64; 6]; 2],  // [Color as usize][PieceType as usize]
     pub(crate) pieces_occ: [u64; 2],   // Total occupancy for each color

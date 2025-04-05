@@ -1,7 +1,7 @@
 use std::cmp::max;
 use crate::board::Board;
 use crate::move_generation::MoveGen;
-use crate::piece_types::{PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING};
+use crate::piece_types::{PAWN, KING};
 
 // Piece values for SEE (simple centipawn values)
 // Order: P, N, B, R, Q, K (index 6 is 0)

@@ -35,7 +35,7 @@ fn test_capture_ordering() {
     let pesto = PestoEval::new();
 
     board.print();
-    let (captures, _) = move_gen.gen_pseudo_legal_moves_with_evals(&board, &pesto);
+    let (captures, _) = move_gen.gen_pseudo_legal_moves_with_evals_no_history(&board, &pesto);
 
     let capture_vals: Vec<i32> = captures.iter().map(|m| move_gen.mvv_lva(&board, m.from, m.to)).collect();
     println!("{} Captures:", captures.len());
@@ -55,7 +55,7 @@ fn test_non_capture_ordering_white() {
     let move_gen = MoveGen::new();
     let pesto = PestoEval::new();
 
-    let (captures, non_captures) = move_gen.gen_pseudo_legal_moves_with_evals(&board, &pesto);
+    let (captures, non_captures) = move_gen.gen_pseudo_legal_moves_with_evals_no_history(&board, &pesto);
 
     board.print();
 
@@ -82,7 +82,7 @@ fn test_non_capture_ordering_black() {
     let move_gen = MoveGen::new();
     let pesto = PestoEval::new();
 
-    let (captures, non_captures) = move_gen.gen_pseudo_legal_moves_with_evals(&board, &pesto);
+    let (captures, non_captures) = move_gen.gen_pseudo_legal_moves_with_evals_no_history(&board, &pesto);
 
     board.print();
 
@@ -124,7 +124,7 @@ fn test_pawn_fork_ordering() {
 
     let board = boardstack.current_state();
 
-    let (captures, non_captures) = move_gen.gen_pseudo_legal_moves_with_evals(&board, &pesto);
+    let (captures, non_captures) = move_gen.gen_pseudo_legal_moves_with_evals_no_history(&board, &pesto);
 
     board.print();
 
@@ -137,4 +137,78 @@ fn test_pawn_fork_ordering() {
         println!("{}. {} ({})", i+1, m, pesto.move_eval(&board, &move_gen, m.from, m.to));
     }
     assert!(pesto.move_eval(&board, &move_gen, non_captures[0].from, non_captures[0].to) == 600);
+}
+
+#[test]
+fn test_pseudo_legal_captures() {
+    let board = Board::new();
+    let move_gen = MoveGen::new();
+    let pesto = PestoEval::new();
+    
+    // Using the gen_pseudo_legal_moves_with_evals_no_history method instead
+    let (captures, _) = move_gen.gen_pseudo_legal_moves_with_evals_no_history(&board, &pesto);
+    assert!(captures.is_empty(), "No captures should be possible in the starting position");
+}
+
+#[test]
+fn test_mvv_lva_ordering() {
+    let board = Board::from_fen("rnbqkbnr/ppp2ppp/8/3pp3/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 0 1").unwrap();
+    let move_gen = MoveGen::new();
+    let pesto = PestoEval::new();
+    
+    // Using the gen_pseudo_legal_moves_with_evals_no_history method instead
+    let (captures, non_captures) = move_gen.gen_pseudo_legal_moves_with_evals_no_history(&board, &pesto);
+    
+    assert!(!captures.is_empty(), "Captures should be possible in this position");
+    
+    // Check if captures are ordered by MVV-LVA
+    for i in 0..(captures.len() - 1) {
+        let current_score = move_gen.mvv_lva(&board, captures[i].from, captures[i].to);
+        let next_score = move_gen.mvv_lva(&board, captures[i+1].from, captures[i+1].to);
+        assert!(current_score >= next_score, "Captures should be ordered by descending MVV-LVA scores");
+    }
+}
+
+#[test]
+fn test_pesto_move_eval_consistency() {
+    let fen = "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 1";
+    let board = Board::from_fen(fen).unwrap();
+    let move_gen = MoveGen::new();
+    let pesto = PestoEval::new();
+    
+    // Using the gen_pseudo_legal_moves_with_evals_no_history method instead
+    let (captures, non_captures) = move_gen.gen_pseudo_legal_moves_with_evals_no_history(&board, &pesto);
+    
+    // Check if non-captures are ordered by descending PestoEval scores
+    for i in 0..(non_captures.len() - 1) {
+        let current_score = pesto.move_eval(&board, &move_gen, non_captures[i].from, non_captures[i].to);
+        let next_score = pesto.move_eval(&board, &move_gen, non_captures[i+1].from, non_captures[i+1].to);
+        assert!(current_score >= next_score, "Non-captures should be ordered by descending PestoEval scores");
+    }
+}
+
+#[test]
+fn test_promotion_handling() {
+    let fen = "rnbqk2r/pppp1P1p/5n2/2b1p3/4P3/8/PPPP2PP/RNBQKBNR w KQkq - 0 1";
+    let board = Board::from_fen(fen).unwrap();
+    let move_gen = MoveGen::new();
+    let pesto = PestoEval::new();
+    
+    // Using the gen_pseudo_legal_moves_with_evals_no_history method instead
+    let (captures, non_captures) = move_gen.gen_pseudo_legal_moves_with_evals_no_history(&board, &pesto);
+    
+    // Count promotions and make sure they're properly ordered
+    let mut promotion_count = 0;
+    for m in &captures {
+        if m.promotion.is_some() {
+            promotion_count += 1;
+            
+            // Promotions to queen should come before other promotion types
+            if promotion_count == 1 {
+                assert_eq!(m.promotion, Some(QUEEN), "First promotion should be to queen");
+            }
+        }
+    }
+    
+    assert!(promotion_count > 0, "Promotions should be present in captures list");
 }

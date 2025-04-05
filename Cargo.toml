@@ -8,8 +8,8 @@ name = "kingfisher"
 path = "src/lib.rs"
 
 [dependencies]
+rand = "0.8.5" # Added for MCTS random playouts
 lazy_static = "1.5.0"
-rand = "0.8.5"
 
 [profile.release]
 debug = true

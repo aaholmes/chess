@@ -31,8 +31,14 @@ This research direction seeks to bridge the gap between traditional chess progra
     *   Killer Heuristic move ordering.
     *   History Heuristic move ordering (`history.rs`).
     *   Aspiration Windows.
+    *   Check Extensions.
     *   Dedicated Mate Search function.
-*   **Evaluation:** Pesto-style tapered evaluation (`eval.rs`) using Piece-Square Tables (PSTs). Includes bonuses/penalties for:
+*   **Monte Carlo Tree Search (MCTS):** (Modularized in `src/mcts/`)
+    *   Core MCTS framework (Selection, Expansion, Backpropagation).
+    *   Uses PUCT (Polynomial Upper Confidence Trees) selection formula.
+    *   Integrates with a `PolicyNetwork` trait (`policy.rs`) for move priors and state evaluation (replaces random rollouts).
+    *   Includes an example `PestoPolicy` using `PestoEval` for value and uniform priors.
+*   **Evaluation:** Pesto-style tapered evaluation (`eval.rs`) used by Alpha-Beta and potentially by MCTS policy/value implementations. Includes:
     *   Material and PSTs
     *   Passed Pawns
     *   Two Bishops Bonus
@@ -75,7 +81,8 @@ To use Kingfisher, you'll need Rust installed on your system. If you don't have 
 *   `src/magic_constants.rs`: Magic bitboard constants.
 *   `src/eval.rs`: Position evaluation using Pesto function (`PestoEval` struct).
 *   `src/eval_constants.rs`: Constants for the Pesto evaluation (PSTs, game phase increments).
-*   `src/search/`: Module containing search algorithms (alpha-beta, iterative deepening, quiescence, SEE, etc.).
+*   `src/search/`: Module containing classical search algorithms (alpha-beta, iterative deepening, quiescence, SEE, etc.).
+*   `src/mcts/`: Module containing Monte Carlo Tree Search implementation (`node.rs`, `policy.rs`, `simulation.rs` [kept for testing]).
 *   `src/transposition.rs`: Transposition table implementation.
 *   `src/make_move.rs`: Move execution and board state updates (integrated into `BoardStack`).
 *   `src/uci.rs`: Handles the UCI protocol for communication with GUIs.
@@ -104,6 +111,7 @@ To use Kingfisher, you'll need Rust installed on your system. If you don't have 
 *   Move Ordering: MVV-LVA, TT Move, Killer Heuristic, History Heuristic, Basic Fork Detection
 *   Check Extensions
 *   Mate Search Function
+*   MCTS Framework (PUCT, Policy/Value integration)
 *   Evaluation Terms:
     *   Piece-Square Tables (PSTs)
     *   Passed Pawns
@@ -116,10 +124,12 @@ To use Kingfisher, you'll need Rust installed on your system. If you don't have 
 ### In Progress
 *   UCI protocol refinement (basic implementation exists)
 *   Mate Search Integration (Function exists, integration into main search TBD)
+*   MCTS Policy Network Implementation (Requires NN or advanced heuristics)
+*   MCTS Tuning (Exploration constant, etc.)
 *   History Heuristic Decay/Scaling (Optional refinement)
 
 ### Implementation Roadmap
-*   **Improved Evaluation:** Refine King Attack Score (e.g., safety table), add more terms (e.g., mobility, open files near king), refine pawn structure logic, tune all term weights.
+*   **Improved Evaluation:** Refine King Attack Score (e.g., safety table), add more terms (e.g., mobility), refine pawn structure logic, tune all term weights (for Pesto and potentially for NN value head).
 *   **Time Management:** Implement robust time controls for UCI.
 *   **Opening Book:** Integrate a standard opening book format.
 *   **Endgame Tablebases:** Add support for querying tablebases (e.g., Syzygy).
@@ -127,7 +137,7 @@ To use Kingfisher, you'll need Rust installed on your system. If you don't have 
 *   **Comprehensive Testing:** Expand test suite (heuristics, eval terms, search interactions).
 
 ### Research Directions
-*   **Hybrid Search (Core Goal):** Integrate the classical search (especially mate search) with MCTS and a neural network evaluation/policy component.
+*   **Hybrid Search (Core Goal):** Integrate the classical search (especially mate search) with the implemented MCTS (using a proper Policy/Value Network).
 *   **Neural Network Design:** Develop and train an interpretable neural network suitable for the hybrid approach.
 *   **Style Mimicry:** Investigate training the NN component to emulate specific human or engine playing styles.
 *   **Variant Exploration:** Apply and evaluate the hybrid approach in chess variants like King of the Hill.

@@ -370,7 +370,7 @@ pub fn get_front_span_mask(color: usize, sq: usize) -> u64 {
 
 /// Get a bitboard containing the king's attack zone (squares around the king).
 /// Used for king safety evaluations and detecting attacks against the king.
-pub fn get_king_attack_zone_mask(color: usize, king_sq: usize) -> u64 {
+pub fn get_king_attack_zone_mask(_color: usize, king_sq: usize) -> u64 {
     // The attack zone is all squares within distance 2 of the king
     let mut mask = 0;
     

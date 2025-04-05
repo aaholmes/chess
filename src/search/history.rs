@@ -38,6 +38,11 @@ impl HistoryTable {
         self.table[mv.from][mv.to]
     }
 
+    /// Get the history score for a move specified by from and to squares
+    pub fn get_score_from_squares(&self, from: usize, to: usize) -> i32 {
+        self.table[from][to]
+    }
+
     /// Clear all history scores
     pub fn clear(&mut self) {
         for from in 0..64 {

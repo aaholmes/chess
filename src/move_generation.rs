@@ -37,9 +37,9 @@ pub struct MoveGen {
     /// Bitboards for pawn captures.
     pub bp_capture_bitboard: [u64; 64],
     /// Precomputed tables for pawn promotions.
-    wp_promotions: Vec<Vec<usize>>,
+    _wp_promotions: Vec<Vec<usize>>,
     /// Precomputed tables for pawn promotions.
-    bp_promotions: Vec<Vec<usize>>,
+    _bp_promotions: Vec<Vec<usize>>,
     /// Precomputed tables for knight moves.
     pub n_moves: Vec<Vec<usize>>,
     /// Precomputed tables for king moves.
@@ -137,13 +137,13 @@ impl MoveGen {
             wp_moves.push(wp.clone());
             bp_moves.push(bp.clone());
         }
-        let mut move_gen: MoveGen = MoveGen {
+        let mut move_gen = MoveGen {
             wp_captures,
             bp_captures,
             wp_capture_bitboard,
             bp_capture_bitboard,
-            wp_promotions,
-            bp_promotions,
+            _wp_promotions: Vec::new(),
+            _bp_promotions: Vec::new(),
             n_moves,
             k_moves,
             n_move_bitboard,
@@ -173,7 +173,7 @@ impl MoveGen {
     /// Internal helper to generate all pseudo-legal moves, separated.
     fn _generate_all_moves(&self, board: &Board) -> (Vec<Move>, Vec<Move>, Vec<Move>) {
         // Returns (captures, promotions, quiet_moves)
-        let (mut captures, mut promotions, mut moves) = self.gen_pawn_moves(board);
+        let (mut captures, promotions, mut moves) = self.gen_pawn_moves(board);
         let (mut captures_knights, mut moves_knights) = self.gen_knight_moves(board);
         let (mut captures_kings, mut moves_kings) = self.gen_king_moves(board);
         let (mut captures_rooks, mut moves_rooks) = self.gen_rook_moves(board);
@@ -228,25 +228,51 @@ impl MoveGen {
     ///
     /// A tuple containing the sorted capture moves and sorted non-capture moves.
     pub fn gen_pseudo_legal_moves_with_evals(&self, board: &Board, pesto: &PestoEval, history: Option<&HistoryTable>) -> (Vec<Move>, Vec<Move>) {
-        let (mut captures, mut promotions, mut moves) = self._generate_all_moves(board);
-        captures.append(&mut promotions); // Combine promotions with captures
-
-        // Sort captures by MVV-LVA (descending)
-        captures.sort_unstable_by_key(|m| -self.mvv_lva(board, m.from, m.to));
-
-        // Sort quiet moves first by history score (if available), then by evaluation score
-        if let Some(history) = history {
-            // First sort by history score (unstable)
-            moves.sort_unstable_by_key(|m| -history.get_score(m));
-            
-            // Then do a stable sort by eval score to maintain history order for equal evals
-            moves.sort_by_key(|m| -pesto.move_eval(board, self, m.from, m.to));
-        } else {
-            // If no history table, just sort by eval score
-            moves.sort_unstable_by_key(|m| -pesto.move_eval(board, self, m.from, m.to));
+        // Get all moves
+        let (captures, non_captures) = self.gen_pseudo_legal_moves(board);
+        
+        // Nothing to do if captures or non_captures are empty
+        if captures.is_empty() && non_captures.is_empty() {
+            return (captures, non_captures);
         }
 
-        (captures, moves)
+        // Sort captures by MVV-LVA
+        let mut captures_with_eval: Vec<(Move, i32)> = captures
+            .into_iter()
+            .map(|m| (m.clone(), self.mvv_lva(board, m.from, m.to)))
+            .collect();
+        captures_with_eval.sort_by(|a, b| b.1.cmp(&a.1));
+        let sorted_captures = captures_with_eval.into_iter().map(|(m, _)| m).collect();
+
+        // Sort non-captures by history score if available, then by evaluation
+        let mut non_captures_with_eval: Vec<(Move, i32, i32)> = non_captures
+            .into_iter()
+            .map(|m| {
+                // Get history score (if history table provided)
+                let history_score = history.map_or(0, |h| h.get_score_from_squares(m.from, m.to));
+                // Get evaluation score
+                let eval_score = pesto.move_eval(board, self, m.from, m.to);
+                (m.clone(), history_score, eval_score)
+            })
+            .collect();
+        
+        // First sort by history score (unstable sort)
+        if history.is_some() {
+            non_captures_with_eval.sort_by(|a, b| b.1.cmp(&a.1));
+        }
+        
+        // Then sort by evaluation (stable sort)
+        non_captures_with_eval.sort_by(|a, b| b.2.cmp(&a.2));
+        
+        let sorted_non_captures = non_captures_with_eval.into_iter().map(|(m, _, _)| m).collect();
+
+        (sorted_captures, sorted_non_captures)
+    }
+    
+    /// Backward-compatible version of gen_pseudo_legal_moves_with_evals that doesn't use history table
+    #[deprecated(since="0.2.0", note="Use gen_pseudo_legal_moves_with_evals with history parameter instead")]
+    pub fn gen_pseudo_legal_moves_with_evals_no_history(&self, board: &Board, pesto: &PestoEval) -> (Vec<Move>, Vec<Move>) {
+        self.gen_pseudo_legal_moves_with_evals(board, pesto, None)
     }
 
     /// Generates only the capture moves for a given position.
@@ -785,7 +811,7 @@ impl MoveGen {
     pub fn attackers_to(&self, board: &Board, sq: usize, side: bool) -> u64 {
         let side_idx = side as usize;
         let mut attackers: u64 = 0;
-        let enemy_color_index = !side as usize; // Needed for pawn captures
+        let _enemy_color_index = !side as usize; // Needed for pawn captures
 
         // Pawns (check captures from the target square's perspective)
         if side_idx == 0 { // White attackers

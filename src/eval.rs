@@ -12,8 +12,8 @@ use crate::bits::{popcnt, bits};
 use crate::board::Board;
 use crate::board_utils::{
     sq_to_rank, sq_to_file, get_passed_pawn_mask, get_king_shield_zone_mask,
-    get_adjacent_files_mask, sq_ind_to_bit, get_pawn_front_square_mask, get_rank_mask, get_file_mask,
-    get_front_span_mask, get_king_attack_zone_mask
+    get_adjacent_files_mask, sq_ind_to_bit, get_rank_mask, get_file_mask,
+    get_front_span_mask, get_king_attack_zone_mask,
 };
 use crate::move_generation::MoveGen;
 use crate::piece_types::{PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING, WHITE, BLACK};
@@ -21,13 +21,12 @@ use crate::eval_constants::{
     MG_VALUE, MG_PESTO_TABLE, EG_VALUE, EG_PESTO_TABLE, GAMEPHASE_INC,
     TWO_BISHOPS_BONUS, PASSED_PAWN_BONUS_MG, PASSED_PAWN_BONUS_EG, KING_SAFETY_PAWN_SHIELD_BONUS,
     ISOLATED_PAWN_PENALTY, PAWN_CHAIN_BONUS, PAWN_DUO_BONUS,
-    MOBILE_PAWN_DUO_BONUS_MG, MOBILE_PAWN_DUO_BONUS_EG,
-    ROOK_ON_SEVENTH_BONUS, ROOK_BEHIND_PASSED_PAWN_BONUS,
-    DOUBLED_ROOKS_ON_SEVENTH_BONUS, ROOK_BEHIND_ENEMY_PASSED_PAWN_BONUS, CASTLING_RIGHTS_BONUS,
+    ROOK_BEHIND_PASSED_PAWN_BONUS, ROOK_BEHIND_ENEMY_PASSED_PAWN_BONUS,
     ROOK_OPEN_FILE_BONUS, ROOK_HALF_OPEN_FILE_BONUS,
-    BACKWARD_PAWN_PENALTY, KING_ATTACK_WEIGHTS
+    DOUBLED_ROOKS_ON_SEVENTH_BONUS,
+    BACKWARD_PAWN_PENALTY, KING_ATTACK_WEIGHTS,
+    CASTLING_RIGHTS_BONUS
 };
-
 /// Struct representing the Pesto evaluation function
 pub struct PestoEval {
     mg_table: [[[i32; 64]; 6]; 2], // [Color][PieceType][Square]
@@ -71,7 +70,7 @@ impl PestoEval {
     /// (eval, game_phase)
     // Note: Added move_gen parameter
     // Pass MoveGen explicitly now as it's needed for king attack calculation
-    fn eval_plus_game_phase(&self, board: &Board, move_gen: &MoveGen) -> (i32, i32) {
+    fn eval_plus_game_phase(&self, board: &Board, _move_gen: &MoveGen) -> (i32, i32) {
 
         let mut mg: [i32; 2] = [0, 0];
         let mut eg: [i32; 2] = [0, 0];
