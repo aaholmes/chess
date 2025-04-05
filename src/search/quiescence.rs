@@ -10,10 +10,23 @@ pub fn quiescence_search(
     pesto: &PestoEval,
     mut alpha: i32,
     beta: i32,
-    max_depth: i32, // Remaining depth
+    max_depth: i32, // Remaining q-search depth
     verbose: bool,
-) -> (i32, i32) {
+    start_time: Option<Instant>, // Added
+    time_limit: Option<Duration>, // Added
+) -> (i32, i32) { // Return type remains (score, nodes) for now, termination checked after call
     let mut nodes = 1;
+
+    // --- Time Check (Periodic) ---
+    // Check time at the start of each quiescence call
+    if let (Some(start), Some(limit)) = (start_time, time_limit) {
+        // Check every N nodes? Simpler to check every call for now.
+        if start.elapsed() >= limit {
+            // Return stand_pat score if time runs out during qsearch
+             let stand_pat = pesto.eval(&board.current_state(), move_gen);
+             return (stand_pat, nodes);
+        }
+    }
 
     // --- Stand-Pat Evaluation ---
     let stand_pat = pesto.eval(&board.current_state(), move_gen);
@@ -29,7 +42,7 @@ pub fn quiescence_search(
     }
 
     // --- Max Depth Check ---
-    if max_depth <= 0 {
+    if max_depth <= 0 { // Check depth limit
         return (alpha, nodes); // Return current best score (alpha)
     }
 
@@ -63,6 +76,8 @@ pub fn quiescence_search(
             -alpha,
             max_depth - 1,
             verbose,
+            start_time, // Pass time info down
+            time_limit, // Pass time info down
         );
         score = -score; // Negamax adjustment
         nodes += n;

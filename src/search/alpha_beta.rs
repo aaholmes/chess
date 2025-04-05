@@ -175,6 +175,7 @@ pub fn alpha_beta_search(
 }
 
 /// Recursive helper function for alpha-beta search
+/// Returns (score, nodes_searched, terminated_early)
 fn alpha_beta_recursive(
     board: &mut BoardStack,
     move_gen: &MoveGen,
@@ -187,9 +188,21 @@ fn alpha_beta_recursive(
     beta: i32,
     q_search_max_depth: i32,
     verbose: bool,
-) -> (i32, i32) {
+    start_time: Option<Instant>, // Added
+    time_limit: Option<Duration>, // Added
+) -> (i32, i32, bool) { // Added bool for termination flag
+    // --- Time Check (Periodic) ---
+    // Check every N nodes (e.g., 2048) to balance overhead and responsiveness
+    // Note: 'n' is the node count for *this* call, not total. Need total node count passed down or a shared counter.
+    // Let's simplify: Check time at the start of each recursive call for now. Less efficient but simpler.
+    if let (Some(start), Some(limit)) = (start_time, time_limit) {
+        if start.elapsed() >= limit {
+            return (0, 0, true); // Return 0 score, 0 nodes, terminated=true
+        }
+    }
+    // --- Depth Check ---
     if depth <= 0 {
-        return quiescence_search(
+        let (score, nodes) = quiescence_search(
             board,
             move_gen,
             pesto,
@@ -197,11 +210,18 @@ fn alpha_beta_recursive(
             beta,
             q_search_max_depth,
             verbose,
+            start_time, // Pass time info down
+            time_limit, // Pass time info down
         );
+        // Check if quiescence search terminated due to time
+        let terminated = if let (Some(start), Some(limit)) = (start_time, time_limit) {
+             start.elapsed() >= limit
+        } else { false };
+        return (score, nodes, terminated);
     }
 
     let mut best_eval: i32 = -1000000;
-    let mut n: i32 = 0;
+    let mut n: i32 = 1; // Count current node
 
     // Generate and combine captures and regular moves
     let (mut captures, moves) = move_gen.gen_pseudo_legal_moves_with_evals(
@@ -228,7 +248,7 @@ fn alpha_beta_recursive(
         }
         let new_depth = depth - 1 + extension;
 
-        let (mut eval, nodes) = alpha_beta_recursive(
+        let (mut eval, nodes, terminated) = alpha_beta_recursive(
             board,
             move_gen,
             pesto,
@@ -240,9 +260,19 @@ fn alpha_beta_recursive(
             -alpha,
             q_search_max_depth,
             verbose,
+            start_time, // Pass down
+            time_limit, // Pass down
         );
+        n += nodes; // Accumulate nodes searched
+
+        // If a sub-search terminated due to time, propagate the termination upwards
+        if terminated {
+            board.undo_move();
+            return (0, n, true); // Return dummy score, accumulated nodes, terminated=true
+        }
+
         eval = -eval;
-        n += nodes;
+        // n += nodes; // Moved up
 
         // Update best evaluation
         best_eval = best_eval.max(eval);
@@ -254,7 +284,8 @@ fn alpha_beta_recursive(
                     history.update(&m, depth);
                 }
                 board.undo_move();
-                return (beta, n);
+                board.undo_move();
+                return (beta, n, false); // Not terminated here
             }
         }
 
@@ -262,7 +293,7 @@ fn alpha_beta_recursive(
         board.undo_move();
     }
 
-    (best_eval, n)
+    (best_eval, n, false) // Not terminated if loop completes normally
 }
 
 /// Helper function to check if a move is a capture
