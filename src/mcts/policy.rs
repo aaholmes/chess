@@ -1,66 +1,86 @@
-//! Defines the trait for policy and value networks used in MCTS.
+//! Policy network interface for MCTS.
+//! 
+//! This module defines interfaces for policy networks used in MCTS.
+//! It allows for different implementations of policy networks.
 
 use crate::board::Board;
 use crate::move_types::Move;
 use std::collections::HashMap;
 
-/// Trait for a policy and value network.
-/// In AlphaZero-style MCTS, this typically involves a neural network.
-/// Here, we can create implementations using PestoEval or other methods.
+/// Trait for policy networks used in MCTS.
+/// 
+/// A policy network evaluates a position and returns:
+/// 1. A prior probability distribution over legal moves
+/// 2. A value estimate for the current position
 pub trait PolicyNetwork {
-    /// Evaluates a board state, returning prior probabilities for legal moves
-    /// and a state value estimate.
-    ///
+    /// Evaluates a position and returns (policy, value).
+    /// 
     /// # Arguments
-    /// * `board` - The board state to evaluate.
-    ///
+    /// * `board` - The chess position to evaluate.
+    /// 
     /// # Returns
-    /// A tuple containing:
-    /// * A map from legal `Move` to its prior probability (`f64`). The sum of probabilities should ideally be 1.0.
-    /// * The estimated value (`f64`) of the state, typically in the range [-1.0, 1.0] or [0.0, 1.0]
-    ///   from the perspective of the current player to move. Let's use [0.0, 1.0] where 1.0 is a win for the current player.
+    /// * `HashMap<Move, f64>` - Prior probabilities for each legal move.
+    /// * `f64` - Value estimate for the position from the perspective of the player to move.
+    ///           Should be in range [0.0, 1.0] where 1.0 means certain win for current player.
     fn evaluate(&self, board: &Board) -> (HashMap<Move, f64>, f64);
 }
 
-// Example implementation using PestoEval (and uniform policy priors)
-// This demonstrates how to adapt the existing eval function.
-use crate::eval::PestoEval;
-use crate::move_generation::MoveGen;
-use crate::mcts::node::MctsNode; // For get_legal_moves
+/// A simple random policy network for testing.
+/// Returns uniform prior probabilities and random value.
+pub struct RandomPolicy;
 
-pub struct PestoPolicy<'a> {
-    evaluator: &'a PestoEval,
-    move_gen: &'a MoveGen,
-}
-
-impl<'a> PestoPolicy<'a> {
-    pub fn new(evaluator: &'a PestoEval, move_gen: &'a MoveGen) -> Self {
-        PestoPolicy { evaluator, move_gen }
+impl PolicyNetwork for RandomPolicy {
+    fn evaluate(&self, _board: &Board) -> (HashMap<Move, f64>, f64) {
+        // This is just a placeholder implementation
+        // In a real implementation, you would generate all legal moves
+        // and assign meaningful probabilities based on position analysis
+        (HashMap::new(), 0.5)
     }
 }
 
-impl<'a> PolicyNetwork for PestoPolicy<'a> {
+/// A simple material-based policy network.
+/// Returns uniform prior probabilities but evaluates position based on material.
+pub struct MaterialPolicy;
+
+impl PolicyNetwork for MaterialPolicy {
     fn evaluate(&self, board: &Board) -> (HashMap<Move, f64>, f64) {
-        // 1. Get Value from PestoEval
-        // Pesto returns score relative to current player. Need to normalize.
-        // Assuming score is in centipawns. Convert to win probability (e.g., using sigmoid).
-        let score_cp = self.evaluator.eval(board, self.move_gen);
-        // Simple sigmoid-like scaling: map [-800, 800] cp to approx [0, 1]
-        // k determines steepness. Let k = 1 / 400 for reasonable scaling.
-        let k = 1.0 / 400.0;
-        let value = 1.0 / (1.0 + (-k * score_cp as f64).exp()); // Value in [0, 1] for current player
-
-        // 2. Get Policy Priors (Uniform for now)
-        let legal_moves = MctsNode::get_legal_moves(board, self.move_gen);
-        let num_legal_moves = legal_moves.len();
-        let mut priors = HashMap::new();
-        if num_legal_moves > 0 {
-            let uniform_prior = 1.0 / num_legal_moves as f64;
-            for mv in legal_moves {
-                priors.insert(mv, uniform_prior);
-            }
+        // Placeholder: Assign uniform priors
+        let priors = HashMap::new();
+        
+        // Simple material evaluation for value
+        use crate::piece_types::*;
+        
+        // Use common piece values (in centipawns)
+        let piece_values = [100, 320, 330, 500, 900, 0]; // P, N, B, R, Q, K
+        
+        let mut white_material = 0;
+        let mut black_material = 0;
+        
+        // Count white material
+        for piece_type in 0..6 {
+            let pieces = board.get_piece_bitboard(WHITE, piece_type);
+            let count = pieces.count_ones();
+            white_material += count as i32 * piece_values[piece_type];
         }
-
+        
+        // Count black material
+        for piece_type in 0..6 {
+            let pieces = board.get_piece_bitboard(BLACK, piece_type);
+            let count = pieces.count_ones();
+            black_material += count as i32 * piece_values[piece_type];
+        }
+        
+        // Calculate advantage from perspective of player to move
+        let advantage = if board.w_to_move {
+            white_material - black_material
+        } else {
+            black_material - white_material
+        };
+        
+        // Convert material advantage to probability with sigmoid
+        // Map advantage from centipawns to [0.0, 1.0] range
+        let value = 1.0 / (1.0 + (-advantage as f64 / 400.0).exp());
+        
         (priors, value)
     }
 }
