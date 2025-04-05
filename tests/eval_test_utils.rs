@@ -19,7 +19,7 @@ use kingfisher::bits;
 
 // Helper to get the raw MG/EG scores *before* tapering and side-to-move adjustment
 // This allows testing the contribution of individual terms more easily.
-// Mirrors the logic in eval::eval_plus_game_phase
+// Modified to use accessor methods instead of private fields
 pub fn get_raw_scores(evaluator: &PestoEval, board: &Board) -> (i32, i32) {
     let mut mg = [0, 0];
     let mut eg = [0, 0];
@@ -27,12 +27,12 @@ pub fn get_raw_scores(evaluator: &PestoEval, board: &Board) -> (i32, i32) {
     // Base Pesto PST scores
     for color in [WHITE, BLACK] {
         for piece in 0..6 {
-            let mut piece_bb = board.pieces[color][piece];
+            let mut piece_bb = board.get_piece_bitboard(color, piece);
             while piece_bb != 0 {
                 let sq = piece_bb.trailing_zeros() as usize;
-                // Access internal tables directly for accurate base score in tests
-                mg[color] += evaluator.mg_table[color][piece][sq];
-                eg[color] += evaluator.eg_table[color][piece][sq];
+                // Access tables through accessor methods
+                mg[color] += evaluator.get_mg_score(color, piece, sq);
+                eg[color] += evaluator.get_eg_score(color, piece, sq);
                 piece_bb &= piece_bb - 1;
             }
         }
@@ -43,14 +43,14 @@ pub fn get_raw_scores(evaluator: &PestoEval, board: &Board) -> (i32, i32) {
         let enemy_color = 1 - color;
 
         // 1. Two Bishops Bonus
-        if bits::popcnt(board.pieces[color][BISHOP]) >= 2 {
+        if bits::popcnt(board.get_piece_bitboard(color, BISHOP)) >= 2 {
             mg[color] += TWO_BISHOPS_BONUS[0];
             eg[color] += TWO_BISHOPS_BONUS[1];
         }
 
         // --- Pawn Structure ---
-        let friendly_pawns = board.pieces[color][PAWN];
-        let enemy_pawns = board.pieces[enemy_color][PAWN];
+        let friendly_pawns = board.get_piece_bitboard(color, PAWN);
+        let enemy_pawns = board.get_piece_bitboard(enemy_color, PAWN);
         let mut chain_bonus_mg = 0;
         let mut chain_bonus_eg = 0;
         let mut duo_bonus_mg = 0;
@@ -105,7 +105,7 @@ pub fn get_raw_scores(evaluator: &PestoEval, board: &Board) -> (i32, i32) {
                     // 7. Mobile Pawn Duo Bonus
                     let front1_mask = board_utils::get_pawn_front_square_mask(color, sq);
                     let front2_mask = board_utils::get_pawn_front_square_mask(color, neighbor_sq);
-                    let occupied = board.pieces_occ[WHITE] | board.pieces_occ[BLACK];
+                    let occupied = board.get_all_occupancy();
                     if (front1_mask & occupied) == 0 && (front2_mask & occupied) == 0 {
                         let bonus_sq = if color == WHITE { sq } else { board_utils::flip_sq_ind_vertically(sq) };
                         mg[color] += MOBILE_PAWN_DUO_BONUS_MG[bonus_sq];
@@ -121,8 +121,9 @@ pub fn get_raw_scores(evaluator: &PestoEval, board: &Board) -> (i32, i32) {
 
 
         // --- King Safety ---
-        let king_sq = board.pieces[color][KING].trailing_zeros() as usize;
-        if king_sq < 64 { // Ensure king exists
+        let king_bb = board.get_piece_bitboard(color, KING);
+        if king_bb != 0 { // Ensure king exists
+            let king_sq = king_bb.trailing_zeros() as usize;
             // 3. Pawn Shield Bonus
             let shield_zone_mask = board_utils::get_king_shield_zone_mask(color, king_sq);
             let shield_pawns = bits::popcnt(shield_zone_mask & friendly_pawns);
@@ -131,7 +132,7 @@ pub fn get_raw_scores(evaluator: &PestoEval, board: &Board) -> (i32, i32) {
         }
 
         // --- Rook Bonuses ---
-        let friendly_rooks = board.pieces[color][ROOK];
+        let friendly_rooks = board.get_piece_bitboard(color, ROOK);
         let seventh_rank = if color == WHITE { 6 } else { 1 };
         let seventh_rank_mask = board_utils::get_rank_mask(seventh_rank);
         let rooks_on_seventh = friendly_rooks & seventh_rank_mask;
@@ -203,4 +204,13 @@ pub fn get_raw_scores(evaluator: &PestoEval, board: &Board) -> (i32, i32) {
     } // End of loop through colors [WHITE, BLACK]
 
     (mg[WHITE] - mg[BLACK], eg[WHITE] - eg[BLACK]) // Return raw W-B score
+}
+
+// Helper to create test boards
+pub fn create_test_board(fen: &str) -> Board {
+    Board::new_from_fen(fen)
+}
+
+pub fn create_initial_board() -> Board {
+    Board::new()
 }

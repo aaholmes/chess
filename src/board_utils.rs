@@ -42,17 +42,23 @@ pub fn sq_ind_to_bit(sq_ind: usize) -> u64 {
     1 << sq_ind
 }
 
-/// Converts a bitboard with a single bit set to its square index.
+/// Converts a bitboard with a single bit set to the index of that bit.
 ///
 /// # Arguments
 ///
-/// * `bit` - A 64-bit integer with only one bit set
+/// * `bit` - A 64-bit integer with (hopefully) one bit set
 ///
 /// # Returns
 ///
 /// The index of the set bit (0-63)
 pub fn bit_to_sq_ind(bit: u64) -> usize {
-    bit.trailing_zeros() as usize
+    if bit == 0 {
+        // Return a default value or handle specially
+        // This is safer than returning 64 which would cause index out of bounds
+        0 // Default to a0 square for now, caller should handle this case specially
+    } else {
+        bit.trailing_zeros() as usize
+    }
 }
 
 /// Converts a square index to algebraic notation.

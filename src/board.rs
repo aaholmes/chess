@@ -271,6 +271,28 @@ impl Board {
         self.pieces[color][piece_type]
     }
 
+    /// Gets the occupancy bitboard for a color.
+    ///
+    /// # Arguments
+    ///
+    /// * `color` - The color (White or Black)
+    ///
+    /// # Returns
+    ///
+    /// A 64-bit unsigned integer representing all pieces of the specified color.
+    pub fn get_color_occupancy(&self, color: usize) -> u64 {
+        self.pieces_occ[color]
+    }
+
+    /// Gets the combined occupancy of all pieces on the board.
+    ///
+    /// # Returns
+    ///
+    /// A 64-bit unsigned integer representing all pieces on the board.
+    pub fn get_all_occupancy(&self) -> u64 {
+        self.pieces_occ[WHITE] | self.pieces_occ[BLACK]
+    }
+
     /// Determines whether the current position is legal.
     ///
     /// A position is considered legal if the side to move cannot capture the opponent's king.
@@ -360,8 +382,16 @@ impl Board {
     pub fn is_check(&self, move_gen: &MoveGen) -> bool {
         let king_sq_ind: usize;
         if self.w_to_move {
+            if self.pieces[WHITE][KING] == 0 {
+                // No king on the board for the side to move - can't be in check
+                return false;
+            }
             king_sq_ind = bit_to_sq_ind(self.pieces[WHITE][KING]);
         } else {
+            if self.pieces[BLACK][KING] == 0 {
+                // No king on the board for the side to move - can't be in check
+                return false;
+            }
             king_sq_ind = bit_to_sq_ind(self.pieces[BLACK][KING]);
         }
         self.is_square_attacked(king_sq_ind, !self.w_to_move, move_gen)

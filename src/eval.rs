@@ -58,6 +58,36 @@ impl PestoEval {
         }
     }
 
+    /// Gets the middle game score for a piece at a square
+    ///
+    /// # Arguments
+    /// 
+    /// * `color` - The color of the piece (WHITE or BLACK)
+    /// * `piece` - The piece type (PAWN, KNIGHT, etc.)
+    /// * `square` - The square index (0-63)
+    ///
+    /// # Returns
+    ///
+    /// The middle game score for the piece at the square
+    pub fn get_mg_score(&self, color: usize, piece: usize, square: usize) -> i32 {
+        self.mg_table[color][piece][square]
+    }
+
+    /// Gets the end game score for a piece at a square
+    ///
+    /// # Arguments
+    ///
+    /// * `color` - The color of the piece (WHITE or BLACK)
+    /// * `piece` - The piece type (PAWN, KNIGHT, etc.)
+    /// * `square` - The square index (0-63)
+    ///
+    /// # Returns
+    ///
+    /// The end game score for the piece at the square
+    pub fn get_eg_score(&self, color: usize, piece: usize, square: usize) -> i32 {
+        self.eg_table[color][piece][square]
+    }
+
     /// Computes the eval (in centipawns) according to the Pesto evaluation function
     /// as well as the game phase
     ///

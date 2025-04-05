@@ -8,7 +8,8 @@ use kingfisher::agent::SimpleAgent;
 use kingfisher::arena::Arena;
 use kingfisher::eval::PestoEval;
 use kingfisher::move_generation::MoveGen;
-use kingfisher::uci::UCIEngine;
+// UCIEngine is commented out in main() so removing this unused import
+// use kingfisher::uci::UCIEngine;
 
 /// The main function that sets up and runs a sample chess game.
 ///
