@@ -6,7 +6,6 @@ use std::f64;
 use crate::board::Board;
 use crate::move_generation::MoveGen;
 use crate::move_types::Move;
-use crate::piece_types::{QUEEN}; // For promotion check in categorization
 use std::collections::HashMap; // For priors and categorized moves
 // use super::policy::PolicyNetwork; // Not needed directly in this file if PolicyNetwork passed to mcts_search
 // use crate::search::see::see; // Import SEE if used for categorization
@@ -15,17 +14,9 @@ use std::collections::HashMap; // For priors and categorized moves
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum MoveCategory {
     // ForcedMate,      // Not used directly here, handled by terminal_or_mate_value
-    // Simplified Categories for now:
-    Capture = 1, // Any capture (could refine with SEE later)
-    Quiet   = 2, // Any non-capture
-    // PromotionToQueen = 1,
-    // WinningCapture   = 2,  // SEE > threshold
-    // KillerMove1      = 3,  // Placeholder category
-    // KillerMove2      = 4,  // Placeholder category
-    // EqualCapture     = 5,  // abs(SEE) <= threshold
-    // Check            = 6,  // Non-capture, non-promo, non-killer check
-    // OtherQuiet       = 8,
-    // LosingCapture    = 9,  // SEE < -threshold
+    // Simplified Categories:
+    Capture = 1,
+    Quiet   = 2,
 }
 
 /// A node in the Monte Carlo Search Tree
@@ -213,7 +204,7 @@ impl MctsNode {
 
         // TODO: Implement move categorization logic here more thoroughly
         for mv in legal_moves {
-            let category = self.categorize_move(&mv, move_gen); // Implement this helper
+            let category = self.categorize_move(&mv); // Implement this helper
             categorized_moves.entry(category).or_default().push(mv);
         }
 
@@ -225,31 +216,17 @@ impl MctsNode {
         self.current_priority_category = sorted_categories.first().cloned();
     }
 
-    /// Helper to categorize a single move (implement heuristic checks here).
-    /// TODO: Needs access to killers, history, SEE results for proper categorization.
-    fn categorize_move(&self, mv: &Move, _move_gen: &MoveGen) -> MoveCategory {
-        // Basic categorization example
-        if mv.promotion.is_some() && mv.promotion == Some(QUEEN) {
-            return MoveCategory::PromotionToQueen;
-        }
-        
-        // Check if the move is a capture by checking the destination square
-        let to_square = mv.to;
+    /// Categorizes a move for prioritizing expansion.
+    fn categorize_move(&self, mv: &Move) -> MoveCategory {
+        // Use MoveGen::is_capture (ensure it exists and is correct)
+        // This check might be simpler by just checking if the destination square has an opponent piece.
         let opponent_color = !self.state.w_to_move as usize;
-        
-        // Check if there's an opponent piece at the destination square
-        // We'll check each piece type
-        let mut opponent_pieces = 0u64;
-        for piece in 0..6 {
-            opponent_pieces |= self.state.get_piece_bitboard(opponent_color, piece);
+        if (self.state.pieces_occ[opponent_color] & (1u64 << mv.to)) != 0 {
+             MoveCategory::Capture
+        } else {
+             // Could add promotion check here if desired later
+             MoveCategory::Quiet
         }
-        
-        if (1u64 << to_square) & opponent_pieces != 0 {
-            return MoveCategory::EqualCapture; // Default capture category for now
-        }
-        
-        // Default for quiet moves
-        MoveCategory::OtherQuiet // Default
     }
 
     /// Gets the highest-priority unexplored move and removes it from the map.
@@ -286,8 +263,9 @@ impl MctsNode {
              // Find the next category in the sorted order
              let mut next_cat_found = false;
              // Iterate through simplified enum variants by discriminant value
+             // Iterate through simplified enum variants by discriminant value
              for cat_num in (current_cat as usize + 1)..=(MoveCategory::Quiet as usize) {
-                  // This unsafe transmute assumes a standard C-like enum layout (safe for simple cases)
+                  // This unsafe transmute assumes a standard C-like enum layout
                   let next_possible_cat = unsafe { std::mem::transmute::<u8, MoveCategory>(cat_num as u8) };
                   if self.unexplored_moves_by_cat.contains_key(&next_possible_cat) {
                       self.current_priority_category = Some(next_possible_cat);

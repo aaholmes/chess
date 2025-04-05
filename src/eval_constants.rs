@@ -194,31 +194,32 @@ pub const EG_PESTO_TABLE: [[i32; 64]; 6] =
 /// Starts at 24 when all are still on the board, and decreases to 0 when all are gone.
 pub const GAMEPHASE_INC: [i32; 6] = [0,1,1,2,4,0];
 
-// --- Additional Evaluation Terms ---
+// --- Default Evaluation Weights (used for initialization) ---
+// These were previously `pub const` but are now defaults for the EvalWeights struct.
 
 // Two Bishops Bonus (MG/EG)
-pub const TWO_BISHOPS_BONUS: [i32; 2] = [25, 35]; // [MG, EG]
+const DEFAULT_TWO_BISHOPS_BONUS: [i32; 2] = [25, 35]; // [MG, EG]
 
 // Passed Pawn Bonus by Rank (Index 0 = Rank 1, Index 7 = Rank 8) - From White's perspective
 // Rank 1 and 8 are impossible for passed pawns, but included for array size.
 // Values increase significantly as the pawn advances.
-pub const PASSED_PAWN_BONUS_MG: [i32; 8] = [0, 10, 15, 25, 40, 60, 90, 0];
-pub const PASSED_PAWN_BONUS_EG: [i32; 8] = [0, 20, 30, 50, 100, 150, 200, 0];
+const DEFAULT_PASSED_PAWN_BONUS_MG: [i32; 8] = [0, 10, 15, 25, 40, 60, 90, 0];
+const DEFAULT_PASSED_PAWN_BONUS_EG: [i32; 8] = [0, 20, 30, 50, 100, 150, 200, 0];
 
 // King Safety Bonus per Pawn in Shield Zone (MG/EG)
 // Zone typically includes squares directly and diagonally one step in front of the king.
-pub const KING_SAFETY_PAWN_SHIELD_BONUS: [i32; 2] = [15, 4]; // [MG, EG] - Increased MG bonus
+const DEFAULT_KING_SAFETY_PAWN_SHIELD_BONUS: [i32; 2] = [15, 4]; // [MG, EG]
 
 // King Attack Score constants removed for now.
 
 // Isolated Pawn Penalty (MG/EG) - Applied per isolated pawn
-pub const ISOLATED_PAWN_PENALTY: [i32; 2] = [-10, -15]; // [MG, EG]
+const DEFAULT_ISOLATED_PAWN_PENALTY: [i32; 2] = [-10, -15]; // [MG, EG]
 
 // Pawn Chain Bonus (MG/EG) - Applied per pawn defended by another pawn diagonally
-pub const PAWN_CHAIN_BONUS: [i32; 2] = [10, 15]; // [MG, EG] - Reduced based on review
+const DEFAULT_PAWN_CHAIN_BONUS: [i32; 2] = [10, 15]; // [MG, EG]
 
 // Pawn Duo Bonus (MG/EG) - Applied per pair of pawns on adjacent files on the same rank
-pub const PAWN_DUO_BONUS: [i32; 2] = [8, 12]; // [MG, EG] - Increased Further
+const DEFAULT_PAWN_DUO_BONUS: [i32; 2] = [8, 12]; // [MG, EG]
 
 // Mobile Pawn Duo Bonus (MG/EG) - Bonus if squares in front are clear. Indexed by square of one of the pawns.
 // Values increase by rank and are slightly higher for central files (c-f).
@@ -244,45 +245,94 @@ const MOBILE_DUO_BONUS_TABLE_EG: [i32; 64] = [
     0,  0,  0,  0,  0,  0,  0,  0,  // Rank 8
 ];
 
-pub const MOBILE_PAWN_DUO_BONUS_MG: [i32; 64] = MOBILE_DUO_BONUS_TABLE_MG;
-pub const MOBILE_PAWN_DUO_BONUS_EG: [i32; 64] = MOBILE_DUO_BONUS_TABLE_EG;
+// Mobile Pawn Duo tables remain const as they are complex PSTs
+const MOBILE_PAWN_DUO_BONUS_MG: [i32; 64] = MOBILE_DUO_BONUS_TABLE_MG;
+const MOBILE_PAWN_DUO_BONUS_EG: [i32; 64] = MOBILE_DUO_BONUS_TABLE_EG;
 
 // Doubled Rooks on 7th Rank Bonus (MG/EG) - Additional bonus if two rooks are on 7th
-pub const DOUBLED_ROOKS_ON_SEVENTH_BONUS: [i32; 2] = [50, 25]; // [MG, EG] - Increased MG/EG based on review
+const DEFAULT_DOUBLED_ROOKS_ON_SEVENTH_BONUS: [i32; 2] = [50, 25]; // [MG, EG]
 
 // Rook on Open File Bonus (MG/EG) - No pawns of either color on the file
-pub const ROOK_OPEN_FILE_BONUS: [i32; 2] = [25, 15]; // [MG, EG] - Increased
+const DEFAULT_ROOK_OPEN_FILE_BONUS: [i32; 2] = [25, 15]; // [MG, EG]
 
 // Rook on Half-Open File Bonus (MG/EG) - No friendly pawns on the file
-pub const ROOK_HALF_OPEN_FILE_BONUS: [i32; 2] = [15, 8]; // [MG, EG] - Increased
+const DEFAULT_ROOK_HALF_OPEN_FILE_BONUS: [i32; 2] = [15, 8]; // [MG, EG]
 
 // Backward Pawn Penalty (MG/EG) - Applied per backward pawn
-pub const BACKWARD_PAWN_PENALTY: [i32; 2] = [-8, -12]; // [MG, EG]
+const DEFAULT_BACKWARD_PAWN_PENALTY: [i32; 2] = [-8, -12]; // [MG, EG]
 
 // King Attack Score Constants (Simplified)
 // Bonus per attacking piece type near the enemy king zone (MG only)
 // Zone typically includes squares around the king (e.g., 3x3 area)
-pub const KING_ATTACK_WEIGHTS: [i32; 6] = [0, 7, 7, 10, 15, 0]; // P, N, B, R, Q, K (King weight is 0)
-pub const KING_ATTACK_COUNT_BONUS: [i32; 2] = [0, 0]; // Bonus based on *number* of attackers (can be tuned)
-// Example: KING_ATTACK_SCORE = sum(KING_ATTACK_WEIGHTS[piece] for piece attacking zone) + KING_ATTACK_COUNT_BONUS[min(4, num_attackers)]
-// We will implement a simpler version for now using just weights.
+const DEFAULT_KING_ATTACK_WEIGHTS: [i32; 6] = [0, 7, 7, 10, 15, 0]; // P, N, B, R, Q, K
+// Example: KING_ATTACK_SCORE = sum(KING_ATTACK_WEIGHTS[piece] for piece attacking zone)
 
 // --- Mobility Constants ---
 // Bonus per legal move for each piece type [N, B, R, Q] (MG/EG)
 // Knights and Bishops benefit more in open endgames? Queens less critical?
-pub const MOBILITY_WEIGHTS_MG: [i32; 4] = [3, 3, 2, 1]; // N, B, R, Q
-pub const MOBILITY_WEIGHTS_EG: [i32; 4] = [4, 4, 3, 2]; // N, B, R, Q
+const DEFAULT_MOBILITY_WEIGHTS_MG: [i32; 4] = [3, 3, 2, 1]; // N, B, R, Q
+const DEFAULT_MOBILITY_WEIGHTS_EG: [i32; 4] = [4, 4, 3, 2]; // N, B, R, Q
 // --- Redundant King Safety Constants Removed ---
 // (Using KING_ATTACK_WEIGHTS array defined above instead)
 
-/// Bonus for a rook on the 7th rank [mg, eg]
-pub const ROOK_ON_SEVENTH_BONUS: [i32; 2] = [20, 40];
+/// Bonus for a rook behind a passed pawn [mg, eg]
+const DEFAULT_ROOK_BEHIND_PASSED_PAWN_BONUS: [i32; 2] = [20, 30];
 
-// Add constant for ROOK_BEHIND_PASSED_PAWN_BONUS if it doesn't exist
-pub const ROOK_BEHIND_PASSED_PAWN_BONUS: [i32; 2] = [20, 30]; // [MG, EG]
+/// Bonus for a rook behind enemy passed pawn [mg, eg]
+const DEFAULT_ROOK_BEHIND_ENEMY_PASSED_PAWN_BONUS: [i32; 2] = [25, 30];
 
-// Add ROOK_BEHIND_ENEMY_PASSED_PAWN_BONUS if it doesn't exist
-pub const ROOK_BEHIND_ENEMY_PASSED_PAWN_BONUS: [i32; 2] = [25, 30]; // [MG, EG]
+/// Bonus for castling rights [mg, eg]
+const DEFAULT_CASTLING_RIGHTS_BONUS: [i32; 2] = [15, 0];
 
-// Add CASTLING_RIGHTS_BONUS if it doesn't exist
-pub const CASTLING_RIGHTS_BONUS: [i32; 2] = [15, 0]; // [MG, EG]
+// --- Trainable Weights Structure ---
+
+#[derive(Clone, Debug)]
+pub struct EvalWeights {
+    // Piece Values (MG/EG) - Keeping these const for now
+    // pub mg_value: [i32; 6],
+    // pub eg_value: [i32; 6],
+
+    // Bonus/Penalty Terms (MG/EG pairs or arrays)
+    pub two_bishops_bonus: [i32; 2],
+    pub passed_pawn_bonus_mg: [i32; 8],
+    pub passed_pawn_bonus_eg: [i32; 8],
+    pub king_safety_pawn_shield_bonus: [i32; 2],
+    pub isolated_pawn_penalty: [i32; 2],
+    pub pawn_chain_bonus: [i32; 2],
+    pub pawn_duo_bonus: [i32; 2],
+    // Mobile pawn bonus uses PSTs, keep const for now
+    pub doubled_rooks_on_seventh_bonus: [i32; 2],
+    pub rook_behind_passed_pawn_bonus: [i32; 2],
+    pub rook_behind_enemy_passed_pawn_bonus: [i32; 2],
+    pub castling_rights_bonus: [i32; 2],
+    pub rook_open_file_bonus: [i32; 2],
+    pub rook_half_open_file_bonus: [i32; 2],
+    pub backward_pawn_penalty: [i32; 2],
+    pub king_attack_weights: [i32; 6],
+    pub mobility_weights_mg: [i32; 4], // N, B, R, Q
+    pub mobility_weights_eg: [i32; 4], // N, B, R, Q
+}
+
+impl Default for EvalWeights {
+    fn default() -> Self {
+        EvalWeights {
+            two_bishops_bonus: DEFAULT_TWO_BISHOPS_BONUS,
+            passed_pawn_bonus_mg: DEFAULT_PASSED_PAWN_BONUS_MG,
+            passed_pawn_bonus_eg: DEFAULT_PASSED_PAWN_BONUS_EG,
+            king_safety_pawn_shield_bonus: DEFAULT_KING_SAFETY_PAWN_SHIELD_BONUS,
+            isolated_pawn_penalty: DEFAULT_ISOLATED_PAWN_PENALTY,
+            pawn_chain_bonus: DEFAULT_PAWN_CHAIN_BONUS,
+            pawn_duo_bonus: DEFAULT_PAWN_DUO_BONUS,
+            doubled_rooks_on_seventh_bonus: DEFAULT_DOUBLED_ROOKS_ON_SEVENTH_BONUS,
+            rook_behind_passed_pawn_bonus: DEFAULT_ROOK_BEHIND_PASSED_PAWN_BONUS,
+            rook_behind_enemy_passed_pawn_bonus: DEFAULT_ROOK_BEHIND_ENEMY_PASSED_PAWN_BONUS,
+            castling_rights_bonus: DEFAULT_CASTLING_RIGHTS_BONUS,
+            rook_open_file_bonus: DEFAULT_ROOK_OPEN_FILE_BONUS,
+            rook_half_open_file_bonus: DEFAULT_ROOK_HALF_OPEN_FILE_BONUS,
+            backward_pawn_penalty: DEFAULT_BACKWARD_PAWN_PENALTY,
+            king_attack_weights: DEFAULT_KING_ATTACK_WEIGHTS,
+            mobility_weights_mg: DEFAULT_MOBILITY_WEIGHTS_MG, // Use DEFAULT_ prefix
+            mobility_weights_eg: DEFAULT_MOBILITY_WEIGHTS_EG, // Use DEFAULT_ prefix
+        }
+    }
+}

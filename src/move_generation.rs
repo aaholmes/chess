@@ -24,6 +24,109 @@ use crate::eval::PestoEval;
 use crate::piece_types::{PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING, WHITE, BLACK};
 use crate::search::HistoryTable;
 
+// Define mask constants for mobility calculations
+const FILE_MASKS: [u64; 64] = generate_file_masks();
+const RANK_MASKS: [u64; 64] = generate_rank_masks();
+const DIAG_MASKS: [u64; 64] = generate_diag_masks();
+const ANTI_DIAG_MASKS: [u64; 64] = generate_anti_diag_masks();
+
+// Helper function to generate file masks
+const fn generate_file_masks() -> [u64; 64] {
+    let mut masks = [0; 64];
+    let mut sq = 0;
+    while sq < 64 {
+        let file = sq % 8;
+        let mut mask = 0;
+        let mut i = 0;
+        while i < 8 {
+            mask |= 1u64 << (file + i * 8);
+            i += 1;
+        }
+        masks[sq] = mask & !(1u64 << sq); // Exclude the square itself
+        sq += 1;
+    }
+    masks
+}
+
+// Helper function to generate rank masks
+const fn generate_rank_masks() -> [u64; 64] {
+    let mut masks = [0; 64];
+    let mut sq = 0;
+    while sq < 64 {
+        let rank = sq / 8;
+        let mask = 0xFF_u64 << (rank * 8);
+        masks[sq] = mask & !(1u64 << sq); // Exclude the square itself
+        sq += 1;
+    }
+    masks
+}
+
+// Helper function to generate diagonal masks
+const fn generate_diag_masks() -> [u64; 64] {
+    let mut masks = [0; 64];
+    let mut sq = 0;
+    while sq < 64 {
+        let file = sq % 8;
+        let rank = sq / 8;
+        let mut mask = 0_u64;
+        
+        // Add squares to the NW
+        let mut f = file;
+        let mut r = rank;
+        while f > 0 && r > 0 {
+            f -= 1;
+            r -= 1;
+            mask |= 1_u64 << (f + r * 8);
+        }
+        
+        // Add squares to the SE
+        f = file;
+        r = rank;
+        while f < 7 && r < 7 {
+            f += 1;
+            r += 1;
+            mask |= 1_u64 << (f + r * 8);
+        }
+        
+        masks[sq] = mask;
+        sq += 1;
+    }
+    masks
+}
+
+// Helper function to generate anti-diagonal masks
+const fn generate_anti_diag_masks() -> [u64; 64] {
+    let mut masks = [0; 64];
+    let mut sq = 0;
+    while sq < 64 {
+        let file = sq % 8;
+        let rank = sq / 8;
+        let mut mask = 0_u64;
+        
+        // Add squares to the NE
+        let mut f = file;
+        let mut r = rank;
+        while f < 7 && r > 0 {
+            f += 1;
+            r -= 1;
+            mask |= 1_u64 << (f + r * 8);
+        }
+        
+        // Add squares to the SW
+        f = file;
+        r = rank;
+        while f > 0 && r < 7 {
+            f -= 1;
+            r += 1;
+            mask |= 1_u64 << (f + r * 8);
+        }
+        
+        masks[sq] = mask;
+        sq += 1;
+    }
+    masks
+}
+
 /// Represents the move generator, which generates pseudo-legal moves.
 ///
 /// This struct contains precomputed tables and bitboards used for move generation.
@@ -868,4 +971,82 @@ impl MoveGen {
          }
          64 // Indicate no attacker found (error condition)
      }
+
+    /// Get diagonal moves from a specific square, given an occupied bitboard.
+    /// Helper method for get_bishop_moves.
+    fn get_diag_moves(&self, from_sq_ind: usize, occupied: u64) -> u64 {
+        // Get blocker mask for diagonals
+        let blockers = occupied & DIAG_MASKS[from_sq_ind];
+        
+        // Calculate index for magic bitboard lookup
+        let key = ((blockers.wrapping_mul(self.b_magics[from_sq_ind])) >> (64 - B_BITS[from_sq_ind])) as usize;
+        
+        // Get the diagonal component from the bishop moves
+        let diag_mask = DIAG_MASKS[from_sq_ind];
+        self.b_move_bitboard[from_sq_ind][key] & diag_mask
+    }
+
+    /// Get anti-diagonal moves from a specific square, given an occupied bitboard.
+    /// Helper method for get_bishop_moves.
+    fn get_anti_diag_moves(&self, from_sq_ind: usize, occupied: u64) -> u64 {
+        // Get blocker mask for anti-diagonals
+        let blockers = occupied & ANTI_DIAG_MASKS[from_sq_ind];
+        
+        // Calculate index for magic bitboard lookup
+        let key = ((blockers.wrapping_mul(self.b_magics[from_sq_ind])) >> (64 - B_BITS[from_sq_ind])) as usize;
+        
+        // Get the anti-diagonal component from the bishop moves
+        let anti_diag_mask = ANTI_DIAG_MASKS[from_sq_ind];
+        self.b_move_bitboard[from_sq_ind][key] & anti_diag_mask
+    }
+
+    /// Get file moves from a specific square, given an occupied bitboard.
+    /// Helper method for get_rook_moves.
+    fn get_file_moves(&self, from_sq_ind: usize, occupied: u64) -> u64 {
+        // Get blocker mask for files
+        let blockers = occupied & FILE_MASKS[from_sq_ind];
+        
+        // Calculate index for magic bitboard lookup
+        let key = ((blockers.wrapping_mul(self.r_magics[from_sq_ind])) >> (64 - R_BITS[from_sq_ind])) as usize;
+        
+        // Get the file component from the rook moves
+        let file_mask = FILE_MASKS[from_sq_ind];
+        self.r_move_bitboard[from_sq_ind][key] & file_mask
+    }
+
+    /// Get rank moves from a specific square, given an occupied bitboard.
+    /// Helper method for get_rook_moves.
+    fn get_rank_moves(&self, from_sq_ind: usize, occupied: u64) -> u64 {
+        // Get blocker mask for ranks
+        let blockers = occupied & RANK_MASKS[from_sq_ind];
+        
+        // Calculate index for magic bitboard lookup
+        let key = ((blockers.wrapping_mul(self.r_magics[from_sq_ind])) >> (64 - R_BITS[from_sq_ind])) as usize;
+        
+        // Get the rank component from the rook moves
+        let rank_mask = RANK_MASKS[from_sq_ind];
+        self.r_move_bitboard[from_sq_ind][key] & rank_mask
+    }
+
+    /// Get bishop moves from a specific square, given an occupied bitboard.
+    /// This is primarily used for mobility evaluation.
+    pub fn get_bishop_moves(&self, from_sq_ind: usize, occupied: u64) -> u64 {
+        let diag_moves = self.get_diag_moves(from_sq_ind, occupied);
+        let anti_diag_moves = self.get_anti_diag_moves(from_sq_ind, occupied);
+        diag_moves | anti_diag_moves
+    }
+
+    /// Get rook moves from a specific square, given an occupied bitboard.
+    /// This is primarily used for mobility evaluation.
+    pub fn get_rook_moves(&self, from_sq_ind: usize, occupied: u64) -> u64 {
+        let file_moves = self.get_file_moves(from_sq_ind, occupied);
+        let rank_moves = self.get_rank_moves(from_sq_ind, occupied);
+        file_moves | rank_moves
+    }
+
+    /// Get queen moves from a specific square, given an occupied bitboard.
+    /// This is primarily used for mobility evaluation.
+    pub fn get_queen_moves(&self, from_sq_ind: usize, occupied: u64) -> u64 {
+        self.get_bishop_moves(from_sq_ind, occupied) | self.get_rook_moves(from_sq_ind, occupied)
+    }
 }

@@ -18,20 +18,15 @@ use crate::board_utils::{
 use crate::move_generation::MoveGen;
 use crate::piece_types::{PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING, WHITE, BLACK};
 use crate::eval_constants::{
-    MG_VALUE, MG_PESTO_TABLE, EG_VALUE, EG_PESTO_TABLE, GAMEPHASE_INC,
-    TWO_BISHOPS_BONUS, PASSED_PAWN_BONUS_MG, PASSED_PAWN_BONUS_EG, KING_SAFETY_PAWN_SHIELD_BONUS,
-    ISOLATED_PAWN_PENALTY, PAWN_CHAIN_BONUS, PAWN_DUO_BONUS,
-    ROOK_BEHIND_PASSED_PAWN_BONUS, ROOK_BEHIND_ENEMY_PASSED_PAWN_BONUS,
-    ROOK_OPEN_FILE_BONUS, ROOK_HALF_OPEN_FILE_BONUS,
-    DOUBLED_ROOKS_ON_SEVENTH_BONUS,
-    BACKWARD_PAWN_PENALTY, KING_ATTACK_WEIGHTS,
-    CASTLING_RIGHTS_BONUS,
-    MOBILITY_WEIGHTS_MG, MOBILITY_WEIGHTS_EG // Added mobility constants
+    MG_VALUE, MG_PESTO_TABLE, EG_VALUE, EG_PESTO_TABLE, GAMEPHASE_INC, EvalWeights
 };
+
 /// Struct representing the Pesto evaluation function
+#[derive(Clone, Debug)] // Add Debug derive
 pub struct PestoEval {
-    mg_table: [[[i32; 64]; 6]; 2], // [Color][PieceType][Square]
-    eg_table: [[[i32; 64]; 6]; 2], // [Color][PieceType][Square]
+    mg_table: [[[i32; 64]; 6]; 2], // Precomputed PSTs + Base Values
+    eg_table: [[[i32; 64]; 6]; 2], // Precomputed PSTs + Base Values
+    pub weights: EvalWeights, // Store the tunable weights
 }
 
 impl PestoEval {
@@ -53,9 +48,12 @@ impl PestoEval {
             }
         }
 
+        let weights = EvalWeights::default(); // Initialize weights with defaults
+
         PestoEval {
             mg_table,
             eg_table,
+            weights, // Store weights
         }
     }
 
@@ -127,8 +125,8 @@ impl PestoEval {
 
             // 1. Two Bishops Bonus
             if popcnt(board.pieces[color][BISHOP]) >= 2 {
-                mg[color] += TWO_BISHOPS_BONUS[0];
-                eg[color] += TWO_BISHOPS_BONUS[1];
+                mg[color] += self.weights.two_bishops_bonus[0];
+                eg[color] += self.weights.two_bishops_bonus[1];
             }
 
             // --- Pawn Structure ---
@@ -147,15 +145,15 @@ impl PestoEval {
                 if (passed_mask & enemy_pawns) == 0 {
                     let rank = sq_to_rank(sq);
                     let bonus_rank = if color == WHITE { rank } else { 7 - rank };
-                    mg[color] += PASSED_PAWN_BONUS_MG[bonus_rank];
-                    eg[color] += PASSED_PAWN_BONUS_EG[bonus_rank];
+                    mg[color] += self.weights.passed_pawn_bonus_mg[bonus_rank];
+                    eg[color] += self.weights.passed_pawn_bonus_eg[bonus_rank];
                 }
 
                 // 4. Isolated Pawn Penalty
                 let adjacent_mask = get_adjacent_files_mask(sq);
                 if (adjacent_mask & friendly_pawns) == 0 {
-                    mg[color] += ISOLATED_PAWN_PENALTY[0];
-                    eg[color] += ISOLATED_PAWN_PENALTY[1];
+                    mg[color] += self.weights.isolated_pawn_penalty[0];
+                    eg[color] += self.weights.isolated_pawn_penalty[1];
                 }
 
                 // 5. Pawn Chain Bonus (Diagonal defense)
@@ -168,15 +166,15 @@ impl PestoEval {
                 if let Some(defend1_sq) = defend1_sq_opt {
                     // Check bounds and if squares are actually diagonal (same color squares) and on board
                     if defend1_sq < 64 && (sq % 2 == defend1_sq % 2) && (friendly_pawns & sq_ind_to_bit(defend1_sq) != 0) {
-                        chain_bonus_mg += PAWN_CHAIN_BONUS[0];
-                        chain_bonus_eg += PAWN_CHAIN_BONUS[1];
+                        chain_bonus_mg += self.weights.pawn_chain_bonus[0];
+                        chain_bonus_eg += self.weights.pawn_chain_bonus[1];
                     }
                 }
                  if let Some(defend2_sq) = defend2_sq_opt {
                     // Check bounds and if squares are actually diagonal (same color squares) and on board
                     if defend2_sq < 64 && (sq % 2 == defend2_sq % 2) && (friendly_pawns & sq_ind_to_bit(defend2_sq) != 0) {
-                        chain_bonus_mg += PAWN_CHAIN_BONUS[0];
-                        chain_bonus_eg += PAWN_CHAIN_BONUS[1];
+                        chain_bonus_mg += self.weights.pawn_chain_bonus[0];
+                        chain_bonus_eg += self.weights.pawn_chain_bonus[1];
                     }
                 }
 
@@ -184,8 +182,8 @@ impl PestoEval {
                 if file < 7 {
                     let neighbor_sq = sq + 1;
                     if (friendly_pawns & sq_ind_to_bit(neighbor_sq)) != 0 {
-                        duo_bonus_mg += PAWN_DUO_BONUS[0];
-                        duo_bonus_eg += PAWN_DUO_BONUS[1];
+                        duo_bonus_mg += self.weights.pawn_duo_bonus[0];
+                        duo_bonus_eg += self.weights.pawn_duo_bonus[1];
                     }
                 }
 
@@ -213,8 +211,8 @@ impl PestoEval {
                      // if _move_gen.is_sq_attacked_by_pawn(stop_sq, enemy_color, &enemy_pawns) {
                      // Simplified check: Is front square occupied by enemy pawn? (Less accurate but avoids MoveGen dependency here)
                      if (enemy_pawns & sq_ind_to_bit(stop_sq)) != 0 {
-                         backward_penalty_mg += BACKWARD_PAWN_PENALTY[0];
-                         backward_penalty_eg += BACKWARD_PAWN_PENALTY[1];
+                         backward_penalty_mg += self.weights.backward_pawn_penalty[0];
+                         backward_penalty_eg += self.weights.backward_pawn_penalty[1];
                      }
                  }
             }
@@ -227,8 +225,8 @@ impl PestoEval {
                 // 3. Pawn Shield Bonus
                 let shield_zone_mask = get_king_shield_zone_mask(color, king_sq);
                 let shield_pawns = popcnt(shield_zone_mask & friendly_pawns);
-                mg[color] += shield_pawns as i32 * KING_SAFETY_PAWN_SHIELD_BONUS[0];
-                eg[color] += shield_pawns as i32 * KING_SAFETY_PAWN_SHIELD_BONUS[1];
+                mg[color] += shield_pawns as i32 * self.weights.king_safety_pawn_shield_bonus[0];
+                eg[color] += shield_pawns as i32 * self.weights.king_safety_pawn_shield_bonus[1];
 
                 // 8. King Attack Score (Refined: Sum weights of pieces attacking the king zone)
                 // Applied only in middlegame for now
@@ -244,7 +242,7 @@ impl PestoEval {
                             // Add attack weight if this piece can potentially attack the king zone
                             // This is a simplified approach rather than calculating exact attacks
                             if get_king_attack_zone_mask(color, sq) & attack_zone != 0 {
-                                total_attack_weight += KING_ATTACK_WEIGHTS[piece_type];
+                                total_attack_weight += self.weights.king_attack_weights[piece_type];
                             }
                         }
                     }
@@ -272,11 +270,11 @@ impl PestoEval {
 
                 if friendly_pawns_on_file == 0 {
                     if enemy_pawns_on_file == 0 { // Open File
-                        mg[color] += ROOK_OPEN_FILE_BONUS[0];
-                        eg[color] += ROOK_OPEN_FILE_BONUS[1];
+                        mg[color] += self.weights.rook_open_file_bonus[0];
+                        eg[color] += self.weights.rook_open_file_bonus[1];
                     } else { // Half-Open File (for this rook's color)
-                        mg[color] += ROOK_HALF_OPEN_FILE_BONUS[0];
-                        eg[color] += ROOK_HALF_OPEN_FILE_BONUS[1];
+                        mg[color] += self.weights.rook_half_open_file_bonus[0];
+                        eg[color] += self.weights.rook_half_open_file_bonus[1];
                     }
                 }
 
@@ -287,8 +285,8 @@ impl PestoEval {
                     if (passed_mask & enemy_pawns) == 0 { // Is pawn passed?
                         let pawn_rank = sq_to_rank(pawn_sq);
                         if (color == WHITE && rank < pawn_rank) || (color == BLACK && rank > pawn_rank) { // Is rook behind?
-                            mg[color] += ROOK_BEHIND_PASSED_PAWN_BONUS[0];
-                            eg[color] += ROOK_BEHIND_PASSED_PAWN_BONUS[1];
+                            mg[color] += self.weights.rook_behind_passed_pawn_bonus[0];
+                            eg[color] += self.weights.rook_behind_passed_pawn_bonus[1];
                             break; // Only once per rook
                         }
                     }
@@ -302,8 +300,8 @@ impl PestoEval {
                         let pawn_rank = sq_to_rank(pawn_sq);
                          // Is rook behind enemy pawn (relative to enemy pawn direction)?
                         if (color == WHITE && rank > pawn_rank) || (color == BLACK && rank < pawn_rank) {
-                            mg[color] += ROOK_BEHIND_ENEMY_PASSED_PAWN_BONUS[0];
-                            eg[color] += ROOK_BEHIND_ENEMY_PASSED_PAWN_BONUS[1];
+                            mg[color] += self.weights.rook_behind_enemy_passed_pawn_bonus[0];
+                            eg[color] += self.weights.rook_behind_enemy_passed_pawn_bonus[1];
                             break; // Only once per rook
                         }
                     }
@@ -312,18 +310,18 @@ impl PestoEval {
 
             // Doubled Rooks on 7th - Additional bonus if 2+ rooks are there
             if popcnt(rooks_on_seventh) >= 2 {
-                mg[color] += DOUBLED_ROOKS_ON_SEVENTH_BONUS[0];
-                eg[color] += DOUBLED_ROOKS_ON_SEVENTH_BONUS[1];
+                mg[color] += self.weights.doubled_rooks_on_seventh_bonus[0];
+                eg[color] += self.weights.doubled_rooks_on_seventh_bonus[1];
             }
 
             // --- Castling Rights Bonus ---
             // Small bonus for retaining castling rights, mainly in middlegame
             if color == WHITE {
-                if board.castling_rights.white_kingside { mg[color] += CASTLING_RIGHTS_BONUS[0]; }
-                if board.castling_rights.white_queenside { mg[color] += CASTLING_RIGHTS_BONUS[0]; }
+                if board.castling_rights.white_kingside { mg[color] += self.weights.castling_rights_bonus[0]; }
+                if board.castling_rights.white_queenside { mg[color] += self.weights.castling_rights_bonus[0]; }
             } else { // BLACK
-                if board.castling_rights.black_kingside { mg[color] += CASTLING_RIGHTS_BONUS[0]; }
-                if board.castling_rights.black_queenside { mg[color] += CASTLING_RIGHTS_BONUS[0]; }
+                if board.castling_rights.black_kingside { mg[color] += self.weights.castling_rights_bonus[0]; }
+                if board.castling_rights.black_queenside { mg[color] += self.weights.castling_rights_bonus[0]; }
             }
 
         } // End of loop through colors [WHITE, BLACK]
@@ -339,39 +337,39 @@ impl PestoEval {
 
         for color in [WHITE, BLACK] {
             let friendly_occ = board.pieces_occ[color];
-            let enemy_occ = board.pieces_occ[1 - color];
+            let _enemy_occ = board.pieces_occ[1 - color];
 
             // Knight Mobility
             let mut knight_moves = 0;
             for sq in bits(&board.pieces[color][KNIGHT]) {
                 knight_moves += popcnt(move_gen.n_move_bitboard[sq] & !friendly_occ);
             }
-            mobility_mg[color] += knight_moves as i32 * MOBILITY_WEIGHTS_MG[0]; // Index 0 for Knight
-            mobility_eg[color] += knight_moves as i32 * MOBILITY_WEIGHTS_EG[0];
+            mobility_mg[color] += knight_moves as i32 * self.weights.mobility_weights_mg[0]; // Index 0 for Knight
+            mobility_eg[color] += knight_moves as i32 * self.weights.mobility_weights_eg[0];
 
             // Bishop Mobility
             let mut bishop_moves = 0;
             for sq in bits(&board.pieces[color][BISHOP]) {
                 bishop_moves += popcnt(move_gen.get_bishop_moves(sq, occupied) & !friendly_occ);
             }
-            mobility_mg[color] += bishop_moves as i32 * MOBILITY_WEIGHTS_MG[1]; // Index 1 for Bishop
-            mobility_eg[color] += bishop_moves as i32 * MOBILITY_WEIGHTS_EG[1];
+            mobility_mg[color] += bishop_moves as i32 * self.weights.mobility_weights_mg[1]; // Index 1 for Bishop
+            mobility_eg[color] += bishop_moves as i32 * self.weights.mobility_weights_eg[1];
 
             // Rook Mobility
             let mut rook_moves = 0;
             for sq in bits(&board.pieces[color][ROOK]) {
                 rook_moves += popcnt(move_gen.get_rook_moves(sq, occupied) & !friendly_occ);
             }
-            mobility_mg[color] += rook_moves as i32 * MOBILITY_WEIGHTS_MG[2]; // Index 2 for Rook
-            mobility_eg[color] += rook_moves as i32 * MOBILITY_WEIGHTS_EG[2];
+            mobility_mg[color] += rook_moves as i32 * self.weights.mobility_weights_mg[2]; // Index 2 for Rook
+            mobility_eg[color] += rook_moves as i32 * self.weights.mobility_weights_eg[2];
 
             // Queen Mobility
             let mut queen_moves = 0;
             for sq in bits(&board.pieces[color][QUEEN]) {
                 queen_moves += popcnt(move_gen.get_queen_moves(sq, occupied) & !friendly_occ);
             }
-            mobility_mg[color] += queen_moves as i32 * MOBILITY_WEIGHTS_MG[3]; // Index 3 for Queen
-            mobility_eg[color] += queen_moves as i32 * MOBILITY_WEIGHTS_EG[3];
+            mobility_mg[color] += queen_moves as i32 * self.weights.mobility_weights_mg[3]; // Index 3 for Queen
+            mobility_eg[color] += queen_moves as i32 * self.weights.mobility_weights_eg[3];
 
             // Add mobility score to the main score components
             mg[color] += mobility_mg[color];

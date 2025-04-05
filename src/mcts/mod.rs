@@ -82,8 +82,8 @@ pub fn mcts_search(
             
             // Store them in the unexplored_moves_by_cat map
             if !legal_moves.is_empty() {
-                // For simplicity, just use OtherQuiet category for all moves
-                let cat = MoveCategory::OtherQuiet;
+                // For simplicity, just use Quiet category for all moves
+                let cat = MoveCategory::Quiet;
                 root_node.unexplored_moves_by_cat.insert(cat, legal_moves);
                 root_node.current_priority_category = Some(cat);
             }
@@ -146,8 +146,8 @@ pub fn mcts_search(
                     
                     // Store them in the unexplored_moves_by_cat map
                     if !legal_moves.is_empty() {
-                        // For simplicity, just use OtherQuiet category for all moves
-                        let cat = MoveCategory::OtherQuiet;
+                        // For simplicity, just use Quiet category for all moves
+                        let cat = MoveCategory::Quiet;
                         leaf_node.unexplored_moves_by_cat.insert(cat, legal_moves);
                         leaf_node.current_priority_category = Some(cat);
                     }
