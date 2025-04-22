@@ -1,291 +1,152 @@
-# Design Doc: Hybrid MCTS with Prioritized Selection and Mate Search
+# Design Document: Humanlike Chess Training Platform
+Version: 1.2 (Reflecting Current Implementation Progress)
 
-## 1. Goals
+Date: 2025-04-23
 
-*   Implement a Monte Carlo Tree Search (MCTS) algorithm for the Kingfisher chess engine.
-*   Integrate the existing linear evaluation function (`PestoEval`) for state value estimation, ensuring its weights (`eval_constants.rs`) are structured for future trainability.
-*   Implement the "Mate Search First" strategy: Utilize the existing classical `mate_search` function to find forced mates at leaf nodes, using the exact result (win/loss) for backpropagation and bypassing policy/value evaluation if a mate is found.
-*   Implement a modified MCTS **Selection** strategy that prioritizes exploring moves based on predefined heuristic categories (e.g., Mates, Captures, Killers, Checks, Quiet) before applying the PUCT selection metric.
-*   Define a `PolicyNetwork` interface to provide prior probabilities (`P(a|s)`) for moves, initially using uniform priors via `PestoPolicy`.
-*   Structure the implementation modularly within `src/mcts/`.
+Project Goal: To create a chess training platform featuring a unique "humanlike" chess engine for sparring and a hybrid repertoire builder. The engine should mimic the play style, common moves, and tactical alertness of human players within specific Elo rating bands (e.g., 2000-2200).
 
-## 2. Background
+Target User: Chess players looking to improve by practicing against realistic opponents and building practical opening repertoires tailored to human responses.
 
-Standard MCTS relies heavily on random simulations (rollouts) or a learned value/policy network (like AlphaZero). This design aims for a hybrid approach leveraging existing classical components:
-1.  **Trainable Linear Evaluation:** Use `PestoEval` as `V(s)`, making its weights parameters for future learning via self-play, avoiding the need for a deep NN value head initially.
-2.  **Classical Search Integration:** Incorporate `mate_search` results directly into the MCTS value estimation and use heuristic move categorization to guide MCTS exploration more intelligently than uniform random selection or basic PUCT alone, especially before a policy network is trained.
+## 1. High-Level Architecture
 
-## 3. Proposed Changes
+The platform comprises several interacting components:
 
-1.  **Refactor `PestoEval`:** Modify `PestoEval` and `eval_constants.rs` to store evaluation weights as struct fields rather than global constants, enabling future tuning.
-2.  **Modify `MctsNode`:** Enhance the node structure to support the new selection and evaluation strategies.
-3.  **Implement Prioritized Selection:** Modify the selection phase logic to use heuristic move categories.
-4.  **Implement Mate Search First Evaluation:** Modify the expansion/evaluation phase to run `mate_search` before consulting the `PolicyNetwork`.
-5.  **Update Backpropagation:** Ensure backpropagation correctly handles values derived from both mate search (exact 1.0/0.0) and `PestoEval` (normalized 0.0-1.0).
-6.  **Update Main Loop:** Modify `mcts_search` to orchestrate the new cycle.
+*   **Core Engine (Rust):** A custom chess engine responsible for generating moves.
+    *   *Status:* Foundation implemented in Rust (`src/`). Currently uses classical search (Alpha-Beta) and evaluation (Pesto), not the originally planned MCTS/Policy NN for the "humanlike" aspect. MCTS code exists (`src/mcts/`) but is not the primary search in `src/agent.rs`.
+*   **Policy Network Models:** Neural network models (likely trained in Python, deployed in ONNX or TorchScript format) loaded by the Core Engine. Separate models exist for different target rating bands, providing move probabilities (policy).
+    *   *Status:* Planned. Core engine integration (`src/mcts/policy.rs` exists) but loading/inference logic and connection to the main search (`src/search/` or `src/agent.rs`) is not apparent in the provided `src` files. Training pipeline is separate.
+*   **Strong Engine (External):** An external, powerful UCI-compliant chess engine (e.g., Stockfish) used for objective analysis and suggesting strong moves for the user within the repertoire builder.
+    *   *Status:* Planned. No integration code found in `src`.
+*   **User Interface (UI):** The front-end application (technology TBD, potentially Web or Desktop) providing user interaction for sparring, repertoire building, and analysis.
+    *   *Status:* Planned. No UI code found in `src`.
+*   **Supporting Data Files:**
+    *   Opening Books (Polyglot .bin): Rating-band specific books containing move frequencies from human games.
+        *   *Status:* Planned. No loading/probing logic found in `src`.
+    *   Endgame Tablebases (Syzygy .rtbm, .rtbw): 6-piece set for perfect mate resolution.
+        *   *Status:* Planned. No probing logic found in `src`.
+    *   User Data (Repertoires, Settings): Saved locally (e.g., PGN, JSON).
+        *   *Status:* Planned.
 
-## 4. Data Structures
+*Interaction Flow Example (Sparring Move Request):*
+*(Note: This flow describes the original MCTS/NN plan. The current implementation uses Alpha-Beta search as described below)*
 
-### 4.1. `MoveCategory` Enum
+1.  UI sends current board state (position command) and go command to Core Engine (via UCI protocol). *(UCI implemented in `src/uci.rs`)*
+2.  Core Engine checks piece count: If <= 6 pieces -> Probes Syzygy EGTB (.rtbm file). If mate found, returns mate score/move immediately. *(EGTB probing planned)*
+3.  If not EGTB mate, checks rating-specific Opening Book (Polyglot .bin). If move found & criteria met (e.g., >100 games in DB), selects move probabilistically based on stored weights. *(Opening book planned)*
+4.  If not in book or book threshold not met, initiates MCTS search: *(Current implementation uses Alpha-Beta search instead)*
+    *   Performs pre-expansion Deep Mate Search (configurable depth, e.g., 9-ply), unless EGTB already resolved mate. *(Mate search implemented in `src/search/mate_search.rs`)*
+    *   Runs MCTS iterations: *(MCTS planned, Alpha-Beta implemented)*
+        *   Node Selection: PUCT algorithm.
+        *   Node Expansion: Prioritizes checks/captures (see Section 2.4), uses Policy NN priors for remaining moves.
+        *   Simulation/Evaluation: Uses Heuristic Function (see Section 2.2).
+        *   Backpropagation: Updates node statistics (visits N, value W).
+    *   Selects best move based on MCTS results (e.g., highest visit count). *(Current implementation selects based on Alpha-Beta result)*
+5.  Core Engine sends `bestmove <move>` back to UI. *(Implemented)*
 
-Define an enum to represent move priorities. The order defines the priority (lower discriminant = higher priority).
+## 2. Core Engine Design (Rust)
 
-```rust
-// (Location: Potentially mcts/node.rs or mcts/policy.rs)
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
-enum MoveCategory {
-    ForcedMate,      // Priority 0 (Highest) - If known via shallow search/checkmate
-    PromotionToQueen,// Priority 1
-    WinningCapture,  // Priority 2 (SEE > threshold)
-    KillerMove1,     // Priority 3 (Quiet move)
-    KillerMove2,     // Priority 4 (Quiet move)
-    EqualCapture,    // Priority 5 (abs(SEE) <= threshold)
-    Check,           // Priority 6 (Non-capture, non-promo, non-killer)
-    HistoryHeuristic, // Priority 7 (Quiet moves with high history scores)
-    OtherQuiet,      // Priority 8
-    LosingCapture,   // Priority 9 (SEE < -threshold)
-}
-4.2. MctsNode Modifications (mcts/node.rs)
-use crate::move_types::Move;
-use crate::board::Board;
-use std::rc::{Rc, Weak};
-use std::cell::RefCell;
-use std::collections::HashMap; // Needed for categorized moves
+Primary Goal: Simulate human play at specific rating levels, incorporating realistic opening choices, tactical awareness, and characteristic move patterns. *(Note: Current implementation is a classical engine)*
 
-// ... (Existing imports, NEXT_NODE_ID) ...
-use super::policy::PolicyNetwork; // Assuming policy.rs exists
+Language: Rust *(Implemented)*
 
-#[derive(Debug)]
-pub struct MctsNode {
-    pub id: usize,
-    pub state: Board,
-    pub parent: Option<Weak<RefCell<MctsNode>>>,
-    pub children: Vec<Rc<RefCell<MctsNode>>>, // Explored children
-    pub action: Option<Move>, // Move from parent
+Core Libraries: `lazy_static`, `rand`. *(Implemented)* Potential future: `rust-syzygy`, ONNX/TorchScript runtime.
 
-    // --- Statistics ---
-    pub visits: u32,
-    pub total_value: f64, // Accumulated value (0-1 relative to White) from backpropagation
+**2.1. Search Algorithm:** MCTS *(Planned)*
+*   *Current Implementation:* Iterative Deepening Alpha-Beta Search (`src/search/iterative_deepening.rs`, `src/search/alpha_beta.rs`) with Transposition Tables (`src/transposition.rs`), Quiescence Search (`src/search/quiescence.rs`), History Heuristic (`src/search/history.rs`), and Static Exchange Evaluation (`src/search/see.rs`). MCTS code exists (`src/mcts/`) but is not the primary search used by `SimpleAgent`.
 
-    // --- Evaluation / Mate Status ---
-    /// Stores the exact value if determined by mate search (1.0 W win, 0.0 B win) or terminal state.
-    pub terminal_or_mate_value: Option<f64>,
-    /// Stores the value from the policy/evaluation network (0-1 relative to White) if evaluated.
-    pub nn_value: Option<f64>,
-    /// Stores the policy priors for all legal moves from this state, evaluated once.
-    pub priors: Option<HashMap<Move, f64>>,
+**2.2. Position Evaluation:** Heuristic Function *(Planned: Specific heuristic for MCTS)*
+*   *Current Implementation:* Pesto-style Tapered Evaluation (`src/eval.rs`, `src/eval_constants.rs`). Includes material, PSQTs, king safety, pawn structure, mobility, bishop pair, rook bonuses.
 
-    // --- Expansion / Selection Control ---
-    /// Stores unexplored legal moves, categorized by priority.
-    /// Key: MoveCategory, Value: List of Moves in that category.
-    pub unexplored_moves_by_cat: HashMap<MoveCategory, Vec<Move>>,
-    /// Tracks the current highest-priority category being explored.
-    pub current_priority_category: MoveCategory,
-    /// Stores the policy prior P(action|state) for the action leading to this node.
-    pub policy_prior: f64,
-}
+**2.3. Move Guidance:** Policy Network Interface *(Planned)*
+*   *Status:* No NN model loading/inference integrated into the main search/agent flow. `src/mcts/policy.rs` exists.
 
-impl MctsNode {
-    // --- Constructor Updates ---
-    // new_root: Initializes fields, potentially calls categorize_moves if policy known immediately.
-    // new_child: Needs policy_prior, initializes other fields.
+**2.4. Tactical Enhancements**
+*   Deep Mate Search: Before root MCTS expansion (if not resolved by EGTB), perform dedicated search for forced mates (configurable depth, e.g., 9-ply). If mate found, use result directly.
+    *   *Status:* Mate search implemented (`src/search/mate_search.rs`). Integration point (before MCTS/Alpha-Beta root) confirmed in `src/agent.rs`.
+*   Check/Capture Prioritization (MCTS Expansion): *(Planned for MCTS)*
+    *   *Current Implementation (Alpha-Beta):* Moves are generated (`src/move_generation.rs`) and sorted using MVV-LVA for captures and History Heuristic / Pesto evaluation difference for quiet moves (`gen_pseudo_legal_moves_with_evals`).
 
-    // --- Helper for Categorization (Called once per node, likely after policy evaluation) ---
-    // fn store_priors_and_categorize_moves(&mut self, priors: HashMap<Move, f64>, move_gen: &MoveGen)
+**2.5. Opening Book Integration** *(Planned)*
+*   *Status:* No implementation found in `src`.
 
-    // --- PUCT Calculation (Uses stored policy_prior) ---
-    // pub fn puct_value(...) -> f64
+**2.6. Endgame Tablebase (EGTB) Integration** *(Planned)*
+*   *Status:* No implementation found in `src`.
 
-    // --- Backpropagation (Remains similar, uses total_value) ---
-    // pub fn backpropagate(...)
+**2.7. Engine Communication Protocol:** UCI Subset *(Implemented)*
+*   *Status:* Implemented in `src/uci.rs` via standard input/output. Handles `uci`, `isready`, `ucinewgame`, `position`, `go`, `quit`. Parses time controls and depth limits. Outputs `bestmove` and basic `info` string. Custom options are planned but not implemented in the handler.
 
-    // --- Other helpers ---
-    // pub fn is_fully_explored(&self) -> bool // Checks if unexplored_moves_by_cat is empty
-    // pub fn advance_priority_category(&mut self) -> bool // Moves to next category, returns false if all exhausted
-    // pub fn get_best_unexplored_move(&mut self) -> Option<Move> // Gets & removes move from current category
-}
-Self-Correction: Added priors: Option<HashMap<Move, f64>> to store policy results. Modified relevant method comments.
+## 3. Policy Network Subsystem *(Planned)*
 
-5. Algorithm Details
-5.1. Refactor PestoEval
-Modify PestoEval struct to hold weights (e.g., two_bishops_bonus: [i32; 2], etc.) loaded from constants or configuration.
-Update eval_plus_game_phase to use self.weight_field instead of global constants.
-Implement normalization (e.g., sigmoid) within PestoPolicy::evaluate to convert centipawn score to a [0.0, 1.0] value relative to the current player.
-5.2. PolicyNetwork Trait (mcts/policy.rs)
-evaluate(&self, board: &Board) -> (HashMap<Move, f64>, f64) remains the same.
-PestoPolicy::evaluate implementation:
-Gets legal moves.
-Calculates normalized value v using PestoEval::eval and sigmoid.
-Calculates uniform priors P(a|s) = 1 / N for all legal moves a.
-Returns (priors_map, v).
-5.3. MCTS Cycle (mcts_search in mcts/mod.rs)
-The core loop needs restructuring to accommodate the "Mate Search First" and prioritized expansion logic.
+Goal: Train NNs to predict human moves for specific rating bands.
+Technology: Python with PyTorch or TensorFlow recommended for training.
+*   *Status:* External to the Rust codebase. No direct evidence in `src`.
 
-pub fn mcts_search<P: PolicyNetwork>(
-    root_state: Board,
-    move_gen: &MoveGen,
-    policy_network: &P,
-    // evaluator: &PestoEval, // Assuming PolicyNetwork provides value
-    mate_search_depth: i32,
-    iterations: Option<u32>,
-    time_limit: Option<Duration>,
-) -> Option<Move> {
-    let root_node_rc = MctsNode::new_root(root_state, move_gen); // Does not categorize yet
+## 4. Strong Engine Integration (Rust) *(Planned)*
 
-    loop {
-        // --- Termination Check ---
-        // ...
+Implement a Rust module to manage an external UCI engine process (e.g., Stockfish executable).
+*   *Status:* No implementation found in `src`.
 
-        // --- 1. Selection (Prioritized) ---
-        // Traverses the tree using PUCT on *explored* children,
-        // but prioritizes expanding nodes based on category if available.
-        let leaf_node_rc = select_leaf_for_expansion(root_node_rc.clone(), EXPLORATION_CONSTANT);
+## 5. User Interface (UI) Design *(Planned)*
 
-        // --- 2. Mate Check ---
-        let mut leaf_node = leaf_node_rc.borrow_mut(); // Mutable borrow needed
-        let mut value_to_propagate: Option<f64> = None; // Value relative to White [0.0, 1.0]
+Technology: TBD.
+*   *Status:* No implementation found in `src`.
 
-        if leaf_node.terminal_or_mate_value.is_none() { // Only run mate search once
-            // Check terminal state first
-            let (is_mate, is_stalemate) = leaf_node.state.is_checkmate_or_stalemate(move_gen);
-            if is_stalemate {
-                leaf_node.terminal_or_mate_value = Some(0.5);
-            } else if is_mate {
-                 // If white is to move and it's mate, black won (0.0)
-                 // If black is to move and it's mate, white won (1.0)
-                leaf_node.terminal_or_mate_value = Some(if leaf_node.state.w_to_move { 0.0 } else { 1.0 });
-            } else {
-                // Not terminal, run mate search
-                let (mate_score, _mate_move, _nodes) = mate_search(&mut BoardStack::with_board(leaf_node.state.clone()), move_gen, mate_search_depth, false);
-                if mate_score == 1000000 { // Mate found for current player
-                    leaf_node.terminal_or_mate_value = Some(if leaf_node.state.w_to_move { 1.0 } else { 0.0 });
-                } else if mate_score == -1000000 { // Mated
-                    leaf_node.terminal_or_mate_value = Some(if leaf_node.state.w_to_move { 0.0 } else { 1.0 });
-                }
-                // If no mate found by search, terminal_or_mate_value remains None for now
-            }
-        }
+## 6. Technology Stack & Data Summary
 
-        // --- 3. Expansion & Evaluation (If no mate/terminal state found) ---
-        let node_to_propagate_from: Rc<RefCell<MctsNode>>;
+*   **Core Engine:** Rust *(Implemented)*
+*   **Policy NN Training:** Python (PyTorch/TensorFlow) *(Planned/External)*
+*   **NN Model Format:** ONNX / TorchScript *(Planned)*
+*   **EGTB:** Syzygy 6-piece (.rtbm, .rtbw) on local SSD *(Planned)*
+*   **EGTB Library:** rust-syzygy *(Planned)*
+*   **Opening Book:** Polyglot (.bin), per rating band, local storage *(Planned)*
+*   **Strong Engine:** External UCI (e.g., Stockfish) *(Planned)*
+*   **UI:** TBD *(Planned)*
+*   **User Repertoires:** PGN (recommended), local storage *(Planned)*
 
-        if let Some(exact_value) = leaf_node.terminal_or_mate_value {
-            // Mate found or terminal state reached
-            value_to_propagate = Some(exact_value);
-            node_to_propagate_from = leaf_node_rc.clone(); // Backpropagate from the leaf itself
-            drop(leaf_node); // Release borrow
-        } else {
-            // No mate found, node is not terminal. Evaluate if not already done.
-            if leaf_node.nn_value.is_none() {
-                let (priors, value_current_player) = policy_network.evaluate(&leaf_node.state);
-                let value_white_pov = if leaf_node.state.w_to_move { value_current_player } else { 1.0 - value_current_player };
-                leaf_node.nn_value = Some(value_white_pov);
-                leaf_node.store_priors_and_categorize_moves(priors, move_gen); // New method
-                value_to_propagate = Some(value_white_pov);
-                node_to_propagate_from = leaf_node_rc.clone(); // Backpropagate from evaluated leaf
-                drop(leaf_node); // Release borrow
-            } else {
-                // Already evaluated, expand the highest priority available move
-                let best_unexplored_move = leaf_node.get_best_unexplored_move(); // New method
-                if let Some(action) = best_unexplored_move {
-                    let next_state = leaf_node.state.apply_move_to_board(action);
-                    let prior = leaf_node.priors.as_ref().unwrap().get(&action).cloned().unwrap_or(0.0);
-                    let parent_weak = Rc::downgrade(&leaf_node_rc);
-                    let new_child_rc = MctsNode::new_child(next_state, action, parent_weak, prior, move_gen);
-                    leaf_node.children.push(new_child_rc.clone());
-                    drop(leaf_node); // Release borrow before evaluating child
+## 7. Development Roadmap & Priorities
 
-                    // Evaluate the newly expanded child node
-                    let (child_priors, child_value_curr_player) = policy_network.evaluate(&new_child_rc.borrow().state);
-                    let child_value_white_pov = if new_child_rc.borrow().state.w_to_move { child_value_curr_player } else { 1.0 - child_value_curr_player };
-                    { // Borrow scope for child
-                        let mut child_node = new_child_rc.borrow_mut();
-                        child_node.nn_value = Some(child_value_white_pov);
-                        child_node.store_priors_and_categorize_moves(child_priors, move_gen);
-                    }
-                    value_to_propagate = Some(child_value_white_pov);
-                    node_to_propagate_from = new_child_rc; // Backpropagate from the new child
+(Updated status based on `src` review)
 
-                } else {
-                    // Node was evaluated but somehow fully explored? Error or edge case.
-                    // Backpropagate stored value anyway.
-                    value_to_propagate = leaf_node.nn_value; // Use stored value
-                    node_to_propagate_from = leaf_node_rc.clone();
-                    drop(leaf_node); // Release borrow
-                }
-            }
-        }
+*   **P1: Core Engine Foundation (Highest Priority)**
+    *   Rust project setup, basic crate integration. *(DONE)*
+    *   Implement MCTS framework structure. *(Partially DONE - `src/mcts/` exists, but Alpha-Beta is primary)*
+    *   Implement Heuristic Evaluation (v1). *(DONE - Pesto implemented in `src/eval.rs`)*
+    *   Implement Check/Capture prioritization logic. *(DONE - Implemented for Alpha-Beta move ordering)*
+    *   Implement Deep Mate Search logic stub. *(DONE - Implemented in `src/search/mate_search.rs`)*
+    *   Implement basic UCI handling (uci, isready, position, go, quit). *(DONE - Implemented in `src/uci.rs`)*
+    *   *Current Goal Status:* Engine plays legal moves via UCI using Alpha-Beta search and Pesto evaluation.
+*   **P2: Policy Network Pipeline (High Priority - Parallelizable)**
+    *   Develop Python data processing scripts (Lichess PGN -> Training Data). *(External - Status Unknown)*
+    *   Implement/adapt Policy NN architecture. *(External - Status Unknown)*
+    *   Setup training pipeline. Train initial model (one rating band). *(External - Status Unknown)*
+    *   Implement model export (ONNX/TorchScript). *(External - Status Unknown)*
+    *   *Current Goal Status:* Unknown (External task).
+*   **P3: Engine Integration (High Priority - Depends on P1 & P2)**
+    *   Integrate NN model loading/inference in Rust. Connect to MCTS. *(TODO)*
+    *   Integrate Syzygy EGTB probing (DTM mate resolution). *(TODO)*
+    *   Integrate Polyglot Opening Book probing. *(TODO)*
+    *   Initial tuning of MCTS parameters, heuristic function, mate search depth. *(Partially DONE - Tuning likely needed for Alpha-Beta/Pesto)*
+    *   *Current Goal Status:* Basic Alpha-Beta engine structure exists. Integration of NN, EGTB, Book needed for original "humanlike" goal.
+*   **P4: Strong Engine Integration (Medium Priority)**
+    *   Implement Rust UCI wrapper for external engine. *(TODO)*
+    *   *Current Goal Status:* Not started.
+*   **P5: Basic UI / Test Harness (Medium Priority)**
+    *   Develop a simple way to interact with the engine (CLI, test GUI, basic API). *(Partially DONE - UCI serves as a basic CLI interface, `src/main.rs` can run a simple game)*
+    *   *Current Goal Status:* Basic interaction via UCI possible.
+*   **P6: Full UI Feature Implementation (Lower Priority - Depends on P5)**
+    *   Build out Sparring, Repertoire Builder, Analysis modules. *(TODO)*
+    *   *Current Goal Status:* Not started.
+*   **P7: Refinement & Testing (Ongoing, Increased Priority Later)**
+    *   Extensive testing for "humanlike" feel..., bug fixing, performance tuning. *(Ongoing for current Alpha-Beta engine, major effort needed if switching to MCTS/NN)*
+    *   Refine Heuristic function, MCTS parameters, potentially retrain Policy NN. *(Ongoing/Planned)*
+    *   Documentation. *(Partially DONE - Doc comments exist)*
+    *   *Current Goal Status:* Basic engine functional, requires significant testing and refinement, especially towards the "humanlike" goal.
 
-        // --- 4. Backpropagation ---
-        if let Some(value) = value_to_propagate {
-            MctsNode::backpropagate(node_to_propagate_from, value);
-        } // Else: Error? Or maybe mate search failed beyond depth?
+## 8. Future Considerations
 
-        iteration_count += 1;
-    }
-
-    // --- Select Best Move --- (Based on visits, as before)
-    // ...
-}
-Self-Correction: Refined the MCTS loop logic significantly to better match the AlphaZero flow combined with the mate search. Evaluation now happens on the leaf node before expansion, and the evaluated value is backpropagated. Expansion creates one child based on priority.
-
-5.4. Prioritized Selection (select_leaf_for_expansion)
-This function needs to traverse the tree using PUCT, but with a modification: if a node has unexplored moves according to the priority categories, it should be selected for expansion before descending further based purely on PUCT of existing children.
-
-// (Location: mcts/mod.rs or mcts/node.rs)
-fn select_leaf_for_expansion(
-    node: Rc<RefCell<MctsNode>>,
-    exploration_constant: f64,
-) -> Rc<RefCell<MctsNode>> {
-    let mut current_node_rc = node;
-    loop {
-        let node_borrow = current_node_rc.borrow();
-
-        if node_borrow.terminal_or_mate_value.is_some() || node_borrow.is_terminal() {
-            // Reached a terminal node or one decided by mate search - select this node
-            drop(node_borrow);
-            return current_node_rc;
-        }
-
-        // Check if there are unexplored moves according to the current priority category
-        if !node_borrow.is_fully_explored() {
-             // This node has high-priority unexplored moves, select it for expansion/evaluation
-             drop(node_borrow);
-             return current_node_rc;
-        }
-
-        // All moves in current priority (and higher) are explored.
-        // If no children exist at all (shouldn't happen if not terminal), return self.
-        if node_borrow.children.is_empty() {
-             drop(node_borrow);
-             return current_node_rc;
-        }
-
-        // Otherwise, select the best *existing* child using PUCT and descend.
-        let best_child_rc = node_borrow.select_best_child(exploration_constant); // Uses PUCT
-        drop(node_borrow);
-        current_node_rc = best_child_rc; // Descend tree
-    }
-}
-Self-Correction: Simplified selection. It uses PUCT on explored children. If it reaches a node that isn't fully explored according to the priority categories, that node is returned immediately for evaluation/expansion.
-
-6. Interfaces
-PolicyNetwork Trait: evaluate(board) -> (HashMap<Move, f64>, f64) - Provides priors and value [0,1] for the current player.
-Board::apply_move_to_board(&self, Move) -> Board: Needs to be public and correctly implement move application, returning a new state.
-mate_search(...) -> (score, Move, nodes): Needs to be accessible. Score indicates mate (e.g., +/- 1M) or no mate found (e.g., 0).
-MoveGen: Needs gen_pseudo_legal_moves, is_capture, potentially helpers for categorization (like accessing SEE results if not done within categorization).
-MctsNode: Needs methods like store_priors_and_categorize_moves, get_best_unexplored_move, is_fully_explored, advance_priority_category.
-7. Trade-offs & Considerations
-Performance: Mate search adds overhead. Categorization adds overhead during expansion/evaluation. Selection is closer to standard PUCT.
-Tuning: Requires tuning mate_search_depth, MCTS exploration_constant, and move category definitions/priorities.
-Complexity: Higher than standard MCTS or the previous policy-based MCTS due to the conditional logic involving mate search and prioritized expansion.
-Mate Search Depth: Choosing an appropriate mate_search_depth is crucial.
-Policy Priors: Still needed for PUCT calculation among explored children and potentially for tie-breaking within priority categories during expansion.
-8. Future Work
-Implement Board::apply_move_to_board.
-Implement MctsNode helper methods (store_priors_and_categorize_moves, etc.).
-Refine the select_leaf_for_expansion logic.
-Refactor PestoEval for trainable weights.
-Implement a non-uniform policy (heuristic or learned).
-Tune parameters.
-Add comprehensive tests.
+*   Training/Integrating a Value Network.
+*   Subtle use of EGTB WDL scores in evaluation.
+*   More rating band models.
+*   Cloud deployment / Web service.
+*   User accounts / Cloud storage.
+*   Fully integrating or replacing Alpha-Beta with the MCTS implementation.
