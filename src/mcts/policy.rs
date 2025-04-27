@@ -13,16 +13,17 @@ use std::collections::HashMap;
 /// 1. A prior probability distribution over legal moves
 /// 2. A value estimate for the current position
 pub trait PolicyNetwork {
-    /// Evaluates a position and returns (policy, value).
+    /// Evaluates a position given the legal moves and returns (policy, value).
     ///
     /// # Arguments
     /// * `board` - The chess position to evaluate.
+    /// * `legal_moves` - A slice containing the legal moves for the current position.
     ///
     /// # Returns
-    /// * `HashMap<Move, f64>` - Prior probabilities for each legal move.
+    /// * `HashMap<Move, f64>` - Prior probabilities for each legal move provided.
     /// * `f64` - Value estimate for the position from the perspective of the player to move.
     ///           Should be in range [0.0, 1.0] where 1.0 means certain win for current player.
-    fn evaluate(&self, board: &Board) -> (HashMap<Move, f64>, f64);
+    fn evaluate(&self, board: &Board, legal_moves: &[Move]) -> (HashMap<Move, f64>, f64);
 }
 
 /// A simple random policy network for testing.
@@ -30,11 +31,16 @@ pub trait PolicyNetwork {
 pub struct RandomPolicy;
 
 impl PolicyNetwork for RandomPolicy {
-    fn evaluate(&self, _board: &Board) -> (HashMap<Move, f64>, f64) {
-        // This is just a placeholder implementation
-        // In a real implementation, you would generate all legal moves
-        // and assign meaningful probabilities based on position analysis
-        (HashMap::new(), 0.5)
+    fn evaluate(&self, _board: &Board, legal_moves: &[Move]) -> (HashMap<Move, f64>, f64) {
+        let mut policy = HashMap::new();
+        let num_moves = legal_moves.len();
+        if num_moves > 0 {
+            let uniform_prob = 1.0 / num_moves as f64;
+            for mv in legal_moves {
+                policy.insert(*mv, uniform_prob);
+            }
+        }
+        (policy, 0.5) // Return uniform policy and neutral value
     }
 }
 
@@ -43,11 +49,18 @@ impl PolicyNetwork for RandomPolicy {
 pub struct MaterialPolicy;
 
 impl PolicyNetwork for MaterialPolicy {
-    fn evaluate(&self, board: &Board) -> (HashMap<Move, f64>, f64) {
-        // Placeholder: Assign uniform priors
-        let priors = HashMap::new();
+    fn evaluate(&self, board: &Board, legal_moves: &[Move]) -> (HashMap<Move, f64>, f64) {
+        // Assign uniform priors for policy part
+        let mut policy = HashMap::new();
+        let num_moves = legal_moves.len();
+        if num_moves > 0 {
+            let uniform_prob = 1.0 / num_moves as f64;
+            for mv in legal_moves {
+                policy.insert(*mv, uniform_prob);
+            }
+        }
 
-        // Simple material evaluation for value
+        // Simple material evaluation for value part
         use crate::piece_types::*;
 
         // Use common piece values (in centipawns)
@@ -81,6 +94,37 @@ impl PolicyNetwork for MaterialPolicy {
         // Map advantage from centipawns to [0.0, 1.0] range
         let value = 1.0 / (1.0 + (-advantage as f64 / 400.0).exp());
 
-        (priors, value)
+        (policy, value)
+    }
+}
+
+/// Placeholder for a policy network loaded from an ONNX model.
+pub struct OnnxPolicyNetwork {
+    // Placeholder for model path, runtime session, etc.
+    // model_path: String,
+    // session: Option<onnxruntime::session::Session<'static>>, // Example using onnxruntime crate
+}
+
+impl OnnxPolicyNetwork {
+    pub fn new(_model_path: &str) -> Self {
+        // TODO: Implement model loading logic here
+        OnnxPolicyNetwork {
+            // model_path: model_path.to_string(),
+            // session: None, // Load session here
+        }
+    }
+}
+
+impl PolicyNetwork for OnnxPolicyNetwork {
+    fn evaluate(&self, _board: &Board, _legal_moves: &[Move]) -> (HashMap<Move, f64>, f64) {
+        // TODO: Implement actual model inference here
+        // 1. Convert board state to model input tensor
+        // 2. Run inference using the ONNX session
+        // 3. Convert model output (policy logits, value) back to HashMap<Move, f64> and f64
+        // 4. Ensure policy probabilities are normalized and only include legal moves
+
+        // Placeholder implementation:
+        eprintln!("Warning: OnnxPolicyNetwork::evaluate is not implemented yet.");
+        (HashMap::new(), 0.5) // Return empty policy and neutral value
     }
 }

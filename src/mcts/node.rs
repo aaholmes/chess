@@ -13,10 +13,9 @@ use std::rc::{Rc, Weak}; // For priors and categorized moves
 // Define Move Categories (Lower discriminant = higher priority)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum MoveCategory {
-    // ForcedMate,      // Not used directly here, handled by terminal_or_mate_value
-    // Simplified Categories:
-    Capture = 1,
-    Quiet = 2,
+    Check = 0,   // Highest priority
+    Capture = 1, // Includes promotions
+    Quiet = 2,   // Lowest priority
 }
 
 /// A node in the Monte Carlo Search Tree
@@ -216,20 +215,55 @@ impl MctsNode {
 
         self.policy_priors = Some(priors);
         let legal_moves = MctsNode::get_legal_moves(&self.state, move_gen); // Regenerate legal moves
-        let mut categorized_moves: HashMap<MoveCategory, Vec<Move>> = HashMap::new();
+        let mut categorized_moves: HashMap<MoveCategory, Vec<(Move, f64)>> = HashMap::new(); // Store prior with move for sorting
 
-        // TODO: Implement move categorization logic here more thoroughly
+        // Get MVV-LVA scores for captures beforehand
+        let mut capture_scores: HashMap<Move, i32> = HashMap::new();
+        for mv in &legal_moves {
+             let opponent_color = !self.state.w_to_move as usize;
+             let is_capture = (self.state.pieces_occ[opponent_color] & (1u64 << mv.to)) != 0 || mv.is_en_passant();
+             if is_capture || mv.is_promotion() {
+                 // Use a helper function or directly calculate MVV-LVA. Assuming move_gen has mvv_lva.
+                 // Need to handle promotions appropriately in MVV-LVA score if not done implicitly.
+                 // Placeholder: Use 0 if move_gen.mvv_lva doesn't exist or isn't accessible here.
+                 // capture_scores.insert(*mv, move_gen.mvv_lva(&self.state, mv.from, mv.to));
+                 capture_scores.insert(*mv, 0); // Placeholder MVV-LVA
+             }
+        }
+
+
+        // Categorize moves and store with their policy prior
+        let current_priors = self.policy_priors.as_ref().expect("Policy priors should be set before categorization");
         for mv in legal_moves {
-            // Pass move_gen needed for check detection
-            let category = self.categorize_move(&mv, move_gen);
-            categorized_moves.entry(category).or_default().push(mv);
+            let prior = current_priors.get(&mv).cloned().unwrap_or(0.0); // Get prior, default 0 if missing
+            let category = self.categorize_move(&mv, move_gen); // Pass move_gen needed for check detection
+            categorized_moves.entry(category).or_default().push((mv, prior));
+        }
+
+        // Sort moves within each category
+        let mut final_categorized_moves: HashMap<MoveCategory, Vec<Move>> = HashMap::new();
+        for (category, mut moves_with_priors) in categorized_moves {
+            match category {
+                MoveCategory::Check | MoveCategory::Quiet => {
+                    // Sort by policy prior (descending)
+                    moves_with_priors.sort_unstable_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+                }
+                MoveCategory::Capture => {
+                    // Sort by MVV-LVA score (descending)
+                    moves_with_priors.sort_unstable_by_key(|(mv, _)| {
+                        std::cmp::Reverse(capture_scores.get(mv).cloned().unwrap_or(0)) // Use Reverse for descending
+                    });
+                }
+            }
+            // Store only the sorted moves, discarding priors now
+            final_categorized_moves.insert(category, moves_with_priors.into_iter().map(|(mv, _)| mv).collect());
         }
 
         // Sort categories by priority to determine the starting category
         let mut sorted_categories: Vec<_> = categorized_moves.keys().cloned().collect();
         sorted_categories.sort(); // Sorts by enum discriminant (priority)
 
-        self.unexplored_moves_by_cat = categorized_moves;
+        self.unexplored_moves_by_cat = final_categorized_moves; // Store the map with sorted Vec<Move>
         self.current_priority_category = sorted_categories.first().cloned();
     }
 
@@ -238,18 +272,20 @@ impl MctsNode {
     /// TODO: Needs access to killers, history, SEE results for proper categorization.
     /// TODO: Needs efficient fork detection logic.
     fn categorize_move(&self, mv: &Move, move_gen: &MoveGen) -> MoveCategory {
-        // 1. Promotions (Tactical)
-        if mv.is_promotion() {
-            return MoveCategory::Tactical;
+        // Check detection (potentially expensive)
+        // Apply the move temporarily to check if the opponent is in check
+        let next_state = self.state.apply_move_to_board(*mv);
+        // is_check checks if the *new* side to move (opponent) is in check
+        if next_state.is_check(move_gen) {
+             return MoveCategory::Check;
         }
 
-        // 2. Captures (Tactical)
+        // Captures (includes promotions as they often capture or are high value)
         let opponent_color = !self.state.w_to_move as usize;
-        let is_capture =
-            (self.state.pieces_occ[opponent_color] & (1u64 << mv.to)) != 0 || mv.is_en_passant();
-        if is_capture {
-            // TODO: Could refine with SEE later (WinningCapture, LosingCapture, EqualCapture)
-            return MoveCategory::Tactical;
+        let is_capture = (self.state.pieces_occ[opponent_color] & (1u64 << mv.to)) != 0 || mv.is_en_passant();
+        if is_capture || mv.is_promotion() {
+             // TODO: Could refine with SEE later (WinningCapture, LosingCapture, EqualCapture)
+             return MoveCategory::Capture;
         }
 
         // 3. Checks (Tactical) - Check if the move puts the opponent's king in check
@@ -269,7 +305,7 @@ impl MctsNode {
         // TODO: Check if mv matches killer moves for the current ply (requires passing killer table context)
         // if is_killer(mv, ply, killers) { return MoveCategory::Killer; }
 
-        // 6. Quiet Moves
+        // Otherwise, it's a quiet move
         MoveCategory::Quiet
     }
 
@@ -308,11 +344,16 @@ impl MctsNode {
             let mut next_cat_found = false;
             // Iterate through simplified enum variants by discriminant value
             // Iterate through refined enum variants by discriminant value
-            for cat_num in (current_cat as usize + 1)..=(MoveCategory::Quiet as usize) {
-                // This unsafe transmute assumes a standard C-like enum layout
-                let next_possible_cat =
-                    unsafe { std::mem::transmute::<u8, MoveCategory>(cat_num as u8) };
-                if self
+            // Iterate through enum variants by discriminant value, starting from the next one
+            for cat_num in (current_cat as usize + 1)..=(MoveCategory::Quiet as usize) { // Ensure range includes all categories
+                // This unsafe transmute assumes a standard C-like enum layout and discriminant order
+                let next_possible_cat = match cat_num {
+                    0 => MoveCategory::Check,
+                    1 => MoveCategory::Capture,
+                    2 => MoveCategory::Quiet,
+                    _ => continue, // Should not happen
+                };
+                 if self
                     .unexplored_moves_by_cat
                     .contains_key(&next_possible_cat)
                 {
