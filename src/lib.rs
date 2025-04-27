@@ -23,6 +23,7 @@ pub mod board_utils;
 pub mod boardstack;
 pub mod eval;
 pub mod eval_constants;
+pub mod egtb;
 pub mod hash;
 pub mod magic_bitboard;
 pub mod magic_constants;

@@ -2,34 +2,72 @@
 //!
 //! This module implements the UCI interface for the chess engine. It allows the user to interact with the engine using UCI commands.
 
+use crate::agent::{Agent, HumanlikeAgent, SimpleAgent}; // Import agents and trait
 use crate::boardstack::BoardStack;
+use crate::egtb::EgtbProber; // Import EGTB Prober
 use crate::eval::PestoEval;
 use crate::move_generation::MoveGen;
 use crate::move_types::Move;
-use crate::search::iterative_deepening_ab_search;
-use crate::transposition::TranspositionTable;
+// Removed unused search imports, agent will handle search
+// use crate::search::iterative_deepening_ab_search;
+// use crate::transposition::TranspositionTable;
 use std::io::{self, BufRead, Write};
 use std::time::{Duration, Instant};
 
 pub struct UCIEngine {
     board: BoardStack,
     move_gen: MoveGen,
-    pesto: PestoEval,
+    pesto: PestoEval, // Keep pesto for agent creation
+    egtb_prober: Option<EgtbProber>, // Add EGTB prober
     time_left: Duration,
     increment: Duration,
     moves_to_go: Option<u32>,
-    depth: Option<i32>,
-    nodes: Option<u64>,
-    mate: Option<i32>,
-    movetime: Option<Duration>,
+    depth: Option<i32>, // UCI depth limit (may or may not be used by agent)
+    nodes: Option<u64>, // UCI node limit (may or may not be used by agent)
+    mate: Option<i32>,  // UCI mate search depth (may or may not be used by agent)
+    movetime: Option<Duration>, // UCI move time limit
+    agent_type: String,
+    agent: Box<dyn Agent + 'static>, // Store the selected agent
+
+    // Agent configuration (using defaults for now, UCI options needed later)
+    mate_search_depth: i32,
+    ab_search_depth: i32,
+    q_search_max_depth: i32,
+    mcts_iterations: u32,
+    mcts_time_limit_ms: u64,
+    // placeholder_ab_depth: i32, // Included in HumanlikeAgent::new
+    // placeholder_q_depth: i32, // Included in HumanlikeAgent::new
 }
 
 impl UCIEngine {
     pub fn new() -> Self {
-        UCIEngine {
+        let move_gen = MoveGen::new();
+        let pesto = PestoEval::new();
+        // Initialize EGTB prober - requires path, set to None for now
+        // TODO: Add UCI option for EGTB path
+        let egtb_prober: Option<EgtbProber> = None;
+        // match EgtbProber::load("/path/to/egtb") {
+        //     Ok(prober) => Some(prober),
+        //     Err(e) => {
+        //         println!("info string Failed to load EGTB: {}", e);
+        //         None
+        //     }
+        // };
+
+        let agent_type = "Humanlike".to_string(); // Default agent type
+
+        // Default configurations
+        let mate_search_depth = 4; // Example default
+        let ab_search_depth = 6;   // Example default
+        let q_search_max_depth = 4; // Example default
+        let mcts_iterations = 10000; // Example default
+        let mcts_time_limit_ms = 5000; // Example default
+
+        let mut engine = UCIEngine {
             board: BoardStack::new(),
-            move_gen: MoveGen::new(),
-            pesto: PestoEval::new(),
+            move_gen, // Store initialized move_gen
+            pesto,    // Store initialized pesto
+            egtb_prober, // Store initialized egtb_prober
             time_left: Duration::from_secs(0),
             increment: Duration::from_secs(0),
             moves_to_go: None,
@@ -37,8 +75,65 @@ impl UCIEngine {
             nodes: None,
             mate: None,
             movetime: None,
-        }
+            agent_type, // Store default agent type string
+            // Placeholder agent, will be replaced by update_agent
+            agent: Box::new(SimpleAgent::new(0, 0, 0, false, &MoveGen::new(), &PestoEval::new())), // Temporary dummy
+            mate_search_depth,
+            ab_search_depth,
+            q_search_max_depth,
+            mcts_iterations,
+            mcts_time_limit_ms,
+        };
+        engine.update_agent(); // Create the actual agent based on agent_type
+        engine
     }
+
+    /// Creates and updates the `agent` field based on the current `agent_type`.
+    fn update_agent(&mut self) {
+        // *** LIFETIME WORKAROUND ***
+        // Create temporary owned instances for agent creation to satisfy the borrow checker.
+        // This is NOT the ideal long-term solution. See notes in previous response.
+        // The correct fix involves managing lifetimes/ownership properly (e.g., using Arc).
+        let temp_move_gen = MoveGen::new();
+        let temp_pesto = PestoEval::new();
+        // We still use the potentially initialized self.egtb_prober
+        let temp_egtb_prober = self.egtb_prober.clone();
+
+
+        let agent: Box<dyn Agent + 'static> = match self.agent_type.as_str() {
+            "AlphaBeta" => Box::new(SimpleAgent::new(
+                self.mate_search_depth,
+                self.ab_search_depth,
+                self.q_search_max_depth,
+                false, // verbose - could be another UCI option
+                &temp_move_gen, // Use temporary instance
+                &temp_pesto,    // Use temporary instance
+            )),
+            "Humanlike" | _ => {
+                // Default to Humanlike if type is unknown
+                if self.agent_type != "Humanlike" {
+                    println!(
+                        "info string Unknown AgentType '{}', defaulting to Humanlike",
+                        self.agent_type
+                    );
+                    self.agent_type = "Humanlike".to_string(); // Correct the stored type
+                }
+                Box::new(HumanlikeAgent::new(
+                    &temp_move_gen, // Use temporary instance
+                    &temp_pesto,    // Use temporary instance
+                    temp_egtb_prober, // Use cloned Option<EgtbProber>
+                    self.mate_search_depth,
+                    self.mcts_iterations,
+                    self.mcts_time_limit_ms,
+                    self.ab_search_depth, // Using ab_search_depth for placeholder
+                    self.q_search_max_depth, // Using q_search_max_depth for placeholder
+                ))
+            }
+        };
+        self.agent = agent; // Assign the newly created agent
+        println!("info string Agent set to {}", self.agent_type); // Debug info
+    }
+
 
     pub fn run(&mut self) {
         let stdin = io::stdin();
@@ -54,11 +149,14 @@ impl UCIEngine {
                 "uci" => {
                     println!("id name Kingfisher");
                     println!("id author Adam Holmes");
+                    // Define the AgentType option
+                    println!("option name AgentType type combo default Humanlike var AlphaBeta var Humanlike");
                     println!("uciok");
                 }
                 "isready" => println!("readyok"),
-                "ucinewgame" => self.board = BoardStack::new(),
+                "ucinewgame" => self.handle_ucinewgame(), // Changed to handle potential agent re-init
                 "position" => self.handle_position(&tokens[1..]),
+                "setoption" => self.handle_setoption(&tokens[1..]), // Added handler for setoption
                 "go" => self.handle_go(&tokens[1..]),
                 "quit" => break,
                 _ => println!("Unknown command: {}", tokens[0]),
@@ -111,40 +209,29 @@ impl UCIEngine {
     }
 
     fn handle_go(&mut self, args: &[&str]) {
-        self.parse_go_command(args);
+        self.parse_go_command(args); // Parses time controls, depth, nodes etc. into self
 
-        let allocated_time = self.calculate_allocated_time();
+        // Note: The current Agent trait doesn't pass time controls.
+        // The agents use their internal logic or fixed depths/iterations for now.
+        // TODO: Enhance Agent trait or agent implementations to use UCI time controls.
+        let _allocated_time = self.calculate_allocated_time(); // Calculate but not used directly by agent.get_move yet
         let start_time = Instant::now();
 
-        let max_depth = self.depth.unwrap_or(100);
-
-        // Create a transposition table for the search
-        let mut tt = TranspositionTable::new();
-
-        let (depth, score, current_best_move, nodes) = iterative_deepening_ab_search(
-            &mut self.board,
-            &self.move_gen,
-            &self.pesto,
-            &mut tt,
-            max_depth,
-            4,
-            Some(allocated_time),
-            false,
-        );
+        // Get the move from the currently selected agent
+        // The agent's get_move implementation handles the search (AB, MCTS, etc.)
+        // We pass a mutable reference to the board stack.
+        let best_move = self.agent.get_move(&mut self.board);
 
         let elapsed = start_time.elapsed();
 
-        // Update best move
-        let best_move = current_best_move;
-
-        // Print info
+        // Print info - We don't get depth, score, nodes back from the generic agent easily.
+        // We could modify the Agent trait to return this info, or have agents print UCI info internally.
+        // For now, just print the best move and time.
+        // Agents might print their own info during search.
         println!(
-            "info depth {} score cp {} nodes {} time {} pv {}",
-            depth,
-            score,
-            nodes,
-            elapsed.as_millis(),
-            &best_move.print_algebraic()
+            "info time {}", // Basic info from UCI loop
+            elapsed.as_millis()
+            // Example if agent printed info: info depth 10 score cp 150 nodes 12345 time 1500 pv e2e4 e7e5 ...
         );
 
         println!("bestmove {}", &best_move.print_algebraic());
@@ -201,6 +288,40 @@ impl UCIEngine {
                 _ => i += 1,
             }
         }
+    
+        // Renamed from direct assignment in the match arm to potentially handle agent re-initialization
+        fn handle_ucinewgame(&mut self) {
+            self.board = BoardStack::new();
+            // Potentially re-initialize agent state here if needed based on self.agent_type
+        }
+    
+        fn handle_setoption(&mut self, args: &[&str]) {
+            if args.len() >= 4 && args[0] == "name" && args[2] == "value" {
+                let name = args[1];
+                let value = args[3];
+                match name {
+                    "AgentType" => {
+                        if value == "AlphaBeta" || value == "Humanlike" {
+                            if self.agent_type != value { // Only update if changed
+                                self.agent_type = value.to_string();
+                                self.update_agent(); // Re-create the agent instance
+                            }
+                        } else {
+                            println!("info string Invalid value for AgentType: {}", value);
+                        }
+                    }
+                    // TODO: Add handlers for other UCI options (e.g., EgtbPath, MCTS iterations, depths)
+                    // Example:
+                    // "EgtbPath" => { /* load EGTB */ self.update_agent(); }
+                    // "MateSearchDepth" => { self.mate_search_depth = value.parse().unwrap_or(self.mate_search_depth); self.update_agent(); }
+                    _ => {
+                        // println!("info string Unknown option: {}", name);
+                    }
+                }
+            } else {
+                println!("info string Invalid setoption command format");
+            }
+        }
     }
 
     /// This function calculates the allocated time for a chess move based on the time control settings.
@@ -222,5 +343,208 @@ impl UCIEngine {
         let bonus_time = self.increment.as_secs_f32();
 
         Duration::from_secs_f32(base_time + bonus_time * 0.5)
+    }
+
+    // Make internal handlers public for testing
+    #[cfg(test)]
+    pub fn handle_position(&mut self, args: &[&str]) {
+        // Call the actual private method
+        self.handle_position(args);
+    }
+
+    #[cfg(test)]
+    pub fn handle_go(&mut self, args: &[&str]) {
+        // Call the actual private method
+        self.handle_go(args);
+    }
+
+    #[cfg(test)]
+    pub fn parse_go_command(&mut self, args: &[&str]) {
+        // Call the actual private method
+        self.parse_go_command(args);
+    }
+
+    #[cfg(test)]
+    pub fn handle_ucinewgame(&mut self) {
+        // Call the actual private method
+        self.handle_ucinewgame();
+    }
+
+    #[cfg(test)]
+    pub fn handle_setoption(&mut self, args: &[&str]) {
+        // Call the actual private method
+        self.handle_setoption(args);
+    }
+
+    #[cfg(test)]
+    pub fn get_board(&self) -> &BoardStack {
+        &self.board
+    }
+
+    #[cfg(test)]
+    pub fn get_agent_type(&self) -> &str {
+        &self.agent_type
+    }
+
+    #[cfg(test)]
+    pub fn get_time_limits(&self) -> (Duration, Duration, Option<Duration>) {
+        (self.time_left, self.increment, self.movetime)
+    }
+
+    #[cfg(test)]
+    pub fn get_search_limits(&self) -> (Option<i32>, Option<u64>, Option<i32>) {
+        (self.depth, self.nodes, self.mate)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::board::Board; // Assuming Board is needed for state checks
+
+    #[test]
+    fn test_handle_position_startpos() {
+        let mut engine = UCIEngine::new();
+        engine.handle_position(&["startpos"]);
+        // Check if the board is in the initial state
+        assert_eq!(engine.get_board().current_state().to_fen(), "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
+    }
+
+    #[test]
+    fn test_handle_position_startpos_moves() {
+        let mut engine = UCIEngine::new();
+        engine.handle_position(&["startpos", "moves", "e2e4", "e7e5"]);
+        // Check if the board is in the correct state after moves
+        assert_eq!(engine.get_board().current_state().to_fen(), "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 2");
+    }
+
+    #[test]
+    fn test_handle_position_fen() {
+        let mut engine = UCIEngine::new();
+        let fen = "r3k2r/p1ppqpbp/bnNppnp1/8/4P3/2N2Q2/PPP2PPP/R3K2R w KQkq - 0 1";
+        engine.handle_position(&["fen", "r3k2r/p1ppqpbp/bnNppnp1/8/4P3/2N2Q2/PPP2PPP/R3K2R", "w", "KkQq", "-", "0", "1"]);
+        // Check if the board is in the state specified by the FEN
+        assert_eq!(engine.get_board().current_state().to_fen(), fen);
+    }
+
+    #[test]
+    fn test_handle_position_fen_moves() {
+        let mut engine = UCIEngine::new();
+        let fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+        engine.handle_position(&["fen", fen, "moves", "e2e4", "e7e5", "g1f3"]);
+        // Check if the board is in the correct state after FEN and moves
+        assert_eq!(engine.get_board().current_state().to_fen(), "rnbqkbnr/pppp1ppp/8/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2");
+    }
+
+    #[test]
+    fn test_parse_go_movetime() {
+        let mut engine = UCIEngine::new();
+        engine.parse_go_command(&["go", "movetime", "1000"]);
+        let (time_left, increment, movetime) = engine.get_time_limits();
+        assert_eq!(movetime, Some(Duration::from_millis(1000)));
+        assert_eq!(time_left, Duration::from_secs(0));
+        assert_eq!(increment, Duration::from_secs(0));
+    }
+
+    #[test]
+    fn test_parse_go_wtime_btime_winc_binc() {
+        let mut engine = UCIEngine::new();
+        // Test for white to move
+        engine.handle_position(&["startpos"]); // White to move
+        engine.parse_go_command(&["go", "wtime", "60000", "btime", "50000", "winc", "1000", "binc", "500"]);
+        let (time_left, increment, movetime) = engine.get_time_limits();
+        assert_eq!(time_left, Duration::from_millis(60000));
+        assert_eq!(increment, Duration::from_millis(1000));
+        assert_eq!(movetime, None);
+
+        // Test for black to move
+        engine.handle_position(&["startpos", "moves", "e2e4"]); // Black to move
+        engine.parse_go_command(&["go", "wtime", "59000", "btime", "49000", "winc", "1000", "binc", "500"]);
+        let (time_left, increment, movetime) = engine.get_time_limits();
+        assert_eq!(time_left, Duration::from_millis(49000));
+        assert_eq!(increment, Duration::from_millis(500));
+        assert_eq!(movetime, None);
+    }
+
+    #[test]
+    fn test_parse_go_depth() {
+        let mut engine = UCIEngine::new();
+        engine.parse_go_command(&["go", "depth", "10"]);
+        let (depth, nodes, mate) = engine.get_search_limits();
+        assert_eq!(depth, Some(10));
+        assert_eq!(nodes, None);
+        assert_eq!(mate, None);
+    }
+
+    #[test]
+    fn test_parse_go_nodes() {
+        let mut engine = UCIEngine::new();
+        engine.parse_go_command(&["go", "nodes", "100000"]);
+        let (depth, nodes, mate) = engine.get_search_limits();
+        assert_eq!(depth, None);
+        assert_eq!(nodes, Some(100000));
+        assert_eq!(mate, None);
+    }
+
+    #[test]
+    fn test_parse_go_mate() {
+        let mut engine = UCIEngine::new();
+        engine.parse_go_command(&["go", "mate", "5"]);
+        let (depth, nodes, mate) = engine.get_search_limits();
+        assert_eq!(depth, None);
+        assert_eq!(nodes, None);
+        assert_eq!(mate, Some(5));
+    }
+
+    #[test]
+    fn test_parse_go_infinite() {
+        let mut engine = UCIEngine::new();
+        engine.parse_go_command(&["go", "infinite"]);
+        let (time_left, increment, movetime) = engine.get_time_limits();
+        assert_eq!(time_left, Duration::from_secs(0));
+        assert_eq!(increment, Duration::from_secs(0));
+        assert_eq!(movetime, None); // infinite doesn't set movetime
+        let (depth, nodes, mate) = engine.get_search_limits();
+        assert_eq!(depth, None);
+        assert_eq!(nodes, None);
+        assert_eq!(mate, None);
+    }
+
+    #[test]
+    fn test_handle_setoption_agenttype() {
+        let mut engine = UCIEngine::new();
+        // Default is Humanlike
+        assert_eq!(engine.get_agent_type(), "Humanlike");
+
+        // Set to AlphaBeta
+        engine.handle_setoption(&["name", "AgentType", "value", "AlphaBeta"]);
+        assert_eq!(engine.get_agent_type(), "AlphaBeta");
+
+        // Set back to Humanlike
+        engine.handle_setoption(&["name", "AgentType", "value", "Humanlike"]);
+        assert_eq!(engine.get_agent_type(), "Humanlike");
+
+        // Try setting an invalid value (should remain Humanlike)
+        engine.handle_setoption(&["name", "AgentType", "value", "InvalidAgent"]);
+        assert_eq!(engine.get_agent_type(), "Humanlike");
+    }
+
+    #[test]
+    fn test_handle_setoption_unknown() {
+        let mut engine = UCIEngine::new();
+        // Setting an unknown option should not change the agent type
+        engine.handle_setoption(&["name", "UnknownOption", "value", "SomeValue"]);
+        assert_eq!(engine.get_agent_type(), "Humanlike"); // Default agent type should remain
+    }
+
+    #[test]
+    fn test_handle_setoption_invalid_format() {
+        let mut engine = UCIEngine::new();
+        // Invalid format should not change the agent type
+        engine.handle_setoption(&["name", "AgentType", "InvalidValue"]);
+        assert_eq!(engine.get_agent_type(), "Humanlike"); // Default agent type should remain
+
+        engine.handle_setoption(&["AgentType", "value", "Humanlike"]);
+        assert_eq!(engine.get_agent_type(), "Humanlike"); // Default agent type should remain
     }
 }

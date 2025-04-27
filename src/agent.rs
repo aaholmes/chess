@@ -4,8 +4,11 @@ use crate::boardstack::BoardStack;
 use crate::eval::PestoEval;
 use crate::move_generation::MoveGen;
 use crate::move_types::Move;
+use crate::mcts::mcts_pesto_search; // Added import
 use crate::search::{iterative_deepening_ab_search, mate_search};
 use crate::transposition::TranspositionTable;
+use crate::board::Board; // For piece count check
+use crate::egtb::{EgtbInfo, EgtbProber}; // For EGTB integration
 
 /// Trait defining the interface for chess agents.
 pub trait Agent {
@@ -68,6 +71,122 @@ impl SimpleAgent<'_> {
             move_gen,
             pesto,
         }
+/// An agent designed to mimic human-like decision making, using EGTB, Mate Search, and MCTS.
+pub struct HumanlikeAgent<'a> {
+    /// Reference to the move generator.
+    pub move_gen: &'a MoveGen,
+    /// Reference to the Pesto evaluation function.
+    pub pesto: &'a PestoEval,
+    /// Optional EGTB prober.
+    pub egtb_prober: Option<EgtbProber>,
+    /// The depth to search for mate.
+    pub mate_search_depth: i32,
+    // Placeholder for MCTS configuration
+    /// Number of MCTS iterations.
+    pub mcts_iterations: u32,
+    /// Time limit for MCTS search in milliseconds.
+    pub mcts_time_limit_ms: u64,
+    /// The depth for the placeholder alpha-beta search (used instead of MCTS for now).
+    pub placeholder_ab_depth: i32,
+    /// The maximum depth for the quiescence search within the placeholder AB search.
+    pub placeholder_q_depth: i32,
+}
+
+impl HumanlikeAgent<'_> {
+    /// Generate a new HumanlikeAgent with the specified components and parameters.
+    pub fn new<'a>(
+        move_gen: &'a MoveGen,
+        pesto: &'a PestoEval,
+        egtb_prober: Option<EgtbProber>,
+        mate_search_depth: i32,
+        mcts_iterations: u32,
+        mcts_time_limit_ms: u64,
+        placeholder_ab_depth: i32,
+        placeholder_q_depth: i32,
+    ) -> HumanlikeAgent<'a> {
+        HumanlikeAgent {
+            move_gen,
+            pesto,
+            egtb_prober,
+impl Agent for HumanlikeAgent<'_> {
+    fn get_move(&self, board: &mut BoardStack) -> Move {
+        let current_board = board.current_board();
+
+        // 1. EGTB Check
+        if let Some(prober) = &self.egtb_prober {
+            let piece_count = current_board.get_all_occupancy().count_ones() as u8;
+            if piece_count <= prober.max_pieces {
+                match prober.probe(current_board) {
+                    Ok(Some(egtb_info)) => {
+                        // EGTB found a result.
+                        // As per instructions, if decisive (Win/Loss), note but proceed
+                        // since EgtbInfo doesn't currently provide a specific move.
+                        // If it provided a move, we would return it here.
+                        println!("EGTB result: {:?}", egtb_info.wdl);
+                        // If egtb_info.best_move was Some(m), we would return m here.
+                    }
+                    Ok(None) => {
+                        // Position not in tables or too many pieces (already checked, but defensive)
+                    }
+                    Err(e) => {
+                        eprintln!("EGTB probe error: {}", e);
+                    }
+                }
+            }
+        }
+
+        // 2. Mate Search
+        #[cfg(not(test))] // Use real mate_search in non-test builds
+        let (eval, m, nodes) =
+            mate_search(board, self.move_gen, self.mate_search_depth, false); // verbose set to false for now
+
+        #[cfg(test)] // Use mock_mate_search in test builds
+        let (eval, m, nodes) =
+            mock_mate_search(board, self.move_gen, self.mate_search_depth, false);
+
+
+        if eval >= 1000000 { // Check for mate score
+            println!("Found checkmate after searching {} nodes!", nodes);
+            return m;
+        }
+
+        // 3. MCTS Call
+        println!("No EGTB move or mate found, falling back to MCTS search.");
+
+        #[cfg(not(test))] // Use real mcts_pesto_search in non-test builds
+        let mcts_move = mcts_pesto_search(
+            board.current_board(),
+            self.move_gen,
+            self.pesto,
+            self.mcts_iterations,
+            self.mcts_time_limit_ms,
+            0, // Mate search already performed above
+        );
+
+        #[cfg(test)] // Use mock_mcts_pesto_search in test builds
+        let mcts_move = mock_mcts_pesto_search(
+            board.current_board(),
+            self.move_gen,
+            self.pesto,
+            self.mcts_iterations,
+            self.mcts_time_limit_ms,
+            0, // Mate search already performed above
+        );
+
+
+        // Handle potential None return (unlikely after mate search unless stalemate)
+        // For now, unwrap, assuming a legal move exists if no mate was found.
+        mcts_move.expect("MCTS search returned None unexpectedly after mate search")
+    }
+}
+            mate_search_depth,
+            mcts_iterations,
+            mcts_time_limit_ms,
+            placeholder_ab_depth,
+            placeholder_q_depth,
+        }
+    }
+}
     }
 }
 
@@ -98,4 +217,216 @@ impl Agent for SimpleAgent<'_> {
         println!("Mate search searched {} nodes, iterative deepening search searched another {} nodes at a depth of {} ({} total nodes). Eval: {}", nodes, n, depth, nodes + n, eval);
         m
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::board::Board;
+    use crate::boardstack::BoardStack;
+    use crate::egtb::{EgtbInfo, EgtbError, Wdl};
+    use crate::move_generation::MoveGen;
+    use crate::move_types::Move;
+    use crate::eval::PestoEval;
+    use crate::utils::parse_uci_move; // For creating dummy moves
+    use std::cell::RefCell;
+    use std::rc::Rc;
+    use std::time::Duration;
+
+    // --- Mock Implementations ---
+
+    // Mock EgtbProber
+    struct MockEgtbProber {
+        probe_result: Result<Option<EgtbInfo>, EgtbError>,
+        max_pieces: u8,
+    }
+
+    impl MockEgtbProber {
+        fn new(probe_result: Result<Option<EgtbInfo>, EgtbError>, max_pieces: u8) -> Self {
+            MockEgtbProber { probe_result, max_pieces }
+        }
+
+        fn probe(&self, _board: &Board) -> Result<Option<EgtbInfo>, EgtbError> {
+            // In a real mock, you might inspect the board, but for testing
+            // the agent's logic flow, we just return the predefined result.
+            self.probe_result.clone()
+        }
+    }
+
+    // Flags to track if mock functions were called
+    thread_local! {
+        static MATE_SEARCH_CALLED: RefCell<bool> = RefCell::new(false);
+        static MCTS_SEARCH_CALLED: RefCell<bool> = RefCell::new(false);
+        static MATE_SEARCH_RETURN_VALUE: RefCell<(i32, Move, u64)> = RefCell::new((0, Move::null(), 0));
+        static MCTS_SEARCH_RETURN_VALUE: RefCell<Option<Move>> = RefCell::new(None);
+    }
+
+    // Mock mate_search function
+    fn mock_mate_search(_board: &mut BoardStack, _move_gen: &MoveGen, _depth: i32, _verbose: bool) -> (i32, Move, u64) {
+        MATE_SEARCH_CALLED.with(|cell| *cell.borrow_mut() = true);
+        MATE_SEARCH_RETURN_VALUE.with(|cell| cell.borrow().clone())
+    }
+
+    // Mock mcts_pesto_search function
+    fn mock_mcts_pesto_search(
+        _root_state: Board,
+        _move_gen: &MoveGen,
+        _pesto_eval: &PestoEval,
+        _iterations: u32,
+        _time_limit_ms: u64,
+        _mate_search_depth: i32,
+    ) -> Option<Move> {
+        MCTS_SEARCH_CALLED.with(|cell| *cell.borrow_mut() = true);
+        MCTS_SEARCH_RETURN_VALUE.with(|cell| cell.borrow().clone())
+    }
+
+    // Helper to reset mock flags
+    fn reset_mocks() {
+        MATE_SEARCH_CALLED.with(|cell| *cell.borrow_mut() = false);
+        MCTS_SEARCH_CALLED.with(|cell| *cell.borrow_mut() = false);
+        MATE_SEARCH_RETURN_VALUE.with(|cell| *cell.borrow_mut() = (0, Move::null(), 0));
+        MCTS_SEARCH_RETURN_VALUE.with(|cell| *cell.borrow_mut() = None);
+    }
+
+    // Helper to create a HumanlikeAgent with mocks
+    fn setup_humanlike_agent(
+        egtb_prober: Option<MockEgtbProber>,
+        mate_search_return: (i32, Move, u64),
+        mcts_search_return: Option<Move>,
+    ) -> HumanlikeAgent<'static> {
+        reset_mocks(); // Reset flags before each test
+
+        MATE_SEARCH_RETURN_VALUE.with(|cell| *cell.borrow_mut() = mate_search_return);
+        MCTS_SEARCH_RETURN_VALUE.with(|cell| *cell.borrow_mut() = mcts_search_return);
+
+        // Need dummy MoveGen and PestoEval as they are required by the struct,
+        // but their methods won't be called in these tests due to mocking.
+        let move_gen = Box::new(MoveGen::new());
+        let pesto_eval = Box::new(PestoEval::new());
+
+        // Leak the boxed values to get static references. This is acceptable in tests.
+        let move_gen_ref: &'static MoveGen = Box::leak(move_gen);
+        let pesto_eval_ref: &'static PestoEval = Box::leak(pesto_eval);
+
+
+        HumanlikeAgent {
+            move_gen: move_gen_ref,
+            pesto: pesto_eval_ref,
+            egtb_prober: egtb_prober.map(|m| EgtbProber { tablebases: unsafe { std::mem::zeroed() }, max_pieces: m.max_pieces }), // Create a dummy EgtbProber with the mock's max_pieces
+            mate_search_depth: 5,
+            mcts_iterations: 100,
+            mcts_time_limit_ms: 1000,
+            placeholder_ab_depth: 0, // Not used in this test flow
+            placeholder_q_depth: 0, // Not used in this test flow
+        }
+    }
+
+    // --- Test Cases ---
+
+    #[test]
+    fn test_agent_egtb_found() {
+        let dummy_move = parse_uci_move(&Board::default(), "a2a3").unwrap();
+        let egtb_info = EgtbInfo { wdl: Wdl::Win, dtz: None, best_move: None }; // EGTB finds a result, but no move provided
+        let mock_egtb = MockEgtbProber::new(Ok(Some(egtb_info)), 7);
+
+        // Mate search and MCTS should still be called as EGTB doesn't provide a move yet
+        let agent = setup_humanlike_agent(
+            Some(mock_egtb),
+            (0, Move::null(), 0), // Mate search finds nothing
+            Some(dummy_move), // MCTS returns a move
+        );
+
+        let mut board_stack = BoardStack::new(Board::new_from_fen("8/8/8/8/8/k7/P7/K7 w - - 0 1")); // Position with <= 7 pieces
+        let result_move = agent.get_move(&mut board_stack);
+
+        // Verify the sequence of calls
+        // EGTB is checked first
+        // Mate search is called next
+        assert!(MATE_SEARCH_CALLED.with(|cell| *cell.borrow()), "Mate search should be called after EGTB check");
+        // MCTS is called last
+        assert!(MCTS_SEARCH_CALLED.with(|cell| *cell.borrow()), "MCTS search should be called after mate search fails");
+
+        // Verify the move returned is from MCTS
+        assert_eq!(result_move, dummy_move, "Agent should return the move from MCTS");
+    }
+
+    #[test]
+    fn test_agent_egtb_none_mate_found() {
+        let mate_move = parse_uci_move(&Board::default(), "e7e8q").unwrap(); // Dummy mate move
+        let mock_egtb = MockEgtbProber::new(Ok(None), 7); // EGTB finds nothing
+
+        // Mate search finds a mate
+        let agent = setup_humanlike_agent(
+            Some(mock_egtb),
+            (1000000, mate_move, 100), // Mate search finds mate
+            None, // MCTS should NOT be called
+        );
+
+        let mut board_stack = BoardStack::new(Board::new_from_fen("8/8/8/8/8/k7/P7/K7 w - - 0 1")); // Position with <= 7 pieces
+        let result_move = agent.get_move(&mut board_stack);
+
+        // Verify the sequence of calls
+        // EGTB is checked first
+        // Mate search is called next
+        assert!(MATE_SEARCH_CALLED.with(|cell| *cell.borrow()), "Mate search should be called after EGTB check");
+        // MCTS should NOT be called
+        assert!(!MCTS_SEARCH_CALLED.with(|cell| *cell.borrow()), "MCTS search should NOT be called if mate is found");
+
+        // Verify the move returned is from Mate Search
+        assert_eq!(result_move, mate_move, "Agent should return the move from mate search");
+    }
+
+    #[test]
+    fn test_agent_egtb_none_mate_none_mcts_found() {
+        let mcts_move = parse_uci_move(&Board::default(), "d2d4").unwrap(); // Dummy MCTS move
+        let mock_egtb = MockEgtbProber::new(Ok(None), 7); // EGTB finds nothing
+
+        // Mate search finds nothing
+        let agent = setup_humanlike_agent(
+            Some(mock_egtb),
+            (0, Move::null(), 0),
+            Some(mcts_move), // MCTS returns a move
+        );
+
+        let mut board_stack = BoardStack::new(Board::new_from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")); // Starting position (many pieces)
+        let result_move = agent.get_move(&mut board_stack);
+
+        // Verify the sequence of calls
+        // EGTB is checked first (will return None due to piece count)
+        // Mate search is called next
+        assert!(MATE_SEARCH_CALLED.with(|cell| *cell.borrow()), "Mate search should be called after EGTB check");
+        // MCTS is called last
+        assert!(MCTS_SEARCH_CALLED.with(|cell| *cell.borrow()), "MCTS search should be called after mate search fails");
+
+        // Verify the move returned is from MCTS
+        assert_eq!(result_move, mcts_move, "Agent should return the move from MCTS");
+    }
+
+     #[test]
+    fn test_agent_no_egtb_mate_none_mcts_found() {
+        let mcts_move = parse_uci_move(&Board::default(), "g1f3").unwrap(); // Dummy MCTS move
+
+        // No EGTB prober provided
+        // Mate search finds nothing
+        let agent = setup_humanlike_agent(
+            None, // No EGTB
+            (0, Move::null(), 0),
+            Some(mcts_move), // MCTS returns a move
+        );
+
+        let mut board_stack = BoardStack::new(Board::new_from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")); // Starting position
+        let result_move = agent.get_move(&mut board_stack);
+
+        // Verify the sequence of calls
+        // EGTB check is skipped
+        // Mate search is called first
+        assert!(MATE_SEARCH_CALLED.with(|cell| *cell.borrow()), "Mate search should be called when no EGTB");
+        // MCTS is called next
+        assert!(MCTS_SEARCH_CALLED.with(|cell| *cell.borrow()), "MCTS search should be called after mate search fails");
+
+        // Verify the move returned is from MCTS
+        assert_eq!(result_move, mcts_move, "Agent should return the move from MCTS");
+    }
+
+    // Add more tests for EGTB error handling, piece count > max_pieces, etc.
 }

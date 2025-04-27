@@ -39,10 +39,10 @@ pub struct MctsNode {
     /// Stores the exact value if determined by terminal state check or mate search (0.0, 0.5, 1.0 for White).
     /// Also used as a flag to indicate if mate search has been performed. None = not checked, Some(-999.0) = checked, no mate.
     pub terminal_or_mate_value: Option<f64>,
-    /// Stores the value from the policy/evaluation network (0.0 to 1.0 for White) when node is first evaluated.
-    pub nn_value: Option<f64>,
-    /// Stores the policy priors for all legal moves from this state, evaluated once.
-    pub policy_priors: Option<HashMap<Move, f64>>,
+    /// Stores the value from the evaluation (Pesto or NN) (0.0 to 1.0 for White) when node is first evaluated.
+    pub nn_value: Option<f64>, // Reusing this field for Pesto value
+    // /// Stores the policy priors for all legal moves from this state, evaluated once.
+    // pub policy_priors: Option<HashMap<Move, f64>>, // REMOVED - Not used in Pesto MCTS
 
     /// Reference to parent node (None for root)
     pub parent: Option<Weak<RefCell<MctsNode>>>,
@@ -54,6 +54,8 @@ pub struct MctsNode {
     pub unexplored_moves_by_cat: HashMap<MoveCategory, Vec<Move>>,
     /// Tracks the current highest-priority category being explored. Initialized after evaluation.
     pub current_priority_category: Option<MoveCategory>,
+    /// Number of legal moves from this state, used for uniform prior in PUCT. Set during categorization.
+    pub num_legal_moves: Option<usize>,
     // `untried_actions` Vec removed, replaced by the map above.
     /// Whether this is a terminal state (checkmate, stalemate) - based on initial check
     pub is_terminal: bool,
@@ -85,9 +87,10 @@ impl MctsNode {
             children: Vec::new(),
             terminal_or_mate_value: initial_terminal_value,
             nn_value: None,                          // Evaluated later
-            policy_priors: None,                     // Evaluated later
+            // policy_priors: None,                  // REMOVED
             unexplored_moves_by_cat: HashMap::new(), // Populated later
             current_priority_category: None,         // Set later
+            num_legal_moves: None,                   // Set later
             is_terminal,                             // Store initial terminal status
         }))
     }
@@ -123,9 +126,10 @@ impl MctsNode {
             children: Vec::new(),
             terminal_or_mate_value: initial_terminal_value,
             nn_value: None,
-            policy_priors: None,
+            // policy_priors: None,                  // REMOVED
             unexplored_moves_by_cat: HashMap::new(),
             current_priority_category: None,
+            num_legal_moves: None,                   // Set later
             is_terminal,
         }))
     }
@@ -142,10 +146,53 @@ impl MctsNode {
 
     /// Checks if all move categories have been fully explored.
     pub fn is_fully_explored(&self) -> bool {
-        // Considered fully explored if categorization has happened and the map is empty.
-        // If policy_priors is None, it hasn't been evaluated/categorized yet.
-        self.policy_priors.is_some() && self.unexplored_moves_by_cat.is_empty()
+        // Considered fully explored if categorization has happened (num_legal_moves is Some)
+        // and the map of unexplored moves is empty.
+        self.num_legal_moves.is_some() && self.unexplored_moves_by_cat.is_empty()
     }
+
+    /// PUCT value calculation - used for selecting among *explored* children.
+    /// PUCT = Q + U
+    /// Q = Average value for the selector (parent)
+    /// U = exploration_constant * P * sqrt(parent_visits) / (1 + child_visits)
+    /// P = Uniform prior = 1.0 / num_legal_moves (for the parent node)
+    pub fn puct_value(&self, parent_visits: u32, parent_num_legal_moves: usize, exploration_constant: f64) -> f64 {
+        if self.visits == 0 {
+            // For unvisited children, PUCT relies heavily on the prior 'P'.
+            // Calculate U term with visits = 0. Q is effectively 0 for the selector.
+            let prior_p = if parent_num_legal_moves > 0 {
+                1.0 / parent_num_legal_moves as f64
+            } else {
+                0.0 // No legal moves from parent? Should not happen if child exists.
+            };
+            let u_value = exploration_constant * prior_p * (parent_visits as f64).sqrt(); // Denominator is 1 + 0 = 1
+            return u_value; // Return exploration term only for unvisited nodes
+        }
+
+        // Q value: Average value from White's perspective
+        let avg_value_white = self.total_value / self.visits as f64;
+
+        // Adjust Q value based on whose turn it is at the *parent* node (who is selecting)
+        let q_value_for_selector = if let Some(parent_weak) = &self.parent {
+            if let Some(parent_rc) = parent_weak.upgrade() {
+                if parent_rc.borrow().state.w_to_move { avg_value_white } else { 1.0 - avg_value_white }
+            } else { 0.5 } // Parent dropped? Default to draw value
+        } else { 0.5 }; // Root node? Should not be selected via PUCT. Default draw.
+
+        // U value: Exploration term (PUCT)
+        let prior_p = if parent_num_legal_moves > 0 {
+            1.0 / parent_num_legal_moves as f64
+        } else {
+            0.0
+        };
+        let exploration_term = exploration_constant
+            * prior_p
+            * (parent_visits as f64).sqrt()
+            / (1.0 + self.visits as f64);
+
+        q_value_for_selector + exploration_term
+    }
+
 
     /// UCT value calculation - used for selecting among *explored* children.
     /// Note: This uses standard UCT. PUCT logic is implicitly handled by the
@@ -182,40 +229,44 @@ impl MctsNode {
         q_value_for_selector + exploration_term
     }
 
-    /// Selects the best *explored* child node according to the UCT formula.
+    /// Selects the best *explored* child node according to the PUCT formula.
     /// Panics if called on a terminal node or a node with no children.
     pub fn select_best_explored_child(&self, exploration_constant: f64) -> Rc<RefCell<MctsNode>> {
         let parent_visits = self.visits;
+        // Parent needs its own num_legal_moves for the PUCT calculation
+        let parent_num_legal = self.num_legal_moves.unwrap_or(1); // Default to 1 if not set (should be set)
+
         self.children
             .iter()
             .max_by(|a, b| {
-                let uct_a = a.borrow().uct_value(parent_visits, exploration_constant);
-                let uct_b = b.borrow().uct_value(parent_visits, exploration_constant);
-                uct_a
-                    .partial_cmp(&uct_b)
+                let puct_a = a.borrow().puct_value(parent_visits, parent_num_legal, exploration_constant);
+                let puct_b = b.borrow().puct_value(parent_visits, parent_num_legal, exploration_constant);
+                puct_a
+                    .partial_cmp(&puct_b)
                     .unwrap_or(std::cmp::Ordering::Equal)
             })
             .cloned()
             .expect("select_best_explored_child called on node with no children")
     }
 
-    /// Stores policy priors and categorizes unexplored moves after evaluation.
-    /// Called once when a node is first evaluated by the policy network.
-    pub fn store_priors_and_categorize_moves(
+
+    /// Generates legal moves, categorizes them, sorts them within categories,
+    /// and stores them for prioritized expansion. Called once after evaluation.
+    pub fn categorize_and_store_moves(
         &mut self,
-        priors: HashMap<Move, f64>,
         move_gen: &MoveGen,
         // Pass killers if needed for categorization
         // killers: &[[Move; 2]; MAX_PLY],
         // ply: usize,
     ) {
-        if self.policy_priors.is_some() {
-            return;
-        } // Already done
+        if self.num_legal_moves.is_some() {
+             return; // Already done
+        }
 
-        self.policy_priors = Some(priors);
-        let legal_moves = MctsNode::get_legal_moves(&self.state, move_gen); // Regenerate legal moves
-        let mut categorized_moves: HashMap<MoveCategory, Vec<(Move, f64)>> = HashMap::new(); // Store prior with move for sorting
+        let legal_moves = MctsNode::get_legal_moves(&self.state, move_gen);
+        self.num_legal_moves = Some(legal_moves.len()); // Store count for PUCT
+
+        let mut categorized_moves: HashMap<MoveCategory, Vec<Move>> = HashMap::new();
 
         // Get MVV-LVA scores for captures beforehand
         let mut capture_scores: HashMap<Move, i32> = HashMap::new();
@@ -232,40 +283,40 @@ impl MctsNode {
         }
 
 
-        // Categorize moves and store with their policy prior
-        let current_priors = self.policy_priors.as_ref().expect("Policy priors should be set before categorization");
+        // Categorize moves
         for mv in legal_moves {
-            let prior = current_priors.get(&mv).cloned().unwrap_or(0.0); // Get prior, default 0 if missing
-            let category = self.categorize_move(&mv, move_gen); // Pass move_gen needed for check detection
-            categorized_moves.entry(category).or_default().push((mv, prior));
+            let category = self.categorize_move(&mv, move_gen);
+            categorized_moves.entry(category).or_default().push(mv);
         }
 
         // Sort moves within each category
-        let mut final_categorized_moves: HashMap<MoveCategory, Vec<Move>> = HashMap::new();
-        for (category, mut moves_with_priors) in categorized_moves {
+        for (category, moves) in categorized_moves.iter_mut() {
             match category {
                 MoveCategory::Check | MoveCategory::Quiet => {
-                    // Sort by policy prior (descending)
-                    moves_with_priors.sort_unstable_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+                    // No policy priors. Could shuffle or use simple heuristics later.
+                    // For now, keep the order from move generation (often somewhat reasonable).
+                    // Or potentially shuffle them:
+                    // use rand::seq::SliceRandom;
+                    // use rand::thread_rng;
+                    // moves.shuffle(&mut thread_rng());
                 }
                 MoveCategory::Capture => {
                     // Sort by MVV-LVA score (descending)
-                    moves_with_priors.sort_unstable_by_key(|(mv, _)| {
+                    moves.sort_unstable_by_key(|mv| {
                         std::cmp::Reverse(capture_scores.get(mv).cloned().unwrap_or(0)) // Use Reverse for descending
                     });
                 }
             }
-            // Store only the sorted moves, discarding priors now
-            final_categorized_moves.insert(category, moves_with_priors.into_iter().map(|(mv, _)| mv).collect());
         }
 
         // Sort categories by priority to determine the starting category
         let mut sorted_categories: Vec<_> = categorized_moves.keys().cloned().collect();
         sorted_categories.sort(); // Sorts by enum discriminant (priority)
 
-        self.unexplored_moves_by_cat = final_categorized_moves; // Store the map with sorted Vec<Move>
+        self.unexplored_moves_by_cat = categorized_moves; // Store the map with sorted Vec<Move>
         self.current_priority_category = sorted_categories.first().cloned();
     }
+
 
     /// Categorizes a move for prioritizing expansion.
     /// Helper to categorize a single move into Tactical/Killer/Quiet.
@@ -309,12 +360,13 @@ impl MctsNode {
         MoveCategory::Quiet
     }
 
-    /// Gets the highest-priority unexplored move and removes it from the map.
+    /// Gets the next highest-priority unexplored move according to tactical categories
+    /// (Check > Capture > Quiet) and removes it from the map.
     /// Advances the current priority category if necessary.
-    pub fn get_best_unexplored_move(&mut self) -> Option<Move> {
+    pub fn get_next_move_to_explore(&mut self) -> Option<Move> {
         while let Some(current_cat) = self.current_priority_category {
             if let Some(moves_in_cat) = self.unexplored_moves_by_cat.get_mut(&current_cat) {
-                // TODO: Could sort moves within category by policy prior before popping
+                // Pop moves from the end (highest MVV-LVA for captures, last for others)
                 if let Some(mv) = moves_in_cat.pop() {
                     // If category becomes empty after pop, remove it and advance category
                     if moves_in_cat.is_empty() {
@@ -412,20 +464,22 @@ impl MctsNode {
     }
 }
 
-/// Backtracks up the tree in the selection phase to find a node ready for expansion.
-/// Checks each node on the path for expansion opportunity before selection continues.
+/// Determines if a node should be expanded (has unevaluated/unexplored moves)
+/// or if selection should continue down the tree.
 fn should_expand_not_select(node: &MctsNode) -> bool {
-    // If this node hasn't been categorized yet, it's not ready for expansion
-    if node.policy_priors.is_none() {
-        return false;
+    // If the node hasn't been evaluated yet (Pesto value not calculated),
+    // it's the target leaf for evaluation, not expansion yet.
+    if node.nn_value.is_none() {
+        return false; // Don't expand, evaluate this node first.
     }
 
-    // If this node still has unexplored moves, it's ready for expansion
-    if !node.unexplored_moves_by_cat.is_empty() {
-        return true;
+    // If the node has been evaluated AND still has unexplored moves, it's ready for expansion.
+    // Check num_legal_moves.is_some() to ensure categorization has happened.
+    if node.num_legal_moves.is_some() && !node.unexplored_moves_by_cat.is_empty() {
+         return true; // Expand this node.
     }
 
-    // If all moves have been explored, continue selection through this node
+    // If evaluated and no unexplored moves left, continue selection.
     false
 }
 
@@ -457,10 +511,10 @@ pub fn select_leaf_for_expansion(
             break; // Leaf node reached
         }
 
-        // Select child with highest UCT score
+        // Select child with highest PUCT score
         let next = current
             .borrow()
-            .select_best_explored_child(exploration_constant);
+            .select_best_explored_child(exploration_constant); // Uses PUCT now
         current = next;
     }
 
@@ -468,3 +522,96 @@ pub fn select_leaf_for_expansion(
 }
 
 // Note: Expansion logic is now split between MctsNode helpers and the main mcts_search loop.
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::board::Board;
+    // use crate::eval::PestoEval; // Not strictly needed for these tests
+    use crate::move_generation::MoveGen;
+    use crate::utils::parse_uci_move;
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
+    // Helper to create a node, categorize moves, and return the node + movegen
+    fn setup_node_for_priority_test(fen: &str) -> (Rc<RefCell<MctsNode>>, MoveGen) {
+        let board = Board::new_from_fen(fen);
+        let move_gen = MoveGen::new();
+        let node_rc = MctsNode::new_root(board, &move_gen);
+        // We need to simulate the evaluation step to trigger categorization
+        {
+            let mut node = node_rc.borrow_mut();
+            // Assign a dummy evaluation value and categorize
+            // In the real search, this happens if mate isn't found and evaluation is done.
+            if node.terminal_or_mate_value.is_none() || node.terminal_or_mate_value == Some(-999.0) {
+                 node.nn_value = Some(0.5); // Assign a dummy evaluation value
+                 node.categorize_and_store_moves(&move_gen);
+            } else {
+                // If node is already terminal, categorization won't happen,
+                // which might be okay for some tests, but not for priority testing.
+                // Panic here to indicate a bad test setup if the FEN is terminal.
+                panic!("FEN provided for priority test is already terminal: {}", fen);
+            }
+        }
+        (node_rc, move_gen)
+    }
+
+    #[test]
+    fn test_move_priority_check_capture_quiet() {
+        // Position: White to move. Kb3 is check, Kc1 captures queen, Kb1 is quiet.
+        let fen = "k7/8/8/8/8/8/p1K5/q7 w - - 0 1";
+        let (node_rc, _move_gen) = setup_node_for_priority_test(fen);
+        let board = node_rc.borrow().state.clone(); // Get board for parsing
+
+        let check_move = parse_uci_move(&board, "c2b3").unwrap(); // Kb3+
+        let capture_move = parse_uci_move(&board, "c2c1").unwrap(); // Kxc1 (Captures Queen)
+        let quiet_move = parse_uci_move(&board, "c2b1").unwrap(); // Kb1
+
+        let mut node = node_rc.borrow_mut();
+
+        // Verify initial state after categorization
+        assert_eq!(node.current_priority_category, Some(MoveCategory::Check), "Initial priority should be Check");
+        assert!(node.unexplored_moves_by_cat.contains_key(&MoveCategory::Check));
+        assert!(node.unexplored_moves_by_cat.contains_key(&MoveCategory::Capture));
+        assert!(node.unexplored_moves_by_cat.contains_key(&MoveCategory::Quiet));
+        assert_eq!(node.unexplored_moves_by_cat[&MoveCategory::Check].len(), 1);
+        assert_eq!(node.unexplored_moves_by_cat[&MoveCategory::Capture].len(), 1);
+        assert_eq!(node.unexplored_moves_by_cat[&MoveCategory::Quiet].len(), 1);
+
+
+        // 1. Expect Check move first
+        let first_move = node.get_next_move_to_explore();
+        assert!(first_move.is_some(), "Should get a first move");
+        assert_eq!(first_move.unwrap(), check_move, "First move should be the check (Kb3+)");
+        // Check category should now be empty and removed, priority advanced
+        assert!(!node.unexplored_moves_by_cat.contains_key(&MoveCategory::Check), "Check category should be removed");
+        assert_eq!(node.current_priority_category, Some(MoveCategory::Capture), "Priority should advance to Capture after check");
+
+
+        // 2. Expect Capture move second
+        let second_move = node.get_next_move_to_explore();
+        assert!(second_move.is_some(), "Should get a second move");
+        assert_eq!(second_move.unwrap(), capture_move, "Second move should be the capture (Kxc1)");
+        // Capture category should now be empty and removed, priority advanced
+        assert!(!node.unexplored_moves_by_cat.contains_key(&MoveCategory::Capture), "Capture category should be removed");
+        assert_eq!(node.current_priority_category, Some(MoveCategory::Quiet), "Priority should advance to Quiet after capture");
+
+
+        // 3. Expect Quiet move third
+        let third_move = node.get_next_move_to_explore();
+        assert!(third_move.is_some(), "Should get a third move");
+        assert_eq!(third_move.unwrap(), quiet_move, "Third move should be the quiet move (Kb1)");
+         // Quiet category should now be empty and removed, priority advanced
+        assert!(!node.unexplored_moves_by_cat.contains_key(&MoveCategory::Quiet), "Quiet category should be removed");
+        assert!(node.current_priority_category.is_none(), "Priority should be None after quiet");
+
+
+        // 4. Expect no more moves
+        let fourth_move = node.get_next_move_to_explore();
+        assert!(fourth_move.is_none(), "Should be no more moves left");
+        assert!(node.current_priority_category.is_none(), "Priority should be None after exploring all");
+        assert!(node.unexplored_moves_by_cat.is_empty(), "Unexplored map should be empty");
+    }
+
+    // --- More tests can be added below ---
+}

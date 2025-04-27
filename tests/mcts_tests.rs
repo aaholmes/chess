@@ -430,7 +430,53 @@ mod mcts_tests {
 
     }
 
-    // TODO: Add test for time limit termination
     // TODO: Add tests for Killer/History categorization integration
     // TODO: Add tests for prioritized selection logic
+
+    #[test]
+    fn test_mcts_pesto_time_limit_termination() {
+        let (board, move_gen, pesto_eval) = setup_test_env();
+        let time_limit = Duration::from_millis(100); // Set a short time limit
+        let start_time = Instant::now();
+
+        let best_move = mcts_pesto_search(
+            board,
+            &move_gen,
+            &pesto_eval,
+            0, // Disable mate search
+            Some(1_000_000), // High iteration count to ensure time limit is hit
+            Some(time_limit),
+        );
+
+        let elapsed = start_time.elapsed();
+
+        assert!(best_move.is_some(), "MCTS should return a move within the time limit");
+        // Allow a small margin for execution time overhead
+        assert!(elapsed >= time_limit, "Search should run for at least the time limit");
+        assert!(elapsed < time_limit + Duration::from_millis(50), "Search should terminate shortly after the time limit");
+    }
+
+    #[test]
+    fn test_mcts_pesto_tactical_prioritization() {
+        let (mut board, move_gen, pesto_eval) = setup_test_env();
+        // Position with a forced capture sequence leading to material gain for White
+        // White to move: Nxc6, Black must respond with ...dxc6, White then Qxc6+
+        board = Board::new_from_fen("rnbqkb1r/pp2pppp/2n2n2/3p4/3P4/2N5/PPP1PPPP/RNBQKBNR w KQkq - 0 4").expect("Valid FEN");
+
+        let expected_first_move = parse_uci_move(&board, "c3c6").unwrap(); // Nxc6
+
+        // Run with enough iterations to explore the sequence
+        let best_move = mcts_pesto_search(
+            board.clone(),
+            &move_gen,
+            &pesto_eval,
+            0, // Disable mate search
+            Some(1000), // Sufficient iterations
+            None,
+        );
+
+        assert!(best_move.is_some(), "MCTS should find a move");
+        assert_eq!(best_move.unwrap(), expected_first_move, "MCTS should prioritize the tactical capture sequence");
+    }
+
 }

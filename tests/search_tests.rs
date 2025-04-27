@@ -15,6 +15,51 @@ fn test_mate_in_one_detection() {
 }
 
 #[test]
+fn test_mate_in_one_rook() {
+    let mut board = BoardStack::new_from_fen("8/8/8/8/8/8/k1K5/R7 w - - 0 1");
+    let move_gen = MoveGen::new();
+    let (score, best_move, _) = mate_search(&mut board, &move_gen, 1, false);
+    assert!(score > 900000); // Should detect mate
+    assert_eq!(best_move.to_uci(), "a1a8"); // Ra8#
+}
+
+#[test]
+fn test_mate_in_one_queen() {
+    let mut board = BoardStack::new_from_fen("8/8/8/8/8/k1K5/8/Q7 w - - 0 1");
+    let move_gen = MoveGen::new();
+    let (score, best_move, _) = mate_search(&mut board, &move_gen, 1, false);
+    assert!(score > 900000); // Should detect mate
+    assert_eq!(best_move.to_uci(), "a1a8"); // Qa8#
+}
+
+#[test]
+fn test_mate_in_one_bishop() {
+    let mut board = BoardStack::new_from_fen("8/8/8/8/8/k1K5/1B6/8 w - - 0 1");
+    let move_gen = MoveGen::new();
+    let (score, best_move, _) = mate_search(&mut board, &move_gen, 1, false);
+    assert!(score > 900000); // Should detect mate
+    assert_eq!(best_move.to_uci(), "b2a3"); // Ba3#
+}
+
+#[test]
+fn test_mate_in_one_knight() {
+    let mut board = BoardStack::new_from_fen("8/8/8/8/8/k1K5/1N6/8 w - - 0 1");
+    let move_gen = MoveGen::new();
+    let (score, best_move, _) = mate_search(&mut board, &move_gen, 1, false);
+    assert!(score > 900000); // Should detect mate
+    assert_eq!(best_move.to_uci(), "b2c4"); // Nc4#
+}
+
+#[test]
+fn test_mate_in_one_pawn() {
+    let mut board = BoardStack::new_from_fen("8/8/8/8/8/k1K5/P7/8 w - - 0 1");
+    let move_gen = MoveGen::new();
+    let (score, best_move, _) = mate_search(&mut board, &move_gen, 1, false);
+    assert!(score > 900000); // Should detect mate
+    assert_eq!(best_move.to_uci(), "a2a3"); // a3#
+}
+
+#[test]
 fn test_mate_in_two_detection() {
     let mut board = BoardStack::new_from_fen("3qk3/3ppp2/5n2/8/8/8/3PPP2/3QK2R w K - 0 1");
     let move_gen = MoveGen::new();
@@ -22,7 +67,28 @@ fn test_mate_in_two_detection() {
     assert!(score < 900000); // Should not detect mate in 1
     let (score, best_move, _) = mate_search(&mut board, &move_gen, 2, false);
     assert!(score > 900000); // Should detect mate in 2
-    assert_eq!(best_move.to, 63); // Rh8+ (assuming 0-63 board representation)
+    assert_eq!(best_move.to_uci(), "h1h8"); // Rh8+
+}
+:start_line:72
+-------
+
+#[test]
+fn test_mate_search_no_mate_in_depth() {
+    let mut board = BoardStack::new_from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"); // Initial position
+    let move_gen = MoveGen::new();
+    let (score, _, _) = mate_search(&mut board, &move_gen, 3, false); // Search for mate in 3
+    assert!(score < 900000); // Should not detect mate
+}
+
+#[test]
+fn test_mate_search_position_close_to_mate() {
+    let mut board = BoardStack::new_from_fen("8/8/8/8/8/k1K5/1Q6/8 w - - 0 1"); // Queen is one square away from mate
+    let move_gen = MoveGen::new();
+    let (score, _, _) = mate_search(&mut board, &move_gen, 1, false); // Search for mate in 1
+    assert!(score < 900000); // Should not detect mate in 1
+    let (score, best_move, _) = mate_search(&mut board, &move_gen, 2, false); // Search for mate in 2
+    assert!(score > 900000); // Should detect mate in 2
+    assert_eq!(best_move.to_uci(), "b2a3"); // Qb2-a3#
 }
 
 #[test]

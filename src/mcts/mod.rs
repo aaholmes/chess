@@ -6,7 +6,7 @@ pub mod simulation; // Keep for testing/alternative use
 
 use crate::board::Board;
 use crate::boardstack::BoardStack; // Needed for mate_search
-use crate::mcts::policy::PolicyNetwork;
+use crate::eval::PestoEval; // Import PestoEval
 use crate::move_generation::MoveGen;
 use crate::move_types::Move;
 use crate::search::mate_search; // Import mate_search function
@@ -16,7 +16,7 @@ use std::time::{Duration, Instant}; // Use trait from submodule
 
 // Import necessary components from submodules
 pub use self::node::{select_leaf_for_expansion, MctsNode, MoveCategory};
-pub use self::policy::PolicyNetwork; // Re-export trait
+// pub use self::policy::PolicyNetwork; // No longer needed for pesto search
                                      // pub use self::simulation::simulate_random_playout; // Don't export by default
 
 // Constants
@@ -68,10 +68,10 @@ fn backpropagate(node: Rc<RefCell<MctsNode>>, value: f64) {
 ///
 /// # Returns
 /// The best move found for the root state based on visit counts. Returns None if no legal moves from root.
-pub fn mcts_search<P: PolicyNetwork>(
+pub fn mcts_pesto_search(
     root_state: Board,
     move_gen: &MoveGen,
-    policy_network: &P,
+    pesto_eval: &PestoEval, // Use PestoEval
     mate_search_depth: i32,
     iterations: Option<u32>,
     time_limit: Option<Duration>,
@@ -158,21 +158,32 @@ pub fn mcts_search<P: PolicyNetwork>(
                 } else {
                     // No mate found (sentinel -999.0), proceed to evaluate/expand
                     // --- 2c. Evaluate Leaf (if not already done) ---
-                    if leaf_node.nn_value.is_none() {
-                        let (priors, value_current_player) =
-                            policy_network.evaluate(&leaf_node.state);
+                    if leaf_node.nn_value.is_none() { // Reuse nn_value field for Pesto value
+                        // Evaluate using Pesto
+                        let score_cp = pesto_eval.evaluate(&leaf_node.state);
+                        // Convert centipawns to win probability [0.0, 1.0] for the current player
+                        // Using a sigmoid function: 1 / (1 + exp(-score / k))
+                        // k=400 is a common choice (maps +/- 400cp to ~75%/25% win prob)
+                        let value_current_player = 1.0 / (1.0 + (-score_cp as f64 / 400.0).exp());
+
+                        // Convert to White's perspective for storage and backpropagation
                         let value_white_pov = if leaf_node.state.w_to_move {
                             value_current_player
                         } else {
                             1.0 - value_current_player
                         };
-                        leaf_node.nn_value = Some(value_white_pov);
-                        leaf_node.store_priors_and_categorize_moves(priors, move_gen); // Now categorize moves
+                        leaf_node.nn_value = Some(value_white_pov); // Store Pesto-derived value
+
+                        // Now that the node is evaluated, categorize its moves for expansion
+                        leaf_node.categorize_and_store_moves(move_gen);
+
                         value_to_propagate = value_white_pov;
                         node_to_propagate_from = leaf_node_rc.clone(); // Backpropagate evaluated value from leaf
                     } else {
                         // --- 2d. Expand Leaf ---
-                        if let Some(action_to_expand) = leaf_node.get_best_unexplored_move() {
+                        // Node has already been evaluated (nn_value is Some). Try to expand.
+                        // Use the prioritized move selection.
+                        if let Some(action_to_expand) = leaf_node.get_next_move_to_explore() { // Use the correct function
                             let next_state = leaf_node.state.apply_move_to_board(action_to_expand);
                             let parent_weak = Rc::downgrade(&leaf_node_rc);
                             let new_child_rc = MctsNode::new_child(
@@ -249,4 +260,113 @@ pub fn mcts_search<P: PolicyNetwork>(
     };
 
     best_move
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::board::Board;
+    use crate::eval::PestoEval;
+    use crate::move_generation::MoveGen;
+    use crate::utils::parse_uci_move; // Helper for creating Move objects
+    use std::time::Duration;
+
+    // Helper function to initialize common test components
+    fn setup_test_env() -> (Board, MoveGen, PestoEval) {
+        let board = Board::new_from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
+        let move_gen = MoveGen::new();
+        let pesto_eval = PestoEval::new();
+        (board, move_gen, pesto_eval)
+    }
+
+    #[test]
+    fn test_mcts_pesto_basic_run() {
+        let (board, move_gen, pesto_eval) = setup_test_env();
+
+        // Run for a small number of iterations
+        let result = mcts_pesto_search(
+            board,
+            &move_gen,
+            &pesto_eval,
+            0, // Disable mate search for this basic test
+            Some(20), // Low iteration count
+            None,
+        );
+
+        // Should return *some* move from the starting position
+        assert!(result.is_some(), "MCTS should find a move from the start position");
+    }
+
+    #[test]
+    fn test_mcts_pesto_time_limit() {
+         let (board, move_gen, pesto_eval) = setup_test_env();
+
+         // Run with a time limit
+         let result = mcts_pesto_search(
+             board,
+             &move_gen,
+             &pesto_eval,
+             0, // Disable mate search
+             None, // No iteration limit
+             Some(Duration::from_millis(50)), // Short time limit
+         );
+
+         // Should still return a move
+         assert!(result.is_some(), "MCTS with time limit should find a move");
+    }
+
+#[test]
+    fn test_mcts_pesto_favors_better_eval() {
+        // Position: White to move. Can capture black queen (Qxb7) or black pawn (Qxh7).
+        // Capturing the queen is much better according to Pesto.
+        let board = Board::new_from_fen("r1b1kbnr/pq1ppppp/n7/1p6/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
+        let move_gen = MoveGen::new();
+        let pesto_eval = PestoEval::new();
+
+        // Moves available: Qxb7, Qxh7, and others.
+        let queen_capture_move = parse_uci_move(&board, "d1b7").unwrap(); // Capture queen
+        let pawn_capture_move = parse_uci_move(&board, "d1h7").unwrap(); // Capture pawn (less good)
+
+        // Run for enough iterations to distinguish
+        let best_move = mcts_pesto_search(
+            board.clone(),
+            &move_gen,
+            &pesto_eval,
+            0, // Disable mate search
+            Some(500), // More iterations to allow evaluation difference to propagate
+            None,
+        );
+
+        assert!(best_move.is_some(), "Search should return a move");
+
+        // We expect the search to prefer capturing the queen
+        assert_eq!(
+            best_move.unwrap(),
+            queen_capture_move,
+            "MCTS with Pesto should prefer capturing the queen (Qxb7) over the pawn (Qxh7)"
+        );
+
+        // Optional: Verify the pawn capture is also legal, just less preferred
+        let mut legal_moves = Vec::new();
+        move_gen.generate_legal_moves(&board, &mut legal_moves);
+        assert!(legal_moves.contains(&pawn_capture_move), "Pawn capture (Qxh7) should be legal");
+    }
+     #[test]
+     #[should_panic]
+     fn test_mcts_pesto_no_limits_panic() {
+         let (board, move_gen, pesto_eval) = setup_test_env();
+         // This should panic because neither iterations nor time limit is set
+         mcts_pesto_search(board, &move_gen, &pesto_eval, 0, None, None);
+     }
+
+     #[test]
+     #[should_panic]
+     fn test_mcts_pesto_negative_mate_depth_panic() {
+         let (board, move_gen, pesto_eval) = setup_test_env();
+         // This should panic due to negative mate search depth
+         mcts_pesto_search(board, &move_gen, &pesto_eval, -1, Some(10), None);
+     }
+
+    // --- More tests to be added below ---
+
 }
