@@ -1,152 +1,133 @@
-# Design Document: Humanlike Chess Training Platform
-Version: 1.2 (Reflecting Current Implementation Progress)
+# Chess Engine: Design Doc
 
-Date: 2025-04-23
+Version: 1.2
 
-Project Goal: To create a chess training platform featuring a unique "humanlike" chess engine for sparring and a hybrid repertoire builder. The engine should mimic the play style, common moves, and tactical alertness of human players within specific Elo rating bands (e.g., 2000-2200).
+Date: 2025-04-28
 
-Target User: Chess players looking to improve by practicing against realistic opponents and building practical opening repertoires tailored to human responses.
+## 1. Introduction & Goals
 
-## 1. High-Level Architecture
+This document outlines the design for a chess engine aimed at providing a human-like sparring experience, targeting players in a specific Elo range. The engine will feature an interpretable evaluation function, explore a novel combination of classical search and neural network guided Monte Carlo Tree Search (MCTS), and leverage existing chess knowledge to bootstrap its capabilities.
 
-The platform comprises several interacting components:
+Key Goals:
 
-*   **Core Engine (Rust):** A custom chess engine responsible for generating moves.
-    *   *Status:* Foundation implemented in Rust (`src/`). Currently uses classical search (Alpha-Beta) and evaluation (Pesto), not the originally planned MCTS/Policy NN for the "humanlike" aspect. MCTS code exists (`src/mcts/`) but is not the primary search in `src/agent.rs`.
-*   **Policy Network Models:** Neural network models (likely trained in Python, deployed in ONNX or TorchScript format) loaded by the Core Engine. Separate models exist for different target rating bands, providing move probabilities (policy).
-    *   *Status:* Planned. Core engine integration (`src/mcts/policy.rs` exists) but loading/inference logic and connection to the main search (`src/search/` or `src/agent.rs`) is not apparent in the provided `src` files. Training pipeline is separate.
-*   **Strong Engine (External):** An external, powerful UCI-compliant chess engine (e.g., Stockfish) used for objective analysis and suggesting strong moves for the user within the repertoire builder.
-    *   *Status:* Planned. No integration code found in `src`.
-*   **User Interface (UI):** The front-end application (technology TBD, potentially Web or Desktop) providing user interaction for sparring, repertoire building, and analysis.
-    *   *Status:* Planned. No UI code found in `src`.
-*   **Supporting Data Files:**
-    *   Opening Books (Polyglot .bin): Rating-band specific books containing move frequencies from human games.
-        *   *Status:* Planned. No loading/probing logic found in `src`.
-    *   Endgame Tablebases (Syzygy .rtbm, .rtbw): 6-piece set for perfect mate resolution.
-        *   *Status:* Planned. No probing logic found in `src`.
-    *   User Data (Repertoires, Settings): Saved locally (e.g., PGN, JSON).
-        *   *Status:* Planned.
+*   **Humanlike Sparring Partner:** Create an engine whose style, opening choices, and (to some extent) strategic priorities resemble human play in a target Elo range (e.g. 2000-2200).
+*   **Interpretable Evaluation:** Employ an evaluation function whose core components are understandable to humans, allowing for analysis and potential learning.
+*   **Novel Architecture:** Explore interesting ways to combine classical search techniques (alpha-beta, quiescence) and modern neural network-guided MCTS.
+*   **Leverage Chess Knowledge:** Incorporate established chess principles and classical engine techniques to reduce the learning burden on the NN and ensure baseline competence.
 
-*Interaction Flow Example (Sparring Move Request):*
-*(Note: This flow describes the original MCTS/NN plan. The current implementation uses Alpha-Beta search as described below)*
+## 2. Core Architecture
 
-1.  UI sends current board state (position command) and go command to Core Engine (via UCI protocol). *(UCI implemented in `src/uci.rs`)*
-2.  Core Engine checks piece count: If <= 6 pieces -> Probes Syzygy EGTB (.rtbm file). If mate found, returns mate score/move immediately. *(EGTB probing planned)*
-3.  If not EGTB mate, checks rating-specific Opening Book (Polyglot .bin). If move found & criteria met (e.g., >100 games in DB), selects move probabilistically based on stored weights. *(Opening book planned)*
-4.  If not in book or book threshold not met, initiates MCTS search: *(Current implementation uses Alpha-Beta search instead)*
-    *   Performs pre-expansion Deep Mate Search (configurable depth, e.g., 9-ply), unless EGTB already resolved mate. *(Mate search implemented in `src/search/mate_search.rs`)*
-    *   Runs MCTS iterations: *(MCTS planned, Alpha-Beta implemented)*
-        *   Node Selection: PUCT algorithm.
-        *   Node Expansion: Prioritizes checks/captures (see Section 2.4), uses Policy NN priors for remaining moves.
-        *   Simulation/Evaluation: Uses Heuristic Function (see Section 2.2).
-        *   Backpropagation: Updates node statistics (visits N, value W).
-    *   Selects best move based on MCTS results (e.g., highest visit count). *(Current implementation selects based on Alpha-Beta result)*
-5.  Core Engine sends `bestmove <move>` back to UI. *(Implemented)*
+The engine utilizes a Monte Carlo Tree Search (MCTS) algorithm as its core decision-making process.
 
-## 2. Core Engine Design (Rust)
+*   **Search:** MCTS explores the game tree.
+    *   *Status:* MCTS framework structure exists (`src/mcts/`), but the current primary search algorithm implemented and used by the `SimpleAgent` (`src/agent.rs`) is Iterative Deepening Alpha-Beta (`src/search/iterative_deepening.rs`, `src/search/alpha_beta.rs`).
+*   **Guidance (Policy):** A Neural Network Policy (P) guides the MCTS exploration, prioritizing promising moves. This network will be trained on human games.
+    *   *Status:* Planned. Policy network interface structure exists (`src/mcts/policy.rs`), but loading/inference logic and integration into the main search loop are not yet implemented. Training pipeline is external.
+*   **Evaluation (Value):** A custom, enhanced static evaluation function (V_{enhanced}) provides position assessments for MCTS leaf nodes and informs Q-value updates. V_{enhanced} is based on an interpretable classical evaluation (E_{classical}) and a limited tactical search.
+    *   *Status:* See Section 3.
 
-Primary Goal: Simulate human play at specific rating levels, incorporating realistic opening choices, tactical awareness, and characteristic move patterns. *(Note: Current implementation is a classical engine)*
+## 3. Evaluation Subsystem (V_{enhanced})
 
-Language: Rust *(Implemented)*
+The evaluation of positions within the MCTS relies on a two-tiered approach:
 
-Core Libraries: `lazy_static`, `rand`. *(Implemented)* Potential future: `rust-syzygy`, ONNX/TorchScript runtime.
+*   **E_{classical} (Classical Static Evaluation):**
+    *   Purpose: Provides a fast, interpretable baseline evaluation.
+    *   Components: Piece-Square Tables with adjustments for various features:
+        * Two Bishops bonus
+        * Pawn Structure (passed, isolated, backward pawns, pawn chains and duos)
+        * King Safety heuristics
+        * Mobility bonus
+        * Rook placement bonus (open/half-open files, behind passed pawns, doubled on seventh)
+    *   Tunability: Feature selection and weights can be tuned, potentially informed by analysis of the human training data.
+    *   *Status:* Implemented as a Pesto-style Tapered Evaluation with adjustments in `src/eval.rs` and `src/eval_constants.rs`. This is currently used by the Alpha-Beta search.
+*   **V_{enhanced} (Enhanced Static Evaluation via Quiescence Search):**
+    *   Purpose: Provides a tactically robust evaluation for MCTS leaves by resolving immediate forcing lines.
+    *   Algorithm: Node-limited, Alpha-Beta style quiescence search.
+    *   Scope: Explores Checks, Captures, Promotions, and Escapes from Check (C+C+P+E).
+    *   Leaf Evaluation: Uses E_{classical} at the leaves of the quiescence search (i.e., positions deemed "quiet" or where the node limit is hit).
+    *   Termination: Tunable node count limit or reaching a quiet state.
+    *   *Status:* Quiescence search implemented (`src/search/quiescence.rs`) and used by the current Alpha-Beta search. Static Exchange Evaluation (SEE) is also implemented (`src/search/see.rs`) for move ordering/pruning.
 
-**2.1. Search Algorithm:** MCTS *(Planned)*
-*   *Current Implementation:* Iterative Deepening Alpha-Beta Search (`src/search/iterative_deepening.rs`, `src/search/alpha_beta.rs`) with Transposition Tables (`src/transposition.rs`), Quiescence Search (`src/search/quiescence.rs`), History Heuristic (`src/search/history.rs`), and Static Exchange Evaluation (`src/search/see.rs`). MCTS code exists (`src/mcts/`) but is not the primary search used by `SimpleAgent`.
+## 4. Search Algorithm (Per Move)
 
-**2.2. Position Evaluation:** Heuristic Function *(Planned: Specific heuristic for MCTS)*
-*   *Current Implementation:* Pesto-style Tapered Evaluation (`src/eval.rs`, `src/eval_constants.rs`). Includes material, PSQTs, king safety, pawn structure, mobility, bishop pair, rook bonuses.
+*   **Opening Book Check:**
+    *   Check if the current board hash exists in the Human Opening Book database.
+    *   If the position frequency >= threshold (e.g., 100 games): Probabilistically select a move based on human move frequencies from the database. Play the move and terminate search for this turn.
+    *   If not in book or below threshold: Proceed to engine computation.
+    *   *Status:* Planned. No opening book loading/probing logic found in `src`.
+*   **Pre-computation (Root Node Only):**
+    *   **Tablebase Lookup:** Check for endgame tablebase hits. Play mate/draw if found.
+        *   *Status:* Planned. EGTB probing logic using `shakmaty-syzygy` is implemented in `src/egtb.rs`, but integration into the main search loop (`src/agent.rs`) is needed. Dependency added to `Cargo.toml`.
+    *   **Mate Search:** Perform a node-limited Iterative Deepening search specifically for forced mates or forced sequences resulting in a tablebase win (e.g., M1, M2 within 3-ply, M3 within 5-ply, up to a node limit). Play mate or forced reaching of tablebase win if found.
+        *   *Status:* Implemented (`src/search/mate_search.rs`) and integrated into the agent (`src/agent.rs`) before the main search.
+*   **MCTS Execution (If no book/TB/mate result):** *(Note: Current implementation uses Alpha-Beta)*
+    *   Budget: Run MCTS for a predetermined time or node count.
+    *   Selection (Root Node): Use a modified PUCT (Polynomial Upper Confidence Trees) algorithm:
+        *   Ensure at least N=1 visit for all legal root moves that are Checks, Captures, Promotions, or Forks (C+C+P+F).
+        *   After forced exploration, revert to standard PUCT selection using Policy P and Q-values derived from V_{enhanced} for all legal moves.
+    *   Selection (Tree Nodes): Use standard PUCT selection based on Policy P and stored Q-values (V_{enhanced}).
+    *   Expansion: When a leaf node is reached, expand it using the NN Policy (P) to provide priors for child nodes.
+    *   Evaluation (Simulation): Evaluate the newly expanded leaf node using V_{enhanced} (triggering the quiescence search).
+    *   Backpropagation: Update Q-values (V_{enhanced}) and visit counts back up the selected path to the root.
+    *   Final Move Selection: Choose the move from the root node based on MCTS statistics (typically the move with the highest visit count after the budget expires).
+    *   *Status (Alpha-Beta):* Iterative Deepening Alpha-Beta search is used. Moves are generated (`src/move_generation.rs`) and sorted using MVV-LVA, History Heuristic (`src/search/history.rs`), and SEE. Transposition Tables (`src/transposition.rs`) are used. Final move selected based on Alpha-Beta result.
+*   **Engine Communication:**
+    *   *Status:* UCI protocol subset implemented (`src/uci.rs`) via standard input/output. Handles `uci`, `isready`, `ucinewgame`, `position`, `go`, `quit`. Parses time controls and depth limits. Outputs `bestmove` and basic `info` string.
 
-**2.3. Move Guidance:** Policy Network Interface *(Planned)*
-*   *Status:* No NN model loading/inference integrated into the main search/agent flow. `src/mcts/policy.rs` exists.
+## 5. Human-like Elements & Considerations
 
-**2.4. Tactical Enhancements**
-*   Deep Mate Search: Before root MCTS expansion (if not resolved by EGTB), perform dedicated search for forced mates (configurable depth, e.g., 9-ply). If mate found, use result directly.
-    *   *Status:* Mate search implemented (`src/search/mate_search.rs`). Integration point (before MCTS/Alpha-Beta root) confirmed in `src/agent.rs`.
-*   Check/Capture Prioritization (MCTS Expansion): *(Planned for MCTS)*
-    *   *Current Implementation (Alpha-Beta):* Moves are generated (`src/move_generation.rs`) and sorted using MVV-LVA for captures and History Heuristic / Pesto evaluation difference for quiet moves (`gen_pseudo_legal_moves_with_evals`).
+This design incorporates several elements to achieve human-like play:
 
-**2.5. Opening Book Integration** *(Planned)*
-*   *Status:* No implementation found in `src`.
+*   **Training Data:** The core NN Policy (P) is trained via supervised learning on a large database of human games within the target Elo range. E_{classical} weights may also be tuned based on this data. *(Status: Training pipeline external, status unknown)*
+*   **Opening Book:** Directly mimics human opening choices in frequently occurring positions. *(Status: Planned)*
+*   **Root Search Heuristics:** The C+C+P+F priority and initial Mate Search mimic human focus on immediate tactical possibilities. *(Status: Mate search implemented. C+C+P+F planned for MCTS; current Alpha-Beta uses MVV-LVA/History/SEE for move ordering)*
+*   **Evaluation Style:** E_{classical} uses understandable concepts. V_{enhanced} provides tactical robustness, avoiding simple blunders often found in pure static evaluation engines but perhaps less deep than full-width search. *(Status: E_classical (Pesto) and V_enhanced (Quiescence) implemented)*
+*   **Tactical Acumen:** While trained on human data, the combination of MCTS, the dedicated Mate Search, the V_{enhanced} quiescence search, and the endgame tablebases will likely give the engine stronger tactical calculation and late endgame playing abilities than the average player in the training Elo range. This may result in an engine that plays positionally like the target group but is tactically sharper, making it a challenging and beneficial sparring partner. *(Note: Current Alpha-Beta implementation is already tactically strong)*
 
-**2.6. Endgame Tablebase (EGTB) Integration** *(Planned)*
-*   *Status:* No implementation found in `src`.
+## 6. Training Strategy
 
-**2.7. Engine Communication Protocol:** UCI Subset *(Implemented)*
-*   *Status:* Implemented in `src/uci.rs` via standard input/output. Handles `uci`, `isready`, `ucinewgame`, `position`, `go`, `quit`. Parses time controls and depth limits. Outputs `bestmove` and basic `info` string. Custom options are planned but not implemented in the handler.
+*   **Data Source:** A large database of human games (e.g., Lichess Open Database, FICS games) filtered for players within the Elo range.
+*   **Policy Network (P) Training:** Supervised Learning. Train the NN to predict the move played by the human player given the board state. Standard NN architectures for policy prediction (e.g., ResNet-based similar to AlphaZero/Leela) can be used.
+*   **E_{classical} Tuning:** Weights for E_{classical} features are initialized using the PESTO evaluation function from Rofchade, with reasonable guesses for the other adjustments, then will be optimized using Texel Tuning, based on the human game dataset.
+*   *Status:* Initial E_{classical} values hardcoded in `eval_constants.rs`. Training/tuning pipeline not started yet.
 
-## 3. Policy Network Subsystem *(Planned)*
+## 7. Opening Book Implementation
 
-Goal: Train NNs to predict human moves for specific rating bands.
-Technology: Python with PyTorch or TensorFlow recommended for training.
-*   *Status:* External to the Rust codebase. No direct evidence in `src`.
+*   **Source:** Processed human game database (can be the same used for training).
+*   **Format:** Hash table mapping position hash (e.g., Zobrist) to move frequencies. Polyglot (.bin) format planned.
+*   **Logic:** On move request, calculate position hash. Query book. If hash exists and game count >= threshold (e.g., 100), sample a legal move according to the recorded human frequencies.
+*   *Status:* Planned. No implementation found in `src`.
 
-## 4. Strong Engine Integration (Rust) *(Planned)*
-
-Implement a Rust module to manage an external UCI engine process (e.g., Stockfish executable).
-*   *Status:* No implementation found in `src`.
-
-## 5. User Interface (UI) Design *(Planned)*
-
-Technology: TBD.
-*   *Status:* No implementation found in `src`.
-
-## 6. Technology Stack & Data Summary
+## 8. Technology Stack & Status Summary
 
 *   **Core Engine:** Rust *(Implemented)*
-*   **Policy NN Training:** Python (PyTorch/TensorFlow) *(Planned/External)*
+    *   Libraries: `lazy_static`, `rand`, `shakmaty`, `shakmaty-syzygy` *(Implemented)*
+    *   Search: Alpha-Beta with Iterative Deepening, Quiescence, TT, History, SEE *(Implemented)*. MCTS *(Partially Implemented, Inactive)*
+    *   Evaluation: Pesto Tapered Eval with adjustments for pawn structure, king safety, etc. *(Implemented)*
+    *   Mate Search: *(Implemented)*
+    *   UCI Protocol: *(Implemented)*
+*   **Policy NN Training:** Python (PyTorch/TensorFlow) *(Planned)*
 *   **NN Model Format:** ONNX / TorchScript *(Planned)*
 *   **EGTB:** Syzygy 6-piece (.rtbm, .rtbw) on local SSD *(Planned)*
-*   **EGTB Library:** rust-syzygy *(Planned)*
+*   **EGTB Library:** `shakmaty-syzygy` *(Implemented)*
 *   **Opening Book:** Polyglot (.bin), per rating band, local storage *(Planned)*
-*   **Strong Engine:** External UCI (e.g., Stockfish) *(Planned)*
-*   **UI:** TBD *(Planned)*
 *   **User Repertoires:** PGN (recommended), local storage *(Planned)*
 
-## 7. Development Roadmap & Priorities
+**Current Overall Status:** The core engine foundation is built in Rust and functional, capable of playing chess via the UCI protocol using a classical Alpha-Beta search algorithm with Pesto evaluation. Key components like move generation, board representation, basic search enhancements (quiescence, TT, history, SEE), and mate search are implemented. The originally planned MCTS/NN architecture for "humanlike" play is partially present in the codebase (`src/mcts/`) but is not the active search method. The training pipeline for the Policy Network, integration of NN model loading/inference, opening book support, and full EGTB probing into the main search loop are the next major steps required to align with the original design goals.
 
-(Updated status based on `src` review)
+## 9. Key Tunable Parameters
 
-*   **P1: Core Engine Foundation (Highest Priority)**
-    *   Rust project setup, basic crate integration. *(DONE)*
-    *   Implement MCTS framework structure. *(Partially DONE - `src/mcts/` exists, but Alpha-Beta is primary)*
-    *   Implement Heuristic Evaluation (v1). *(DONE - Pesto implemented in `src/eval.rs`)*
-    *   Implement Check/Capture prioritization logic. *(DONE - Implemented for Alpha-Beta move ordering)*
-    *   Implement Deep Mate Search logic stub. *(DONE - Implemented in `src/search/mate_search.rs`)*
-    *   Implement basic UCI handling (uci, isready, position, go, quit). *(DONE - Implemented in `src/uci.rs`)*
-    *   *Current Goal Status:* Engine plays legal moves via UCI using Alpha-Beta search and Pesto evaluation.
-*   **P2: Policy Network Pipeline (High Priority - Parallelizable)**
-    *   Develop Python data processing scripts (Lichess PGN -> Training Data). *(External - Status Unknown)*
-    *   Implement/adapt Policy NN architecture. *(External - Status Unknown)*
-    *   Setup training pipeline. Train initial model (one rating band). *(External - Status Unknown)*
-    *   Implement model export (ONNX/TorchScript). *(External - Status Unknown)*
-    *   *Current Goal Status:* Unknown (External task).
-*   **P3: Engine Integration (High Priority - Depends on P1 & P2)**
-    *   Integrate NN model loading/inference in Rust. Connect to MCTS. *(TODO)*
-    *   Integrate Syzygy EGTB probing (DTM mate resolution). *(TODO)*
-    *   Integrate Polyglot Opening Book probing. *(TODO)*
-    *   Initial tuning of MCTS parameters, heuristic function, mate search depth. *(Partially DONE - Tuning likely needed for Alpha-Beta/Pesto)*
-    *   *Current Goal Status:* Basic Alpha-Beta engine structure exists. Integration of NN, EGTB, Book needed for original "humanlike" goal.
-*   **P4: Strong Engine Integration (Medium Priority)**
-    *   Implement Rust UCI wrapper for external engine. *(TODO)*
-    *   *Current Goal Status:* Not started.
-*   **P5: Basic UI / Test Harness (Medium Priority)**
-    *   Develop a simple way to interact with the engine (CLI, test GUI, basic API). *(Partially DONE - UCI serves as a basic CLI interface, `src/main.rs` can run a simple game)*
-    *   *Current Goal Status:* Basic interaction via UCI possible.
-*   **P6: Full UI Feature Implementation (Lower Priority - Depends on P5)**
-    *   Build out Sparring, Repertoire Builder, Analysis modules. *(TODO)*
-    *   *Current Goal Status:* Not started.
-*   **P7: Refinement & Testing (Ongoing, Increased Priority Later)**
-    *   Extensive testing for "humanlike" feel..., bug fixing, performance tuning. *(Ongoing for current Alpha-Beta engine, major effort needed if switching to MCTS/NN)*
-    *   Refine Heuristic function, MCTS parameters, potentially retrain Policy NN. *(Ongoing/Planned)*
-    *   Documentation. *(Partially DONE - Doc comments exist)*
-    *   *Current Goal Status:* Basic engine functional, requires significant testing and refinement, especially towards the "humanlike" goal.
+*   E_{classical} feature set and weights.
+*   V_{enhanced} quiescence search node count limit.
+*   Mate search node count limit / Iterative Deepening depths.
+*   MCTS parameters: Exploration factor (C_{puct}), total budget (nodes/time per move).
+*   Opening book frequency threshold.
+*   NN Policy (P) architecture and training hyperparameters.
 
-## 8. Future Considerations
+## 10. Future Considerations (Out of Scope for Initial Version)
 
-*   Training/Integrating a Value Network.
-*   Subtle use of EGTB WDL scores in evaluation.
-*   More rating band models.
-*   Cloud deployment / Web service.
-*   User accounts / Cloud storage.
-*   Fully integrating or replacing Alpha-Beta with the MCTS implementation.
+*   Strength Maximization: While the current focus is human-like sparring, the trained model could potentially serve as a starting point for further improvement via self-play reinforcement learning (similar to AlphaZero) if maximizing playing strength becomes a goal later. This would likely move the engine away from the specific human Elo target style.
+
+## 11. Summary
+
+This chess engine design integrates NN-guided MCTS with classical search techniques and an interpretable evaluation function (V_{enhanced} based on E_{classical}). By training the NN policy on human data from the target Elo range and incorporating a human-derived opening book and specific search heuristics, the engine aims to provide a unique, human-like, and instructive sparring experience.
