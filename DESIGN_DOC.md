@@ -126,7 +126,10 @@ This design incorporates several elements to achieve human-like play:
 
 ## 10. Future Considerations (Out of Scope for Initial Version)
 
-*   Strength Maximization: While the current focus is human-like sparring, the trained model could potentially serve as a starting point for further improvement via self-play reinforcement learning (similar to AlphaZero) if maximizing playing strength becomes a goal later. This would likely move the engine away from the specific human Elo target style.
+*   **Strength Maximization:** While the current focus is human-like sparring, the architecture could be adapted for maximum playing strength, likely sacrificing interpretability. This probably involves:
+    *   **Neural Network Evaluation:** Replacing the interpretable `E_classical` evaluation function with a neural network (e.g., NNUE or a deep value network) for significantly stronger positional understanding.
+    *   **Self-Play Reinforcement Learning:** Training the policy and value networks via self-play (potentially after pre-training on human or engine games) allows the engine to surpass human knowledge and optimize for pure performance, similar to engines like AlphaZero or Leela Chess Zero.
+    *   **Advanced Hybrid Evaluation:** An innovative but complex approach could involve using a deep network for primary strategic evaluation (`E_{classical}(deep NN)`) and adding a tactical correction derived from a separate, fast NNUE-powered quiescence search (`Correction = V_{enhanced}(NNUE) - E_{classical}(NNUE)`), feeding `V_final = E_{classical}(deep NN) + Correction` into the MCTS. This aims to combine deep strategic insight with robust tactical verification.
 
 ## 11. Summary
 
