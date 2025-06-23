@@ -124,27 +124,11 @@ impl Agent for HumanlikeAgent<'_> {
     fn get_move(&self, board: &mut BoardStack) -> Move {
         let current_board = board.current_state();
 
-        // 1. EGTB Check
+        // 1. EGTB Check (temporarily disabled to focus on MCTS functionality)
+        #[allow(unused_variables)]
         if let Some(prober) = &self.egtb_prober {
-            let piece_count = current_board.get_all_occupancy().count_ones() as u8;
-            if piece_count <= prober.max_pieces {
-                match prober.probe(current_board) {
-                    Ok(Some(egtb_info)) => {
-                        // EGTB found a result.
-                        // As per instructions, if decisive (Win/Loss), note but proceed
-                        // since EgtbInfo doesn't currently provide a specific move.
-                        // If it provided a move, we would return it here.
-                        println!("EGTB result: {:?}", egtb_info.wdl);
-                        // If egtb_info.best_move was Some(m), we would return m here.
-                    }
-                    Ok(None) => {
-                        // Position not in tables or too many pieces (already checked, but defensive)
-                    }
-                    Err(e) => {
-                        eprintln!("EGTB probe error: {}", e);
-                    }
-                }
-            }
+            // TODO: Re-implement EGTB integration after MCTS is working
+            println!("EGTB temporarily disabled - focusing on MCTS");
         }
 
         // 2. Mate Search
@@ -167,7 +151,7 @@ impl Agent for HumanlikeAgent<'_> {
 
         #[cfg(not(test))] // Use real mcts_pesto_search in non-test builds
         let mcts_move = mcts_pesto_search(
-            board.current_state(),
+            board.current_state().clone(),
             self.move_gen,
             self.pesto,
             0, // Mate search already performed above
@@ -177,7 +161,7 @@ impl Agent for HumanlikeAgent<'_> {
 
         #[cfg(test)] // Use mock_mcts_pesto_search in test builds
         let mcts_move = mock_mcts_pesto_search(
-            board.current_state(),
+            board.current_state().clone(),
             self.move_gen,
             self.pesto,
             0, // Mate search already performed above

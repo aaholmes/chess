@@ -40,6 +40,18 @@ impl BoardStack {
         board
     }
 
+    /// Generate a new boardstack whose starting board is the given board
+    pub fn with_board(initial_board: Board) -> Self {
+        let mut board = BoardStack {
+            position_history: HashMap::new(),
+            state_stack: VecDeque::new(),
+            move_stack: VecDeque::new(),
+        };
+        board.position_history.insert(initial_board.zobrist_hash, 1);
+        board.state_stack.push_front(initial_board);
+        board
+    }
+
     /// Return the current state by peeking at the board stack
     pub fn current_state(&self) -> &Board {
         &self.state_stack.front().unwrap()

@@ -84,6 +84,35 @@ pub fn mcts_pesto_search(
     }
 
     let start_time = Instant::now();
+    
+    // **KEY INNOVATION: Mate Search First at Root Level**
+    // Before any MCTS iterations, check if there's a forced mate from the root
+    let mate_move_result = if mate_search_depth > 0 {
+        let mut mate_search_stack = BoardStack::with_board(root_state.clone());
+        let (mate_score, mate_move, _) = mate_search(&mut mate_search_stack, move_gen, mate_search_depth, false);
+        
+        if mate_score >= 1_000_000 {
+            // Found a forced mate! Return immediately without MCTS
+            println!("Mate found at root level in {} plies, returning immediately: {:?}", mate_search_depth, mate_move);
+            Some(mate_move)
+        } else if mate_score <= -1_000_000 {
+            // We're being mated, but still return best move from mate search
+            println!("Being mated, but returning best defensive move: {:?}", mate_move);
+            Some(mate_move)
+        } else {
+            // No mate found, proceed with normal MCTS
+            println!("No mate found at depth {}, proceeding with MCTS", mate_search_depth);
+            None
+        }
+    } else {
+        None
+    };
+    
+    // If mate was found at root, return immediately
+    if let Some(immediate_mate_move) = mate_move_result {
+        return Some(immediate_mate_move);
+    }
+
     let root_node_rc = MctsNode::new_root(root_state, move_gen);
 
     // Handle case where root node is already terminal
@@ -129,18 +158,21 @@ pub fn mcts_pesto_search(
                         Some(if leaf_node.state.w_to_move { 0.0 } else { 1.0 });
                 // White's perspective
                 } else if mate_search_depth > 0 {
-                    // Not terminal, run mate search
+                    // Not terminal, run mate search first (key innovation!)
                     let mut mate_search_stack = BoardStack::with_board(leaf_node.state.clone());
-                    let (mate_score, _, _) =
-                        mate_search(&mut mate_search_stack, move_gen, mate_search_depth, false);
+                    let (mate_score, mate_move, _) = mate_search(&mut mate_search_stack, move_gen, mate_search_depth, false);
                     if mate_score >= 1_000_000 {
                         // Mate found for current player
                         leaf_node.terminal_or_mate_value =
                             Some(if leaf_node.state.w_to_move { 1.0 } else { 0.0 });
+                        leaf_node.mate_move = Some(mate_move); // Store the mating move!
+                        println!("Mate found during MCTS leaf expansion: {:?}", mate_move);
                     } else if mate_score <= -1_000_000 {
                         // Mated
                         leaf_node.terminal_or_mate_value =
                             Some(if leaf_node.state.w_to_move { 0.0 } else { 1.0 });
+                        leaf_node.mate_move = Some(mate_move); // Store the best defensive move
+                        println!("Being mated during MCTS leaf expansion, best defense: {:?}", mate_move);
                     } else {
                         leaf_node.terminal_or_mate_value = Some(-999.0); // Sentinel: No mate found
                     }
@@ -160,7 +192,7 @@ pub fn mcts_pesto_search(
                     // --- 2c. Evaluate Leaf (if not already done) ---
                     if leaf_node.nn_value.is_none() { // Reuse nn_value field for Pesto value
                         // Evaluate using Pesto
-                        let score_cp = pesto_eval.evaluate(&leaf_node.state);
+                        let score_cp = pesto_eval.eval(&leaf_node.state, move_gen);
                         // Convert centipawns to win probability [0.0, 1.0] for the current player
                         // Using a sigmoid function: 1 / (1 + exp(-score / k))
                         // k=400 is a common choice (maps +/- 400cp to ~75%/25% win prob)
@@ -224,6 +256,19 @@ pub fn mcts_pesto_search(
             .max_by(|a_rc, b_rc| {
                 let a = a_rc.borrow();
                 let b = b_rc.borrow();
+                
+                // **MATE PRIORITIZATION**: If either child has a mate move, prioritize it
+                let a_has_mate = a.mate_move.is_some() && a.terminal_or_mate_value.is_some() && a.terminal_or_mate_value.unwrap() >= 0.0;
+                let b_has_mate = b.mate_move.is_some() && b.terminal_or_mate_value.is_some() && b.terminal_or_mate_value.unwrap() >= 0.0;
+                
+                if a_has_mate && !b_has_mate {
+                    return std::cmp::Ordering::Greater; // A has mate, B doesn't - choose A
+                }
+                if b_has_mate && !a_has_mate {
+                    return std::cmp::Ordering::Less; // B has mate, A doesn't - choose B
+                }
+                // If both have mates or neither have mates, use normal evaluation
+                
                 let visits_a = a.visits as f64;
                 let visits_b = b.visits as f64;
 

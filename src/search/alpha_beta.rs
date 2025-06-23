@@ -102,7 +102,7 @@ pub fn alpha_beta_search(
             board.undo_move();
             continue;
         }
-        let (search_eval, nodes) = alpha_beta_recursive(
+        let (search_eval, nodes, _terminated) = alpha_beta_recursive(
             board,
             move_gen,
             pesto,
@@ -114,6 +114,8 @@ pub fn alpha_beta_search(
             -alpha,
             q_search_max_depth,
             verbose,
+            None, // start_time
+            None, // time_limit
         );
         eval = -search_eval;
         n += nodes;

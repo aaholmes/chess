@@ -39,6 +39,8 @@ pub struct MctsNode {
     /// Stores the exact value if determined by terminal state check or mate search (0.0, 0.5, 1.0 for White).
     /// Also used as a flag to indicate if mate search has been performed. None = not checked, Some(-999.0) = checked, no mate.
     pub terminal_or_mate_value: Option<f64>,
+    /// If mate search found a mate, stores the mating move
+    pub mate_move: Option<Move>,
     /// Stores the value from the evaluation (Pesto or NN) (0.0 to 1.0 for White) when node is first evaluated.
     pub nn_value: Option<f64>, // Reusing this field for Pesto value
     // /// Stores the policy priors for all legal moves from this state, evaluated once.
@@ -86,6 +88,7 @@ impl MctsNode {
             parent: None,
             children: Vec::new(),
             terminal_or_mate_value: initial_terminal_value,
+            mate_move: None,                         // Set if mate search finds a mate
             nn_value: None,                          // Evaluated later
             // policy_priors: None,                  // REMOVED
             unexplored_moves_by_cat: HashMap::new(), // Populated later
@@ -125,6 +128,7 @@ impl MctsNode {
             parent: Some(parent),
             children: Vec::new(),
             terminal_or_mate_value: initial_terminal_value,
+            mate_move: None,                         // Set if mate search finds a mate
             nn_value: None,
             // policy_priors: None,                  // REMOVED
             unexplored_moves_by_cat: HashMap::new(),

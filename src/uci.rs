@@ -7,12 +7,19 @@ use crate::boardstack::BoardStack;
 use crate::egtb::EgtbProber; // Import EGTB Prober
 use crate::eval::PestoEval;
 use crate::move_generation::MoveGen;
+use lazy_static::lazy_static;
 use crate::move_types::Move;
 // Removed unused search imports, agent will handle search
 // use crate::search::iterative_deepening_ab_search;
 // use crate::transposition::TranspositionTable;
 use std::io::{self, BufRead, Write};
 use std::time::{Duration, Instant};
+
+// Static instances to avoid lifetime issues
+lazy_static! {
+    static ref GLOBAL_MOVE_GEN: MoveGen = MoveGen::new();
+    static ref GLOBAL_PESTO_EVAL: PestoEval = PestoEval::new();
+}
 
 pub struct UCIEngine {
     board: BoardStack,
@@ -77,7 +84,7 @@ impl UCIEngine {
             movetime: None,
             agent_type, // Store default agent type string
             // Placeholder agent, will be replaced by update_agent
-            agent: Box::new(SimpleAgent::new(0, 0, 0, false, &MoveGen::new(), &PestoEval::new())), // Temporary dummy
+            agent: Box::new(SimpleAgent::new(0, 0, 0, false, &*GLOBAL_MOVE_GEN, &*GLOBAL_PESTO_EVAL)), // Temporary dummy
             mate_search_depth,
             ab_search_depth,
             q_search_max_depth,
@@ -90,15 +97,8 @@ impl UCIEngine {
 
     /// Creates and updates the `agent` field based on the current `agent_type`.
     fn update_agent(&mut self) {
-        // *** LIFETIME WORKAROUND ***
-        // Create temporary owned instances for agent creation to satisfy the borrow checker.
-        // This is NOT the ideal long-term solution. See notes in previous response.
-        // The correct fix involves managing lifetimes/ownership properly (e.g., using Arc).
-        let temp_move_gen = MoveGen::new();
-        let temp_pesto = PestoEval::new();
-        // We still use the potentially initialized self.egtb_prober
+        // Use static instances to avoid lifetime issues
         let temp_egtb_prober = self.egtb_prober.clone();
-
 
         let agent: Box<dyn Agent + 'static> = match self.agent_type.as_str() {
             "AlphaBeta" => Box::new(SimpleAgent::new(
@@ -106,8 +106,8 @@ impl UCIEngine {
                 self.ab_search_depth,
                 self.q_search_max_depth,
                 false, // verbose - could be another UCI option
-                &temp_move_gen, // Use temporary instance
-                &temp_pesto,    // Use temporary instance
+                &*GLOBAL_MOVE_GEN, // Use static instance
+                &*GLOBAL_PESTO_EVAL,    // Use static instance
             )),
             "Humanlike" | _ => {
                 // Default to Humanlike if type is unknown
@@ -119,8 +119,8 @@ impl UCIEngine {
                     self.agent_type = "Humanlike".to_string(); // Correct the stored type
                 }
                 Box::new(HumanlikeAgent::new(
-                    &temp_move_gen, // Use temporary instance
-                    &temp_pesto,    // Use temporary instance
+                    &*GLOBAL_MOVE_GEN, // Use static instance
+                    &*GLOBAL_PESTO_EVAL,    // Use static instance
                     temp_egtb_prober, // Use cloned Option<EgtbProber>
                     self.mate_search_depth,
                     self.mcts_iterations,
