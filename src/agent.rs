@@ -71,6 +71,9 @@ impl SimpleAgent<'_> {
             move_gen,
             pesto,
         }
+    }
+}
+
 /// An agent designed to mimic human-like decision making, using EGTB, Mate Search, and MCTS.
 pub struct HumanlikeAgent<'a> {
     /// Reference to the move generator.
@@ -108,9 +111,18 @@ impl HumanlikeAgent<'_> {
             move_gen,
             pesto,
             egtb_prober,
+            mate_search_depth,
+            mcts_iterations,
+            mcts_time_limit_ms,
+            placeholder_ab_depth,
+            placeholder_q_depth,
+        }
+    }
+}
+
 impl Agent for HumanlikeAgent<'_> {
     fn get_move(&self, board: &mut BoardStack) -> Move {
-        let current_board = board.current_board();
+        let current_board = board.current_state();
 
         // 1. EGTB Check
         if let Some(prober) = &self.egtb_prober {
@@ -155,38 +167,28 @@ impl Agent for HumanlikeAgent<'_> {
 
         #[cfg(not(test))] // Use real mcts_pesto_search in non-test builds
         let mcts_move = mcts_pesto_search(
-            board.current_board(),
+            board.current_state(),
             self.move_gen,
             self.pesto,
-            self.mcts_iterations,
-            self.mcts_time_limit_ms,
             0, // Mate search already performed above
+            Some(self.mcts_iterations),
+            Some(std::time::Duration::from_millis(self.mcts_time_limit_ms)),
         );
 
         #[cfg(test)] // Use mock_mcts_pesto_search in test builds
         let mcts_move = mock_mcts_pesto_search(
-            board.current_board(),
+            board.current_state(),
             self.move_gen,
             self.pesto,
-            self.mcts_iterations,
-            self.mcts_time_limit_ms,
             0, // Mate search already performed above
+            Some(self.mcts_iterations),
+            Some(std::time::Duration::from_millis(self.mcts_time_limit_ms)),
         );
 
 
         // Handle potential None return (unlikely after mate search unless stalemate)
         // For now, unwrap, assuming a legal move exists if no mate was found.
         mcts_move.expect("MCTS search returned None unexpectedly after mate search")
-    }
-}
-            mate_search_depth,
-            mcts_iterations,
-            mcts_time_limit_ms,
-            placeholder_ab_depth,
-            placeholder_q_depth,
-        }
-    }
-}
     }
 }
 
@@ -272,9 +274,9 @@ mod tests {
         _root_state: Board,
         _move_gen: &MoveGen,
         _pesto_eval: &PestoEval,
-        _iterations: u32,
-        _time_limit_ms: u64,
         _mate_search_depth: i32,
+        _iterations: Option<u32>,
+        _time_limit: Option<std::time::Duration>,
     ) -> Option<Move> {
         MCTS_SEARCH_CALLED.with(|cell| *cell.borrow_mut() = true);
         MCTS_SEARCH_RETURN_VALUE.with(|cell| cell.borrow().clone())

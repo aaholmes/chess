@@ -288,14 +288,15 @@ impl UCIEngine {
                 _ => i += 1,
             }
         }
+    }
     
-        // Renamed from direct assignment in the match arm to potentially handle agent re-initialization
-        fn handle_ucinewgame(&mut self) {
+    // Renamed from direct assignment in the match arm to potentially handle agent re-initialization
+    fn handle_ucinewgame(&mut self) {
             self.board = BoardStack::new();
             // Potentially re-initialize agent state here if needed based on self.agent_type
         }
     
-        fn handle_setoption(&mut self, args: &[&str]) {
+    fn handle_setoption(&mut self, args: &[&str]) {
             if args.len() >= 4 && args[0] == "name" && args[2] == "value" {
                 let name = args[1];
                 let value = args[3];
@@ -322,7 +323,6 @@ impl UCIEngine {
                 println!("info string Invalid setoption command format");
             }
         }
-    }
 
     /// This function calculates the allocated time for a chess move based on the time control settings.
     ///

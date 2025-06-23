@@ -7,7 +7,7 @@ use crate::piece_types::{self, BISHOP, BLACK, KING, KNIGHT, PAWN, QUEEN, ROOK, W
 use crate::board_utils::sq_ind_to_bit; // Needed for piece count calculation
 
 // Use the Syzygy library
-use shakmaty::{Board as ShakmatyBoard, Position, Role, Color, Square, CastlingRights};
+use shakmaty::{Board as ShakmatyBoard, Position, Role, Color, Square};
 use shakmaty_syzygy::{Tablebase, Wdl, Dtz};
 use std::path::Path;
 
@@ -46,7 +46,7 @@ pub struct EgtbInfo {
 /// Structure to handle Syzygy endgame tablebase probing.
 pub struct EgtbProber {
     tablebases: Tablebase,
-    max_pieces: u8, // Store the max pieces supported by loaded tables
+    pub max_pieces: u8, // Store the max pieces supported by loaded tables
 }
 
 impl EgtbProber {

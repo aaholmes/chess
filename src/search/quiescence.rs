@@ -2,6 +2,7 @@ use super::see::see;
 use crate::boardstack::BoardStack;
 use crate::eval::PestoEval;
 use crate::move_generation::MoveGen;
+use std::time::{Duration, Instant};
 
 /// Performs a quiescence search to evaluate tactical sequences and avoid the horizon effect.
 pub fn quiescence_search(
