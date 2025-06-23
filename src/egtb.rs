@@ -7,7 +7,8 @@ use crate::piece_types::{self, BISHOP, BLACK, KING, KNIGHT, PAWN, QUEEN, ROOK, W
 use crate::board_utils::sq_ind_to_bit; // Needed for piece count calculation
 
 // Use the Syzygy library
-use rust_syzygy::{Tablebases, Wdl, Dtz, Board as SyzygyBoard, Piece as SyzygyPiece, Color as SyzygyColor, Square as SyzygySquare, CastlingRights as SyzygyCastlingRights};
+use shakmaty::{Board as ShakmatyBoard, Position, Role, Color, Square, CastlingRights};
+use shakmaty_syzygy::{Tablebase, Wdl, Dtz};
 use std::path::Path;
 
 // Define the error type for EGTB operations
@@ -44,7 +45,7 @@ pub struct EgtbInfo {
 
 /// Structure to handle Syzygy endgame tablebase probing.
 pub struct EgtbProber {
-    tablebases: Tablebases,
+    tablebases: Tablebase,
     max_pieces: u8, // Store the max pieces supported by loaded tables
 }
 
@@ -52,10 +53,12 @@ impl EgtbProber {
     /// Creates a new EgtbProber by loading tablebases from the specified path.
     pub fn new(path_str: &str) -> Result<Self, EgtbError> {
         let path = Path::new(path_str);
-        match Tablebases::new(path) {
-            Ok(tablebases) => {
-                // Assume 7 max pieces for now.
-                let max_pieces = 7; // TODO: Make this more dynamic if possible
+        let mut tablebases = Tablebase::new();
+        match tablebases.add_directory(path) {
+            Ok(_) => {
+                // shakmaty-syzygy doesn't expose max pieces directly,
+                // but it's typically 7 for standard distributions.
+                let max_pieces = 7;
                 Ok(EgtbProber { tablebases, max_pieces })
             }
             Err(e) => Err(EgtbError::LoadError(format!("Failed to load tablebases from '{}': {}", path_str, e))),
@@ -70,14 +73,14 @@ impl EgtbProber {
             return Ok(None); // Too many pieces
         }
 
-        // 2. Convert internal Board to rust_syzygy::Board
-        let syzygy_board = match self.convert_board(board) {
+        // 2. Convert internal Board to shakmaty::Board
+        let shakmaty_board = match self.convert_board(board) {
              Ok(b) => b,
              Err(e) => return Err(e), // Propagate conversion error
         };
 
         // 3. Probe WDL
-        let wdl_result = self.tablebases.probe_wdl(&syzygy_board);
+        let wdl_result = self.tablebases.probe_wdl(&shakmaty_board);
         if wdl_result.is_none() {
              // Position configuration not found in tables (even if piece count <= max)
              return Ok(None);
@@ -85,7 +88,7 @@ impl EgtbProber {
         let wdl = wdl_result.unwrap();
 
         // 4. Probe DTZ
-        let dtz = self.tablebases.probe_dtz(&syzygy_board); // Returns Option<Dtz>
+        let dtz = self.tablebases.probe_dtz(&shakmaty_board); // Returns Option<Dtz>
 
         // 5. Best Move (Still omitted)
         let best_move = None;
@@ -93,9 +96,9 @@ impl EgtbProber {
         Ok(Some(EgtbInfo { wdl, dtz, best_move }))
     }
 
-    /// Helper function to convert `crate::board::Board` to `rust_syzygy::Board`.
-    fn convert_board(&self, board: &Board) -> Result<SyzygyBoard, EgtbError> {
-       let mut syzygy_board = SyzygyBoard::empty();
+    /// Helper function to convert `crate::board::Board` to `shakmaty::Board`.
+    fn convert_board(&self, board: &Board) -> Result<ShakmatyBoard, EgtbError> {
+       let mut shakmaty_board = ShakmatyBoard::empty();
 
        // Set pieces
        for color_idx in [WHITE, BLACK] {
@@ -103,51 +106,48 @@ impl EgtbProber {
                let bb = board.get_piece_bitboard(color_idx, piece_idx);
                for sq_idx in 0..64 {
                    if (bb & sq_ind_to_bit(sq_idx)) != 0 {
-                       let syzygy_piece = match (color_idx, piece_idx) {
-                           (WHITE, PAWN) => SyzygyPiece::WhitePawn,
-                           (WHITE, KNIGHT) => SyzygyPiece::WhiteKnight,
-                           (WHITE, BISHOP) => SyzygyPiece::WhiteBishop,
-                           (WHITE, ROOK) => SyzygyPiece::WhiteRook,
-                           (WHITE, QUEEN) => SyzygyPiece::WhiteQueen,
-                           (WHITE, KING) => SyzygyPiece::WhiteKing,
-                           (BLACK, PAWN) => SyzygyPiece::BlackPawn,
-                           (BLACK, KNIGHT) => SyzygyPiece::BlackKnight,
-                           (BLACK, BISHOP) => SyzygyPiece::BlackBishop,
-                           (BLACK, ROOK) => SyzygyPiece::BlackRook,
-                           (BLACK, QUEEN) => SyzygyPiece::BlackQueen,
-                           (BLACK, KING) => SyzygyPiece::BlackKing,
+                       let shakmaty_role = match piece_idx {
+                           PAWN => Role::Pawn,
+                           KNIGHT => Role::Knight,
+                           BISHOP => Role::Bishop,
+                           ROOK => Role::Rook,
+                           QUEEN => Role::Queen,
+                           KING => Role::King,
                            _ => unreachable!(), // Should not happen
                        };
-                       // rust_syzygy::Square takes u8
-                       let syzygy_sq = SyzygySquare(sq_idx as u8);
-                       syzygy_board.add_piece(syzygy_piece, syzygy_sq);
+                       let shakmaty_color = if color_idx == WHITE { Color::White } else { Color::Black };
+                       let shakmaty_sq = Square::from_int(sq_idx as usize)
+                           .ok_or_else(|| EgtbError::ConversionError(format!("Invalid square index: {}", sq_idx)))?;
+                       shakmaty_board.set_piece(shakmaty_sq, shakmaty_color, shakmaty_role);
                    }
                }
            }
        }
 
        // Set side to move
-       syzygy_board.turn = if board.w_to_move { SyzygyColor::White } else { SyzygyColor::Black };
+       shakmaty_board.side_to_move = if board.w_to_move { Color::White } else { Color::Black };
 
        // Set en passant square
        // Our board.en_passant is Option<u8> (square index)
-       syzygy_board.ep_square = board.en_passant.map(SyzygySquare);
+       shakmaty_board.en_passant = board.en_passant.map(|sq_idx| Square::from_int(sq_idx as usize).unwrap()); // Assuming valid square index
 
        // Set castling rights
-       // Our board.castling_rights uses bool fields directly matching Syzygy's
-       syzygy_board.castling_rights = SyzygyCastlingRights {
-            white_kingside: board.castling_rights.white_kingside,
-            white_queenside: board.castling_rights.white_queenside,
-            black_kingside: board.castling_rights.black_kingside,
-            black_queenside: board.castling_rights.black_queenside,
-       };
+       let mut castling_rights = CastlingRights::empty();
+       if board.castling_rights.white_kingside { castling_rights |= CastlingRights::WHITE_KING_SIDE; }
+       if board.castling_rights.white_queenside { castling_rights |= CastlingRights::WHITE_QUEEN_SIDE; }
+       if board.castling_rights.black_kingside { castling_rights |= CastlingRights::BLACK_KING_SIDE; }
+       if board.castling_rights.black_queenside { castling_rights |= CastlingRights::BLACK_QUEEN_SIDE; }
+       shakmaty_board.castling_rights = castling_rights;
 
-       // Rule 50 counter is not explicitly needed by rust-syzygy::Board
+       // Rule 50 counter and halfmove clock
+       shakmaty_board.halfmove_clock = board.halfmove_clock;
+       shakmaty_board.fullmove_number = board.fullmove_number;
 
-       // TODO: Add validation? rust-syzygy might handle invalid positions (e.g., pawns on back rank)
+
+       // TODO: Add validation? shakmaty might handle invalid positions (e.g., pawns on back rank)
        // during probe, but we could add checks here if needed.
 
-       Ok(syzygy_board)
+       Ok(shakmaty_board)
     }
 }
 
@@ -156,6 +156,7 @@ impl EgtbProber {
 mod tests {
     use super::*;
     use crate::board::Board; // Use internal Board
+    use shakmaty::Chess; // Use shakmaty's Chess board for creating positions
 
     // Mock structure specifically for testing the piece count check logic
     // within the probe function, without needing actual tablebases.

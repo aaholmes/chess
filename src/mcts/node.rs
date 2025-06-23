@@ -274,11 +274,8 @@ impl MctsNode {
              let opponent_color = !self.state.w_to_move as usize;
              let is_capture = (self.state.pieces_occ[opponent_color] & (1u64 << mv.to)) != 0 || mv.is_en_passant();
              if is_capture || mv.is_promotion() {
-                 // Use a helper function or directly calculate MVV-LVA. Assuming move_gen has mvv_lva.
-                 // Need to handle promotions appropriately in MVV-LVA score if not done implicitly.
-                 // Placeholder: Use 0 if move_gen.mvv_lva doesn't exist or isn't accessible here.
-                 // capture_scores.insert(*mv, move_gen.mvv_lva(&self.state, mv.from, mv.to));
-                 capture_scores.insert(*mv, 0); // Placeholder MVV-LVA
+                 // Use the implemented mvv_lva method from MoveGen
+                 capture_scores.insert(*mv, move_gen.mvv_lva(&self.state, mv.from, mv.to));
              }
         }
 

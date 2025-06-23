@@ -6,6 +6,19 @@
 use crate::board_utils::sq_ind_to_algebraic;
 use crate::piece_types::{BISHOP, KNIGHT, QUEEN, ROOK};
 use std::fmt;
+use std::hash::{Hash, Hasher};
+
+// Constants for special squares and files
+const A1: usize = 0;
+const C1: usize = 2;  // Added for white queenside castle
+const E1: usize = 4;
+const G1: usize = 6;  // Added for white kingside castle
+const H1: usize = 7;
+const A8: usize = 56;
+const C8: usize = 58; // Added for black queenside castle
+const E8: usize = 60;
+const G8: usize = 62; // Added for black kingside castle
+const H8: usize = 63;
 
 /// Represents a chess move.
 ///
@@ -20,6 +33,17 @@ pub struct Move {
     /// The type of piece to promote to, if this move results in a promotion.
     /// `None` if the move does not result in a promotion.
     pub promotion: Option<usize>,
+}
+
+// Implement Hash to enable using Move as a HashMap key
+impl Hash for Move {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.from.hash(state);
+        self.to.hash(state);
+        if let Some(promotion) = self.promotion {
+            promotion.hash(state);
+        }
+    }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -146,6 +170,72 @@ impl Move {
         }
     }
 
+    /// Checks if the move is a promotion.
+    ///
+    /// # Returns
+    ///
+    /// True if the move has a promotion piece specified, false otherwise.
+    pub fn is_promotion(&self) -> bool {
+        self.promotion.is_some()
+    }
+
+    /// Checks if the move is an en passant capture.
+    ///
+    /// This is determined by looking at the characteristic pattern of an en passant move:
+    /// - A pawn move (from 6th/3rd rank to 5th/4th rank)
+    /// - Moving diagonally
+    ///
+    /// Note: This is a heuristic and should be used alongside board state to confirm.
+    ///
+    /// # Returns
+    ///
+    /// True if the move appears to be an en passant capture, false otherwise.
+    pub fn is_en_passant(&self) -> bool {
+        // Check if moving diagonally (file difference of 1)
+        let from_file = self.from % 8;
+        let to_file = self.to % 8;
+        let file_diff = if from_file > to_file { from_file - to_file } else { to_file - from_file };
+        
+        if file_diff != 1 {
+            return false;
+        }
+        
+        // Check if it's a pawn move from rank 4 to 5 (white) or rank 3 to 2 (black)
+        let from_rank = self.from / 8;
+        let to_rank = self.to / 8;
+        
+        (from_rank == 4 && to_rank == 5) || (from_rank == 3 && to_rank == 2)
+    }
+
+    /// Checks if the move is kingside castling.
+    ///
+    /// # Returns
+    ///
+    /// True if the move is kingside castling, false otherwise.
+    pub fn is_kingside_castle(&self) -> bool {
+        (self.from == E1 && self.to == G1) || // White kingside (e1g1)
+        (self.from == E8 && self.to == G8)    // Black kingside (e8g8)
+    }
+
+    /// Checks if the move is queenside castling.
+    ///
+    /// # Returns
+    ///
+    /// True if the move is queenside castling, false otherwise.
+    pub fn is_queenside_castle(&self) -> bool {
+        (self.from == E1 && self.to == C1) || // White queenside (e1c1)
+        (self.from == E8 && self.to == C8)    // Black queenside (e8c8)
+    }
+
+    /// Checks if the move is any type of castling.
+    ///
+    /// # Returns
+    ///
+    /// True if the move is either kingside or queenside castling, false otherwise.
+    pub fn is_castle(&self) -> bool {
+        self.is_kingside_castle() || self.is_queenside_castle()
+    }
+
     /// Change the way a move is printed so that it uses algebraic notation
     pub fn print_algebraic(&self) -> String {
         let from = sq_ind_to_algebraic(self.from);
@@ -212,5 +302,34 @@ mod tests {
         assert_eq!(Move::from_uci("invalid"), None);
         assert_eq!(Move::from_uci("e2e9"), None); // Invalid square
         assert_eq!(Move::from_uci("e2e4q"), None); // Invalid promotion (not on last rank)
+    }
+
+    #[test]
+    fn test_move_special_methods() {
+        // Test promotion detection
+        let promotion_move = Move::new(48, 56, Some(QUEEN)); // a7a8q
+        assert!(promotion_move.is_promotion());
+        let normal_move = Move::new(12, 28, None); // e2e4
+        assert!(!normal_move.is_promotion());
+
+        // Test en passant detection
+        let white_ep = Move::new(36, 45, None); // e5xd6 (e.p.)
+        assert!(white_ep.is_en_passant());
+        let black_ep = Move::new(27, 18, None); // d4xe3 (e.p.)
+        assert!(black_ep.is_en_passant());
+        assert!(!normal_move.is_en_passant());
+
+        // Test castling detection
+        let white_kingside = Move::new(E1, G1, None); // e1g1
+        assert!(white_kingside.is_kingside_castle());
+        assert!(!white_kingside.is_queenside_castle());
+        assert!(white_kingside.is_castle());
+
+        let black_queenside = Move::new(E8, C8, None); // e8c8
+        assert!(black_queenside.is_queenside_castle());
+        assert!(!black_queenside.is_kingside_castle());
+        assert!(black_queenside.is_castle());
+
+        assert!(!normal_move.is_castle());
     }
 }

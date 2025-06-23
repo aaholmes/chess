@@ -10,7 +10,8 @@ path = "src/lib.rs"
 [dependencies]
 rand = "0.8.5" # Added for MCTS random playouts
 lazy_static = "1.5.0"
-rust-syzygy = "0.2"
+shakmaty = "0.25" # Dependency for shakmaty-syzygy
+shakmaty-syzygy = "0.15.0"
 
 [profile.release]
 debug = true
