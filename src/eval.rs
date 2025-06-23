@@ -14,8 +14,9 @@ use crate::board_utils::{
     get_king_shield_zone_mask, get_passed_pawn_mask, get_rank_mask, sq_ind_to_bit, sq_to_file,
     sq_to_rank,
 };
+pub use crate::eval_constants::EvalWeights; // Re-export for public use
 use crate::eval_constants::{
-    EvalWeights, EG_PESTO_TABLE, EG_VALUE, GAMEPHASE_INC, MG_PESTO_TABLE, MG_VALUE,
+    EG_PESTO_TABLE, EG_VALUE, GAMEPHASE_INC, MG_PESTO_TABLE, MG_VALUE,
 };
 use crate::move_generation::MoveGen;
 use crate::piece_types::{BISHOP, BLACK, KING, KNIGHT, PAWN, QUEEN, ROOK, WHITE};
@@ -55,6 +56,31 @@ impl PestoEval {
             mg_table,
             eg_table,
             weights, // Store weights
+        }
+    }
+
+    /// Creates a new PestoEval instance with custom weights (for tuning)
+    pub fn with_weights(weights: EvalWeights) -> PestoEval {
+        let mut mg_table = [[[0; 64]; 6]; 2];
+        let mut eg_table = [[[0; 64]; 6]; 2];
+
+        // Initialize the piece square tables using the existing constants 
+        // (piece values and PSTs remain const, only bonus terms are tuned)
+        for p in 0..6 {
+            for sq in 0..64 {
+                mg_table[WHITE][p][sq] =
+                    MG_VALUE[p] + MG_PESTO_TABLE[p][flip_sq_ind_vertically(sq)];
+                eg_table[WHITE][p][sq] =
+                    EG_VALUE[p] + EG_PESTO_TABLE[p][flip_sq_ind_vertically(sq)];
+                mg_table[BLACK][p][sq] = MG_VALUE[p] + MG_PESTO_TABLE[p][sq];
+                eg_table[BLACK][p][sq] = EG_VALUE[p] + EG_PESTO_TABLE[p][sq];
+            }
+        }
+
+        PestoEval {
+            mg_table,
+            eg_table,
+            weights,
         }
     }
 

@@ -17,6 +17,7 @@
 
 pub mod agent;
 pub mod arena;
+pub mod benchmarks;
 pub mod bits;
 pub mod board;
 pub mod board_utils;
@@ -34,5 +35,6 @@ pub mod move_types;
 pub mod piece_types;
 pub mod search;
 pub mod transposition;
+pub mod tuning;
 pub mod uci;
 pub mod utils;

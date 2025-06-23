@@ -313,7 +313,7 @@ mod tests {
     use crate::board::Board;
     use crate::eval::PestoEval;
     use crate::move_generation::MoveGen;
-    use crate::utils::parse_uci_move; // Helper for creating Move objects
+    // Using Move::from_uci for creating Move objects
     use std::time::Duration;
 
     // Helper function to initialize common test components
@@ -369,8 +369,8 @@ mod tests {
         let pesto_eval = PestoEval::new();
 
         // Moves available: Qxb7, Qxh7, and others.
-        let queen_capture_move = parse_uci_move(&board, "d1b7").unwrap(); // Capture queen
-        let pawn_capture_move = parse_uci_move(&board, "d1h7").unwrap(); // Capture pawn (less good)
+        let queen_capture_move = Move::from_uci( "d1b7").unwrap(); // Capture queen
+        let pawn_capture_move = Move::from_uci( "d1h7").unwrap(); // Capture pawn (less good)
 
         // Run for enough iterations to distinguish
         let best_move = mcts_pesto_search(

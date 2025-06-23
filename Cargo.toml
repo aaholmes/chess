@@ -7,11 +7,30 @@ edition = "2021"
 name = "kingfisher"
 path = "src/lib.rs"
 
+[[bin]]
+name = "kingfisher"
+path = "src/main.rs"
+
+[[bin]]
+name = "benchmark"
+path = "src/bin/benchmark.rs"
+
+[[bin]]
+name = "quick_test"
+path = "src/bin/quick_test.rs"
+
+[[bin]]
+name = "texel_tune"
+path = "src/bin/texel_tune.rs"
+
 [dependencies]
 rand = "0.8.5" # Added for MCTS random playouts
 lazy_static = "1.5.0"
 shakmaty = "0.25" # Dependency for shakmaty-syzygy
 shakmaty-syzygy = "0.15.0"
+
+[dev-dependencies]
+tempfile = "3.0"
 
 [profile.release]
 debug = true

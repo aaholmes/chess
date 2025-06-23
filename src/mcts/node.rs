@@ -530,7 +530,7 @@ mod tests {
     use crate::board::Board;
     // use crate::eval::PestoEval; // Not strictly needed for these tests
     use crate::move_generation::MoveGen;
-    use crate::utils::parse_uci_move;
+    // Using Move::from_uci for test moves
     use std::cell::RefCell;
     use std::rc::Rc;
 
@@ -564,9 +564,9 @@ mod tests {
         let (node_rc, _move_gen) = setup_node_for_priority_test(fen);
         let board = node_rc.borrow().state.clone(); // Get board for parsing
 
-        let check_move = parse_uci_move(&board, "c2b3").unwrap(); // Kb3+
-        let capture_move = parse_uci_move(&board, "c2c1").unwrap(); // Kxc1 (Captures Queen)
-        let quiet_move = parse_uci_move(&board, "c2b1").unwrap(); // Kb1
+        let check_move = Move::from_uci( "c2b3").unwrap(); // Kb3+
+        let capture_move = Move::from_uci( "c2c1").unwrap(); // Kxc1 (Captures Queen)
+        let quiet_move = Move::from_uci( "c2b1").unwrap(); // Kb1
 
         let mut node = node_rc.borrow_mut();
 

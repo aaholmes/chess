@@ -214,7 +214,7 @@ mod tests {
     use crate::move_generation::MoveGen;
     use crate::move_types::Move;
     use crate::eval::PestoEval;
-    use crate::utils::parse_uci_move; // For creating dummy moves
+    // Using Move::from_uci for creating dummy moves
     use std::cell::RefCell;
     use std::rc::Rc;
     use std::time::Duration;
@@ -311,7 +311,7 @@ mod tests {
 
     #[test]
     fn test_agent_egtb_found() {
-        let dummy_move = parse_uci_move(&Board::default(), "a2a3").unwrap();
+        let dummy_move = Move::from_uci("a2a3").unwrap();
         let egtb_info = EgtbInfo { wdl: Wdl::Win, dtz: None, best_move: None }; // EGTB finds a result, but no move provided
         let mock_egtb = MockEgtbProber::new(Ok(Some(egtb_info)), 7);
 
@@ -338,7 +338,7 @@ mod tests {
 
     #[test]
     fn test_agent_egtb_none_mate_found() {
-        let mate_move = parse_uci_move(&Board::default(), "e7e8q").unwrap(); // Dummy mate move
+        let mate_move = Move::from_uci( "e7e8q").unwrap(); // Dummy mate move
         let mock_egtb = MockEgtbProber::new(Ok(None), 7); // EGTB finds nothing
 
         // Mate search finds a mate
@@ -364,7 +364,7 @@ mod tests {
 
     #[test]
     fn test_agent_egtb_none_mate_none_mcts_found() {
-        let mcts_move = parse_uci_move(&Board::default(), "d2d4").unwrap(); // Dummy MCTS move
+        let mcts_move = Move::from_uci( "d2d4").unwrap(); // Dummy MCTS move
         let mock_egtb = MockEgtbProber::new(Ok(None), 7); // EGTB finds nothing
 
         // Mate search finds nothing
@@ -390,7 +390,7 @@ mod tests {
 
      #[test]
     fn test_agent_no_egtb_mate_none_mcts_found() {
-        let mcts_move = parse_uci_move(&Board::default(), "g1f3").unwrap(); // Dummy MCTS move
+        let mcts_move = Move::from_uci( "g1f3").unwrap(); // Dummy MCTS move
 
         // No EGTB prober provided
         // Mate search finds nothing
