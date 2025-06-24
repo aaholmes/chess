@@ -273,16 +273,42 @@ Monitor training with:
 - Move prediction rate
 - Value prediction error
 
+## Integration with Kingfisher Engine
+
+### Testing Neural Network Integration
+```bash
+# Test neural network with Rust engine
+cd ..
+cargo run --bin neural_test
+
+# Run comprehensive strength testing
+cargo run --bin strength_test --neural-model python/models/chess_model.pth
+```
+
+### Expected Performance Improvements
+A well-trained neural network should provide:
+- **50-100 Elo improvement** over classical evaluation in MCTS
+- **40%+ move prediction accuracy** on validation positions  
+- **Enhanced strategic understanding** in complex positions
+- **Maintained tactical strength** when combined with mate-search-first
+
 ## Next Steps
 
-1. **Collect More Data**: Use Lichess database downloads
-2. **Hyperparameter Tuning**: Optimize learning rate, batch size
-3. **Architecture Experiments**: Try different network designs
-4. **Self-Play Training**: Generate data from engine games
-5. **Strength Testing**: Compare against baseline engine
+1. **Collect More Data**: Use Lichess database downloads (target: 50k+ positions)
+2. **Hyperparameter Tuning**: Optimize learning rate, batch size, architecture depth
+3. **Model Architecture**: Experiment with attention mechanisms, deeper networks
+4. **Self-Play Training**: Generate training data from engine vs engine games
+5. **Validation**: Continuous testing against Kingfisher engine benchmarks
 
-For more advanced training, consider:
-- AlphaZero-style self-play
-- Knowledge distillation from stronger engines
-- Multi-task learning (tactics + strategy)
-- Reinforcement learning fine-tuning
+### Advanced Training Techniques
+- **AlphaZero-style self-play**: Generate training data through self-play
+- **Knowledge distillation**: Learn from stronger engines like Stockfish
+- **Multi-task learning**: Train on tactics + strategy + endgames simultaneously
+- **Transfer learning**: Pre-train on large datasets, fine-tune for specific styles
+- **Curriculum learning**: Progress from simple to complex positions
+
+### Research Directions
+- **Interpretability**: Understand what the network learns about chess
+- **Efficiency**: Faster inference for real-time tournament play
+- **Robustness**: Performance across different playing styles and time controls
+- **Architecture search**: Automated optimization of network design
