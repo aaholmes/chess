@@ -181,21 +181,28 @@ fn evaluate_leaf_node(
 ) -> f64 {
     let mut node_ref = node.borrow_mut();
     
-    // First check if already evaluated
-    if let Some(value) = node_ref.terminal_or_mate_value {
-        return value;
-    }
-    
-    // Phase 1: Mate search
-    let mut board_stack = BoardStack::with_board(node_ref.state.clone());
-    
-    let mate_result = mate_search(&mut board_stack, move_gen, mate_search_depth, true);
-    if mate_result.0 != 0 { // Mate found
-        let mate_value = if mate_result.0 > 0 { 1.0 } else { 0.0 };
-        node_ref.terminal_or_mate_value = Some(mate_value);
-        node_ref.mate_move = Some(mate_result.1);
-        stats.mates_found += 1;
-        return mate_value;
+    // Phase 1: Mate search (cached to avoid redundant searches)
+    if let Some(cached_value) = node_ref.terminal_or_mate_value {
+        if cached_value >= 0.0 { // Actual mate value (0.0, 0.5, 1.0)
+            return cached_value;
+        }
+        // cached_value == -999.0 means "mate search already done, no mate found"
+        // Continue to position evaluation
+    } else {
+        // First time evaluating this node - run mate search
+        let mut board_stack = BoardStack::with_board(node_ref.state.clone());
+        
+        let mate_result = mate_search(&mut board_stack, move_gen, mate_search_depth, false);
+        if mate_result.0 != 0 { // Mate found
+            let mate_value = if mate_result.0 > 0 { 1.0 } else { 0.0 };
+            node_ref.terminal_or_mate_value = Some(mate_value);
+            node_ref.mate_move = Some(mate_result.1);
+            stats.mates_found += 1;
+            return mate_value;
+        } else {
+            // Mark as mate-search-checked to avoid redundant searches
+            node_ref.terminal_or_mate_value = Some(-999.0); // Sentinel value for "no mate found"
+        }
     }
     
     // Phase 2: Position evaluation

@@ -56,6 +56,7 @@
 //! intelligent move ordering and lazy evaluation.
 
 pub mod neural_mcts;
+pub mod nn_counter;
 pub mod node;
 pub mod policy;
 pub mod selection;
