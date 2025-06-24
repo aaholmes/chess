@@ -158,6 +158,7 @@ fn select_leaf_node(
             exploration_constant,
             move_gen,
             nn_policy,
+            stats,
         ) {
             // Update stats
             if !current.borrow().policy_evaluated && nn_policy.is_some() {

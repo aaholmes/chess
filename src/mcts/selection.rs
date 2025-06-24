@@ -9,6 +9,7 @@ use crate::move_generation::MoveGen;
 use crate::move_types::Move;
 use crate::mcts::node::MctsNode;
 use crate::mcts::tactical::{identify_tactical_moves, TacticalMove};
+use crate::mcts::tactical_mcts::TacticalMctsStats;
 use crate::neural_net::NeuralNetPolicy;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -19,6 +20,7 @@ pub fn select_child_with_tactical_priority(
     exploration_constant: f64,
     move_gen: &MoveGen,
     nn_policy: &mut Option<NeuralNetPolicy>,
+    stats: &mut TacticalMctsStats,
 ) -> Option<Rc<RefCell<MctsNode>>> {
     // First, ensure the node has been expanded (children created)
     ensure_node_expanded(node.clone(), move_gen);
@@ -31,7 +33,7 @@ pub fn select_child_with_tactical_priority(
     }
     
     // Phase 1: Check for unexplored tactical moves
-    if let Some(tactical_child) = select_unexplored_tactical_move(node.clone(), move_gen) {
+    if let Some(tactical_child) = select_unexplored_tactical_move(node.clone(), move_gen, stats) {
         return Some(tactical_child);
     }
     
@@ -69,6 +71,7 @@ fn ensure_node_expanded(node: Rc<RefCell<MctsNode>>, move_gen: &MoveGen) {
 fn select_unexplored_tactical_move(
     node: Rc<RefCell<MctsNode>>,
     move_gen: &MoveGen,
+    stats: &mut TacticalMctsStats,
 ) -> Option<Rc<RefCell<MctsNode>>> {
     let mut node_ref = node.borrow_mut();
     
@@ -97,6 +100,7 @@ fn select_unexplored_tactical_move(
     // Mark move as explored and return child
     if let Some(mv) = move_to_explore {
         node_ref.tactical_moves_explored.insert(mv);
+        stats.tactical_moves_explored += 1; // Track in global statistics
         let child = find_child_for_move(&node_ref.children, mv);
         return child.cloned();
     }
