@@ -3,7 +3,10 @@
 pub mod neural_mcts;
 pub mod node;
 pub mod policy;
+pub mod selection;
 pub mod simulation; // Keep for testing/alternative use
+pub mod tactical;
+pub mod tactical_mcts;
 
 use crate::board::Board;
 use crate::boardstack::BoardStack; // Needed for mate_search
@@ -19,6 +22,7 @@ use std::time::{Duration, Instant}; // Use trait from submodule
 // Import necessary components from submodules
 pub use self::neural_mcts::neural_mcts_search;
 pub use self::node::{select_leaf_for_expansion, MctsNode, MoveCategory};
+pub use self::tactical_mcts::{tactical_mcts_search, TacticalMctsConfig, TacticalMctsStats, print_search_stats};
 
 // pub use self::policy::PolicyNetwork; // No longer needed for pesto search
                                      // pub use self::simulation::simulate_random_playout; // Don't export by default

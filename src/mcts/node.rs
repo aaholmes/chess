@@ -3,10 +3,11 @@
 use crate::board::Board;
 use crate::move_generation::MoveGen;
 use crate::move_types::Move;
+use crate::mcts::tactical::TacticalMove;
 use std::cell::RefCell;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::f64;
-use std::rc::{Rc, Weak}; // For priors and categorized moves
+use std::rc::{Rc, Weak};
                          // use super::policy::PolicyNetwork; // Not needed directly in this file if PolicyNetwork passed to mcts_search
                          // use crate::search::see::see; // Import SEE if used for categorization
 
@@ -63,6 +64,16 @@ pub struct MctsNode {
     // `untried_actions` Vec removed, replaced by the map above.
     /// Whether this is a terminal state (checkmate, stalemate) - based on initial check
     pub is_terminal: bool,
+
+    // --- Tactical-First MCTS Fields ---
+    /// Cached tactical moves from this position (computed once)
+    pub tactical_moves: Option<Vec<TacticalMove>>,
+    /// Set of tactical moves that have been explored
+    pub tactical_moves_explored: HashSet<Move>,
+    /// Whether the neural network policy has been evaluated for this node
+    pub policy_evaluated: bool,
+    /// Move priorities for UCB selection (after tactical phase)
+    pub move_priorities: HashMap<Move, f64>,
 }
 
 impl MctsNode {
@@ -98,6 +109,12 @@ impl MctsNode {
             current_priority_category: None,         // Set later
             num_legal_moves: None,                   // Set later
             is_terminal,                             // Store initial terminal status
+            
+            // Initialize tactical-first fields
+            tactical_moves: None,
+            tactical_moves_explored: HashSet::new(),
+            policy_evaluated: false,
+            move_priorities: HashMap::new(),
         }))
     }
 
@@ -139,6 +156,12 @@ impl MctsNode {
             current_priority_category: None,
             num_legal_moves: None,                   // Set later
             is_terminal,
+            
+            // Initialize tactical-first fields
+            tactical_moves: None,
+            tactical_moves_explored: HashSet::new(),
+            policy_evaluated: false,
+            move_priorities: HashMap::new(),
         }))
     }
 
