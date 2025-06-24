@@ -236,6 +236,26 @@ impl Move {
         self.is_kingside_castle() || self.is_queenside_castle()
     }
 
+    /// Convert move to UCI notation
+    pub fn to_uci(&self) -> String {
+        let from = sq_ind_to_algebraic(self.from);
+        let to = sq_ind_to_algebraic(self.to);
+        let mut result = format!("{}{}", from, to);
+        
+        if let Some(promotion) = self.promotion {
+            let promotion_char = match promotion {
+                n if n == KNIGHT => 'n',
+                n if n == BISHOP => 'b', 
+                n if n == ROOK => 'r',
+                n if n == QUEEN => 'q',
+                _ => 'q', // Default to queen
+            };
+            result.push(promotion_char);
+        }
+        
+        result
+    }
+
     /// Change the way a move is printed so that it uses algebraic notation
     pub fn print_algebraic(&self) -> String {
         let from = sq_ind_to_algebraic(self.from);

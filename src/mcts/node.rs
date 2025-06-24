@@ -43,6 +43,8 @@ pub struct MctsNode {
     pub mate_move: Option<Move>,
     /// Stores the value from the evaluation (Pesto or NN) (0.0 to 1.0 for White) when node is first evaluated.
     pub nn_value: Option<f64>, // Reusing this field for Pesto value
+    /// Neural network prior probability for this move (from parent's perspective)
+    pub prior_probability: f32,
     // /// Stores the policy priors for all legal moves from this state, evaluated once.
     // pub policy_priors: Option<HashMap<Move, f64>>, // REMOVED - Not used in Pesto MCTS
 
@@ -90,6 +92,7 @@ impl MctsNode {
             terminal_or_mate_value: initial_terminal_value,
             mate_move: None,                         // Set if mate search finds a mate
             nn_value: None,                          // Evaluated later
+            prior_probability: 0.0,                  // Default prior
             // policy_priors: None,                  // REMOVED
             unexplored_moves_by_cat: HashMap::new(), // Populated later
             current_priority_category: None,         // Set later
@@ -130,6 +133,7 @@ impl MctsNode {
             terminal_or_mate_value: initial_terminal_value,
             mate_move: None,                         // Set if mate search finds a mate
             nn_value: None,
+            prior_probability: 0.0,                  // Default prior
             // policy_priors: None,                  // REMOVED
             unexplored_moves_by_cat: HashMap::new(),
             current_priority_category: None,

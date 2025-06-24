@@ -1,5 +1,6 @@
 //! Monte Carlo Tree Search (MCTS) module.
 
+pub mod neural_mcts;
 pub mod node;
 pub mod policy;
 pub mod simulation; // Keep for testing/alternative use
@@ -9,13 +10,16 @@ use crate::boardstack::BoardStack; // Needed for mate_search
 use crate::eval::PestoEval; // Import PestoEval
 use crate::move_generation::MoveGen;
 use crate::move_types::Move;
+use crate::neural_net::NeuralNetPolicy; // Import neural network
 use crate::search::mate_search; // Import mate_search function
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::{Duration, Instant}; // Use trait from submodule
 
 // Import necessary components from submodules
+pub use self::neural_mcts::neural_mcts_search;
 pub use self::node::{select_leaf_for_expansion, MctsNode, MoveCategory};
+
 // pub use self::policy::PolicyNetwork; // No longer needed for pesto search
                                      // pub use self::simulation::simulate_random_playout; // Don't export by default
 

@@ -23,6 +23,18 @@ path = "src/bin/quick_test.rs"
 name = "texel_tune"
 path = "src/bin/texel_tune.rs"
 
+[[bin]]
+name = "neural_test"
+path = "src/bin/neural_test.rs"
+
+[[bin]]
+name = "generate_training_data"
+path = "src/bin/generate_training_data.rs"
+
+[[bin]]
+name = "strength_test"
+path = "src/bin/strength_test.rs"
+
 [dependencies]
 rand = "0.8.5" # Added for MCTS random playouts
 lazy_static = "1.5.0"

@@ -9,6 +9,8 @@ use std::time::{Duration, Instant};
 
 pub mod tactical_suite;
 pub mod performance;
+pub mod strength_testing;
+pub mod elo_estimation;
 
 #[derive(Debug, Clone)]
 pub struct BenchmarkResult {

@@ -397,6 +397,13 @@ impl Board {
         self.is_square_attacked(king_sq_ind, !self.w_to_move, move_gen)
     }
 
+    /// Convert board to FEN notation
+    pub fn to_fen(&self) -> Option<String> {
+        // This is a simplified implementation - a full FEN would need more details
+        // For now, return None to indicate it's not implemented
+        None
+    }
+
     /// Checks if a square is attacked by a given side.
     ///
     /// # Arguments
