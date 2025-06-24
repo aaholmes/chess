@@ -1,4 +1,59 @@
-//! Monte Carlo Tree Search (MCTS) module.
+//! Tactical-First Monte Carlo Tree Search (MCTS) Module
+//!
+//! This module implements a sophisticated **Tactical-First MCTS** architecture that combines
+//! classical chess principles with modern AI techniques. The core innovation is a three-tier
+//! prioritization system that ensures tactical completeness while maintaining computational efficiency.
+//!
+//! ## Architecture Overview
+//!
+//! ### Three-Tier Search Prioritization
+//!
+//! 1. **Mate Search First** (`tactical_mcts.rs`)
+//!    - Exhaustive forced-mate analysis before any other evaluation
+//!    - Immediate return if mate found (no further MCTS needed)
+//!
+//! 2. **Tactical Move Priority** (`tactical.rs`, `selection.rs`)
+//!    - Classical heuristics explore forcing moves before strategic moves
+//!    - MVV-LVA ordering for captures
+//!    - Knight/pawn fork detection with value calculation
+//!    - Check move prioritization with centrality bonuses
+//!
+//! 3. **Lazy Neural Policy** (`selection.rs`)
+//!    - Neural network policy evaluation deferred until after tactical exploration
+//!    - Substantially reduces expensive neural network computational overhead
+//!    - UCB selection with policy priors for strategic moves
+//!
+//! ## Key Components
+//!
+//! - **`tactical_mcts`**: Main tactical-first search algorithm
+//! - **`tactical`**: Tactical move detection and prioritization
+//! - **`selection`**: Tactical-first node selection strategy
+//! - **`node`**: Enhanced MCTS node structure with tactical fields
+//! - **`neural_mcts`**: Classical neural-guided MCTS implementation
+//! - **`policy`**: Neural network policy interface
+//!
+//! ## Usage
+//!
+//! ```rust
+//! use kingfisher::mcts::{tactical_mcts_search, TacticalMctsConfig};
+//! use std::time::Duration;
+//!
+//! let config = TacticalMctsConfig {
+//!     max_iterations: 1000,
+//!     time_limit: Duration::from_millis(5000),
+//!     mate_search_depth: 3,
+//!     exploration_constant: 1.414,
+//!     use_neural_policy: true,
+//! };
+//!
+//! let (best_move, stats) = tactical_mcts_search(
+//!     board, &move_gen, &pesto_eval, &mut nn_policy, config
+//! );
+//! ```
+//!
+//! This architecture successfully implements the chess principle of "examine all checks,
+//! captures, and threats" while dramatically reducing computational overhead through
+//! intelligent move ordering and lazy evaluation.
 
 pub mod neural_mcts;
 pub mod node;

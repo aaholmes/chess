@@ -2,14 +2,19 @@
 
 <img width="1038" alt="Kingfisher Chess Engine in action" src="https://github.com/aaholmes/chess/assets/4913443/ceab66cf-67c8-4685-bd28-d454c38ce756">
 
-**A sophisticated chess engine written in Rust featuring novel mate-search-first MCTS architecture and comprehensive neural network integration.**
+**A sophisticated chess engine written in Rust featuring novel Tactics-Enhanced MCTS with lazy policy evaluation and comprehensive neural network integration.**
 
 Kingfisher combines classical alpha-beta search with cutting-edge Monte Carlo Tree Search (MCTS) and neural network policy guidance, designed to bridge traditional chess programming with modern AI techniques.
 
 ## 🚀 Key Innovations
 
-### **Mate-Search-First MCTS**
-Revolutionary approach that performs exhaustive mate search before neural network evaluation, replacing expensive neural network calls with exact forced-win analysis. This hybrid strategy dramatically improves tactical strength and training efficiency.
+### **Tactical-First MCTS with Lazy Policy Evaluation**
+Revolutionary three-tier search architecture that prioritizes tactical completeness:
+1. **Mate Search First**: Exhaustive forced-win analysis before any move evaluation
+2. **Tactical Move Priority**: Classical heuristics (MVV-LVA, fork detection, checks) explored before strategic moves
+3. **Lazy Neural Policy**: Expensive neural network calls deferred until after all tactical moves examined
+
+This approach follows the chess principle of "examine all checks, captures, and threats" while substantially reducing computational overhead through intelligent move ordering.
 
 ### **Neural Network Policy Integration**
 Complete PyTorch-based training pipeline featuring:
@@ -25,11 +30,12 @@ Comprehensive strength testing comparing 5 engine variants with Elo estimation:
 
 ## 📊 Performance Highlights
 
-Our benchmarking demonstrates measurable improvements:
-- **Mate Detection**: Successfully finds mate-in-3 sequences instantly
-- **Tactical Strength**: Enhanced performance on forced variations
-- **Training Efficiency**: Reduced neural network dependency through exact analysis
-- **Elo Validation**: Professional rating estimation with confidence metrics
+Our architecture demonstrates key improvements:
+- **Tactical Efficiency**: Lazy policy evaluation substantially reduces neural network computational overhead
+- **Mate Detection**: Successfully finds mate-in-3 sequences instantly through dedicated mate search
+- **Classical Integration**: MVV-LVA and fork detection enhance tactical move ordering
+- **Chess Principle Implementation**: Systematic examination of forcing moves before strategic analysis
+- **Modular Architecture**: Clean separation between tactical heuristics and neural network guidance
 
 ## 🛠 Quick Start
 
@@ -74,6 +80,9 @@ python3 python/train_chess_ai.py --data-source lichess --epochs 50
 # Quick strength test (500ms per position)
 cargo run --bin strength_test -- --time 500
 
+# Test tactical-first MCTS specifically
+cargo run --bin tactical_test
+
 # Thorough analysis with neural networks
 cargo run --bin strength_test -- --time 2000 --iterations 1000
 
@@ -107,8 +116,8 @@ Kingfisher Chess Engine
 ├── Move Generation (Magic Bitboards)
 ├── Search Algorithms
 │   ├── Alpha-Beta with enhancements
-│   ├── MCTS with mate-search-first
-│   └── Neural network guided search
+│   ├── Tactical-First MCTS with lazy policy evaluation
+│   └── Classical MCTS with neural network guidance
 ├── Evaluation Systems
 │   ├── Pesto-style tapered evaluation
 │   ├── Texel tuning optimization
