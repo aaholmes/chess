@@ -23,6 +23,8 @@ fn setup_test_env() -> (Board, MoveGen, TacticalMctsStats) {
         mates_found: 0,
         nn_policy_evaluations: 0,
         search_time: Duration::from_millis(0),
+        tt_mate_hits: 0,
+        tt_mate_misses: 0,
     };
     (board, move_gen, stats)
 }
@@ -162,6 +164,8 @@ mod tests {
             mates_found: 0,
             nn_policy_evaluations: 0,
             search_time: Duration::from_millis(0),
+            tt_mate_hits: 0,
+            tt_mate_misses: 0,
         };
         let mut nn_policy = None;
         

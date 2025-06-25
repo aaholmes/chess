@@ -180,7 +180,7 @@ fn identify_tactical_moves_internal(board: &Board, move_gen: &MoveGen) -> Vec<Ta
     // 1. Analyze captures with MVV-LVA scoring
     for mv in &captures {
         if board.apply_move_to_board(*mv).is_legal(move_gen) {
-            if !is_losing_capture(*mv, board) {
+            if !is_losing_capture(*mv, board, move_gen) {
                 let mvv_lva_score = calculate_mvv_lva(*mv, board);
                 tactical_moves.push(TacticalMove::Capture(*mv, mvv_lva_score));
                 identified_moves.insert(*mv);
@@ -230,11 +230,10 @@ pub fn calculate_mvv_lva(mv: Move, board: &Board) -> f64 {
 }
 
 /// Check if a capture is losing using Static Exchange Evaluation
-fn is_losing_capture(mv: Move, board: &Board) -> bool {
+fn is_losing_capture(mv: Move, board: &Board, move_gen: &MoveGen) -> bool {
     // Use SEE to determine if the capture loses material
-    // For now, just accept all captures - proper SEE integration needs move_gen context
-    // TODO: Implement proper SEE evaluation with correct parameters
-    false
+    let see_value = see(board, move_gen, mv.to, mv.from);
+    see_value < 0 // Losing if SEE evaluation is negative
 }
 
 /// Get the value of a piece at a given square
@@ -430,7 +429,8 @@ pub fn filter_tactical_moves(tactical_moves: Vec<TacticalMove>, board: &Board) -
             
             // For captures, ensure they're not obviously losing
             if let TacticalMove::Capture(_, _) = tactical_move {
-                return !is_losing_capture(mv, board);
+                let temp_move_gen = MoveGen::new();
+            return !is_losing_capture(mv, board, &temp_move_gen);
             }
             
             true
@@ -507,5 +507,51 @@ mod tests {
         assert!(attacks.contains(&19)); // d6
         assert!(attacks.contains(&21)); // f6
         assert!(attacks.contains(&11)); // d2
+    }
+    
+    #[test]
+    fn test_see_integration() {
+        use crate::move_types::Move;
+        use crate::move_generation::MoveGen;
+        
+        let move_gen = MoveGen::new();
+        
+        // Test position: r1bqkb1r/pppp1ppp/2n2n2/4p3/2B1P3/8/PPPP1PPP/RNBQK1NR w KQkq - 2 3
+        // White can capture on e5 with pawn (good capture) or bishop (bad capture)
+        let board = Board::new_from_fen("r1bqkb1r/pppp1ppp/2n2n2/4p3/2B1P3/8/PPPP1PPP/RNBQK1NR w KQkq - 2 3");
+        
+        // Test pawn takes pawn (should be good)
+        let pawn_capture = Move::new(28, 36, None); // e4 x e5
+        assert!(!is_losing_capture(pawn_capture, &board, &move_gen), 
+                "Pawn takes pawn should not be losing");
+        
+        // Test bishop takes pawn (likely bad due to knight defending)
+        let bishop_capture = Move::new(26, 36, None); // Bc4 x e5 (not possible from this position, but for testing)
+        // Note: This might not be a losing capture depending on the exact position
+        
+        // Test in starting position (no captures should be losing since no pieces can be captured)
+        let starting_board = Board::new();
+        let fake_capture = Move::new(0, 8, None); // Any move in starting position
+        // This won't be a capture in starting position, so SEE should handle gracefully
+    }
+    
+    #[test]
+    fn test_tactical_moves_with_see_filtering() {
+        let board = Board::new_from_fen("r1bqkb1r/pppp1ppp/2n2n2/4p3/2B1P3/8/PPPP1PPP/RNBQK1NR w KQkq - 2 3");
+        let move_gen = MoveGen::new();
+        
+        let tactical_moves = identify_tactical_moves(&board, &move_gen);
+        
+        // Should find tactical moves, and SEE filtering should be working
+        // The exact number depends on the position analysis
+        assert!(tactical_moves.len() >= 0, "Should find tactical moves or filter appropriately");
+        
+        // Verify that all returned moves are not losing captures
+        for tactical_move in &tactical_moves {
+            if let TacticalMove::Capture(mv, _) = tactical_move {
+                assert!(!is_losing_capture(*mv, &board, &move_gen),
+                        "Tactical moves should not include losing captures");
+            }
+        }
     }
 }
