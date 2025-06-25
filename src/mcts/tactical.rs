@@ -3,13 +3,16 @@
 //! This module implements tactical move identification and prioritization for the
 //! tactical-first MCTS approach. It identifies captures, checks, and forks, then
 //! prioritizes them using classical heuristics like MVV-LVA.
+//!
+//! Features position-based caching to avoid redundant tactical move computation.
 
 use crate::board::Board;
 use crate::move_generation::MoveGen;
 use crate::move_types::Move;
 use crate::piece_types::{PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING};
 use crate::search::see;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
+use std::cell::RefCell;
 
 /// Represents a tactical move with its associated priority score
 #[derive(Debug, Clone)]
@@ -56,8 +59,118 @@ impl TacticalMove {
     }
 }
 
-/// Identify all tactical moves from a given position
+/// Position-based cache for tactical moves to avoid redundant computation
+#[derive(Debug)]
+pub struct TacticalMoveCache {
+    /// Cache mapping zobrist hash to computed tactical moves
+    cache: HashMap<u64, Vec<TacticalMove>>,
+    /// Maximum number of entries to keep in cache
+    max_size: usize,
+    /// Cache hit statistics for monitoring
+    pub hits: u64,
+    pub misses: u64,
+}
+
+impl TacticalMoveCache {
+    /// Create a new tactical move cache
+    pub fn new(max_size: usize) -> Self {
+        Self {
+            cache: HashMap::new(),
+            max_size,
+            hits: 0,
+            misses: 0,
+        }
+    }
+    
+    /// Create a new cache with default size (1000 positions)
+    pub fn new_default() -> Self {
+        Self::new(1000)
+    }
+    
+    /// Get cached tactical moves or compute and cache them
+    pub fn get_or_compute(&mut self, board: &Board, move_gen: &MoveGen) -> Vec<TacticalMove> {
+        let zobrist = board.zobrist_hash;
+        
+        if let Some(cached_moves) = self.cache.get(&zobrist) {
+            self.hits += 1;
+            cached_moves.clone()
+        } else {
+            self.misses += 1;
+            
+            // Evict entries if cache is full
+            if self.cache.len() >= self.max_size {
+                self.evict_oldest();
+            }
+            
+            // Compute tactical moves
+            let tactical_moves = identify_tactical_moves_internal(board, move_gen);
+            
+            // Cache the result
+            self.cache.insert(zobrist, tactical_moves.clone());
+            
+            tactical_moves
+        }
+    }
+    
+    /// Clear the cache
+    pub fn clear(&mut self) {
+        self.cache.clear();
+        self.hits = 0;
+        self.misses = 0;
+    }
+    
+    /// Get cache statistics
+    pub fn stats(&self) -> (usize, usize, u64, u64, f64) {
+        let total_requests = self.hits + self.misses;
+        let hit_rate = if total_requests > 0 {
+            self.hits as f64 / total_requests as f64
+        } else {
+            0.0
+        };
+        (self.cache.len(), self.max_size, self.hits, self.misses, hit_rate)
+    }
+    
+    /// Evict the oldest entries (simple FIFO eviction)
+    /// For better performance, consider implementing LRU in the future
+    fn evict_oldest(&mut self) {
+        let entries_to_remove = self.cache.len() / 4; // Remove 25% of entries
+        let keys_to_remove: Vec<u64> = self.cache.keys().take(entries_to_remove).copied().collect();
+        for key in keys_to_remove {
+            self.cache.remove(&key);
+        }
+    }
+}
+
+// Thread-local cache for tactical moves
+thread_local! {
+    static TACTICAL_CACHE: RefCell<TacticalMoveCache> = RefCell::new(TacticalMoveCache::new_default());
+}
+
+/// Identify all tactical moves from a given position (with caching)
+/// This is the main public interface that uses position-based caching
 pub fn identify_tactical_moves(board: &Board, move_gen: &MoveGen) -> Vec<TacticalMove> {
+    TACTICAL_CACHE.with(|cache| {
+        cache.borrow_mut().get_or_compute(board, move_gen)
+    })
+}
+
+/// Get tactical move cache statistics for monitoring performance
+pub fn get_tactical_cache_stats() -> (usize, usize, u64, u64, f64) {
+    TACTICAL_CACHE.with(|cache| {
+        cache.borrow().stats()
+    })
+}
+
+/// Clear the tactical move cache (useful for benchmarking or testing)
+pub fn clear_tactical_cache() {
+    TACTICAL_CACHE.with(|cache| {
+        cache.borrow_mut().clear()
+    })
+}
+
+/// Identify all tactical moves from a given position (without caching)
+/// This is the internal implementation used by the cache
+fn identify_tactical_moves_internal(board: &Board, move_gen: &MoveGen) -> Vec<TacticalMove> {
     let mut tactical_moves = Vec::new();
     let (captures, non_captures) = move_gen.gen_pseudo_legal_moves(board);
     
@@ -339,6 +452,35 @@ mod tests {
         
         // Starting position should have no tactical moves
         assert!(tactical_moves.is_empty());
+    }
+    
+    #[test]
+    fn test_tactical_cache_functionality() {
+        let board = Board::new();
+        let move_gen = MoveGen::new();
+        
+        // Clear cache to start fresh
+        clear_tactical_cache();
+        
+        // First call should be a cache miss
+        let moves1 = identify_tactical_moves(&board, &move_gen);
+        let (cache_size, _, hits, misses, hit_rate) = get_tactical_cache_stats();
+        
+        assert_eq!(misses, 1);
+        assert_eq!(hits, 0);
+        assert!(hit_rate < 0.1);
+        assert_eq!(cache_size, 1);
+        
+        // Second call should be a cache hit
+        let moves2 = identify_tactical_moves(&board, &move_gen);
+        let (_, _, hits, misses, hit_rate) = get_tactical_cache_stats();
+        
+        assert_eq!(misses, 1);
+        assert_eq!(hits, 1);
+        assert!((hit_rate - 0.5).abs() < 0.1);
+        
+        // Results should be identical
+        assert_eq!(moves1.len(), moves2.len());
     }
     
     #[test]

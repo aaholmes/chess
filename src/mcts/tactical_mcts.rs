@@ -15,6 +15,7 @@ use crate::move_generation::MoveGen;
 use crate::move_types::Move;
 use crate::neural_net::NeuralNetPolicy;
 use crate::search::mate_search;
+use crate::transposition::TranspositionTable;
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::{Duration, Instant};
@@ -61,6 +62,10 @@ pub struct TacticalMctsStats {
     pub search_time: Duration,
     /// Number of nodes expanded
     pub nodes_expanded: u32,
+    /// Number of transposition table mate cache hits
+    pub tt_mate_hits: u32,
+    /// Number of transposition table mate cache misses
+    pub tt_mate_misses: u32,
 }
 
 /// Main tactical-first MCTS search function
@@ -70,6 +75,20 @@ pub fn tactical_mcts_search(
     pesto_eval: &PestoEval,
     nn_policy: &mut Option<NeuralNetPolicy>,
     config: TacticalMctsConfig,
+) -> (Option<Move>, TacticalMctsStats) {
+    // Create a transposition table for this search
+    let mut transposition_table = TranspositionTable::new();
+    tactical_mcts_search_with_tt(board, move_gen, pesto_eval, nn_policy, config, &mut transposition_table)
+}
+
+/// Main tactical-first MCTS search function with transposition table
+pub fn tactical_mcts_search_with_tt(
+    board: Board,
+    move_gen: &MoveGen,
+    pesto_eval: &PestoEval,
+    nn_policy: &mut Option<NeuralNetPolicy>,
+    config: TacticalMctsConfig,
+    transposition_table: &mut TranspositionTable,
 ) -> (Option<Move>, TacticalMctsStats) {
     let start_time = Instant::now();
     let mut stats = TacticalMctsStats::default();
@@ -109,6 +128,7 @@ pub fn tactical_mcts_search(
             move_gen,
             pesto_eval,
             config.mate_search_depth,
+            transposition_table,
             &mut stats,
         );
         
@@ -178,31 +198,60 @@ fn evaluate_leaf_node(
     move_gen: &MoveGen,
     pesto_eval: &PestoEval,
     mate_search_depth: i32,
+    transposition_table: &mut TranspositionTable,
     stats: &mut TacticalMctsStats,
 ) -> f64 {
     let mut node_ref = node.borrow_mut();
+    let board = &node_ref.state;
     
-    // Phase 1: Mate search (cached to avoid redundant searches)
+    // Phase 1: Mate search with transposition table caching
+    // First check if we already have mate results cached in the node
     if let Some(cached_value) = node_ref.terminal_or_mate_value {
         if cached_value >= 0.0 { // Actual mate value (0.0, 0.5, 1.0)
             return cached_value;
         }
         // cached_value == -999.0 means "mate search already done, no mate found"
         // Continue to position evaluation
-    } else {
-        // First time evaluating this node - run mate search
-        let mut board_stack = BoardStack::with_board(node_ref.state.clone());
-        
-        let mate_result = mate_search(&mut board_stack, move_gen, mate_search_depth, false);
-        if mate_result.0 != 0 { // Mate found
-            let mate_value = if mate_result.0 > 0 { 1.0 } else { 0.0 };
-            node_ref.terminal_or_mate_value = Some(mate_value);
-            node_ref.mate_move = Some(mate_result.1);
-            stats.mates_found += 1;
-            return mate_value;
+    } else if mate_search_depth > 0 {
+        // Check transposition table for mate search results
+        if let Some((mate_depth, mate_move)) = transposition_table.probe_mate(board, mate_search_depth) {
+            // Found cached mate search results
+            stats.tt_mate_hits += 1;
+            if mate_depth > 0 { // Mate found
+                let mate_value = if mate_depth > 0 { 1.0 } else { 0.0 };
+                node_ref.terminal_or_mate_value = Some(mate_value);
+                node_ref.mate_move = Some(mate_move);
+                stats.mates_found += 1;
+                return mate_value;
+            } else {
+                // No mate found in cached search
+                node_ref.terminal_or_mate_value = Some(-999.0);
+            }
         } else {
-            // Mark as mate-search-checked to avoid redundant searches
-            node_ref.terminal_or_mate_value = Some(-999.0); // Sentinel value for "no mate found"
+            // Cache miss - perform mate search
+            stats.tt_mate_misses += 1;
+            // No cached results - perform mate search
+            let mut board_stack = BoardStack::with_board(board.clone());
+            let mate_result = mate_search(&mut board_stack, move_gen, mate_search_depth, false);
+            
+            // Store results in transposition table
+            transposition_table.store_mate_result(
+                board,
+                mate_result.0.abs(), // Store absolute mate depth
+                mate_result.1,
+                mate_search_depth,
+            );
+            
+            if mate_result.0 != 0 { // Mate found
+                let mate_value = if mate_result.0 > 0 { 1.0 } else { 0.0 };
+                node_ref.terminal_or_mate_value = Some(mate_value);
+                node_ref.mate_move = Some(mate_result.1);
+                stats.mates_found += 1;
+                return mate_value;
+            } else {
+                // Mark as mate-search-checked to avoid redundant searches
+                node_ref.terminal_or_mate_value = Some(-999.0); // Sentinel value for "no mate found"
+            }
         }
     }
     
