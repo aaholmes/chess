@@ -299,7 +299,7 @@ mod tests {
         HumanlikeAgent {
             move_gen: move_gen_ref,
             pesto: pesto_eval_ref,
-            egtb_prober: egtb_prober.map(|m| EgtbProber { tablebases: unsafe { std::mem::zeroed() }, max_pieces: m.max_pieces }), // Create a dummy EgtbProber with the mock's max_pieces
+            egtb_prober: egtb_prober.map(|m| EgtbProber { max_pieces: m.max_pieces }), // Create a dummy EgtbProber with the mock's max_pieces
             mate_search_depth: 5,
             mcts_iterations: 100,
             mcts_time_limit_ms: 1000,
@@ -323,7 +323,7 @@ mod tests {
             Some(dummy_move), // MCTS returns a move
         );
 
-        let mut board_stack = BoardStack::new(Board::new_from_fen("8/8/8/8/8/k7/P7/K7 w - - 0 1")); // Position with <= 7 pieces
+        let mut board_stack = BoardStack::with_board(Board::new_from_fen("8/8/8/8/8/k7/P7/K7 w - - 0 1")); // Position with <= 7 pieces
         let result_move = agent.get_move(&mut board_stack);
 
         // Verify the sequence of calls
@@ -349,7 +349,7 @@ mod tests {
             None, // MCTS should NOT be called
         );
 
-        let mut board_stack = BoardStack::new(Board::new_from_fen("8/8/8/8/8/k7/P7/K7 w - - 0 1")); // Position with <= 7 pieces
+        let mut board_stack = BoardStack::with_board(Board::new_from_fen("8/8/8/8/8/k7/P7/K7 w - - 0 1")); // Position with <= 7 pieces
         let result_move = agent.get_move(&mut board_stack);
 
         // Verify the sequence of calls
@@ -375,7 +375,7 @@ mod tests {
             Some(mcts_move), // MCTS returns a move
         );
 
-        let mut board_stack = BoardStack::new(Board::new_from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")); // Starting position (many pieces)
+        let mut board_stack = BoardStack::with_board(Board::new_from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")); // Starting position (many pieces)
         let result_move = agent.get_move(&mut board_stack);
 
         // Verify the sequence of calls
@@ -401,7 +401,7 @@ mod tests {
             Some(mcts_move), // MCTS returns a move
         );
 
-        let mut board_stack = BoardStack::new(Board::new_from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")); // Starting position
+        let mut board_stack = BoardStack::with_board(Board::new_from_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")); // Starting position
         let result_move = agent.get_move(&mut board_stack);
 
         // Verify the sequence of calls

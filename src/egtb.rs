@@ -12,7 +12,7 @@ use shakmaty_syzygy::{Tablebase, Wdl, Dtz};
 use std::path::Path;
 
 // Define the error type for EGTB operations
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum EgtbError {
     LoadError(String), // Error loading tablebases
     ProbeError(String), // Error during probing

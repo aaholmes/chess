@@ -279,7 +279,8 @@ mod tests {
         let root = MctsNode::new_root(board, &move_gen);
         
         // In starting position, should have no tactical moves
-        let tactical_child = select_unexplored_tactical_move(root.clone(), &move_gen);
+        let mut stats = TacticalMctsStats::default();
+        let tactical_child = select_unexplored_tactical_move(root.clone(), &move_gen, &mut stats);
         assert!(tactical_child.is_none());
     }
     

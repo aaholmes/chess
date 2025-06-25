@@ -346,35 +346,6 @@ impl UCIEngine {
     }
 
     // Make internal handlers public for testing
-    #[cfg(test)]
-    pub fn handle_position(&mut self, args: &[&str]) {
-        // Call the actual private method
-        self.handle_position(args);
-    }
-
-    #[cfg(test)]
-    pub fn handle_go(&mut self, args: &[&str]) {
-        // Call the actual private method
-        self.handle_go(args);
-    }
-
-    #[cfg(test)]
-    pub fn parse_go_command(&mut self, args: &[&str]) {
-        // Call the actual private method
-        self.parse_go_command(args);
-    }
-
-    #[cfg(test)]
-    pub fn handle_ucinewgame(&mut self) {
-        // Call the actual private method
-        self.handle_ucinewgame();
-    }
-
-    #[cfg(test)]
-    pub fn handle_setoption(&mut self, args: &[&str]) {
-        // Call the actual private method
-        self.handle_setoption(args);
-    }
 
     #[cfg(test)]
     pub fn get_board(&self) -> &BoardStack {
@@ -407,7 +378,7 @@ mod tests {
         let mut engine = UCIEngine::new();
         engine.handle_position(&["startpos"]);
         // Check if the board is in the initial state
-        assert_eq!(engine.get_board().current_state().to_fen(), "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
+        assert_eq!(engine.get_board().current_state().to_fen(), Some("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1".to_string()));
     }
 
     #[test]
@@ -415,7 +386,7 @@ mod tests {
         let mut engine = UCIEngine::new();
         engine.handle_position(&["startpos", "moves", "e2e4", "e7e5"]);
         // Check if the board is in the correct state after moves
-        assert_eq!(engine.get_board().current_state().to_fen(), "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 2");
+        assert_eq!(engine.get_board().current_state().to_fen(), Some("rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 2".to_string()));
     }
 
     #[test]
@@ -424,7 +395,7 @@ mod tests {
         let fen = "r3k2r/p1ppqpbp/bnNppnp1/8/4P3/2N2Q2/PPP2PPP/R3K2R w KQkq - 0 1";
         engine.handle_position(&["fen", "r3k2r/p1ppqpbp/bnNppnp1/8/4P3/2N2Q2/PPP2PPP/R3K2R", "w", "KkQq", "-", "0", "1"]);
         // Check if the board is in the state specified by the FEN
-        assert_eq!(engine.get_board().current_state().to_fen(), fen);
+        assert_eq!(engine.get_board().current_state().to_fen(), Some(fen.to_string()));
     }
 
     #[test]
@@ -433,7 +404,7 @@ mod tests {
         let fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
         engine.handle_position(&["fen", fen, "moves", "e2e4", "e7e5", "g1f3"]);
         // Check if the board is in the correct state after FEN and moves
-        assert_eq!(engine.get_board().current_state().to_fen(), "rnbqkbnr/pppp1ppp/8/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2");
+        assert_eq!(engine.get_board().current_state().to_fen(), Some("rnbqkbnr/pppp1ppp/8/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2".to_string()));
     }
 
     #[test]

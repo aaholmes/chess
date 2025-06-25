@@ -466,7 +466,10 @@ mod tests {
 
         // Optional: Verify the pawn capture is also legal, just less preferred
         let mut legal_moves = Vec::new();
-        move_gen.generate_legal_moves(&board, &mut legal_moves);
+        let (captures, non_captures) = move_gen.gen_pseudo_legal_moves(&board);
+        legal_moves.extend(captures);
+        legal_moves.extend(non_captures);
+        legal_moves.retain(|&mv| board.apply_move_to_board(mv).is_legal(&move_gen));
         assert!(legal_moves.contains(&pawn_capture_move), "Pawn capture (Qxh7) should be legal");
     }
      #[test]

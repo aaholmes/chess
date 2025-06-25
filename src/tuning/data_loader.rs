@@ -215,7 +215,12 @@ mod tests {
         
         // Check that we have variety in results
         let results: Vec<f64> = positions.iter().map(|p| p.game_result).collect();
-        let unique_results: std::collections::HashSet<_> = results.iter().collect();
+        let mut unique_results: Vec<f64> = Vec::new();
+        for &result in &results {
+            if !unique_results.iter().any(|&x: &f64| (x - result).abs() < 0.001) {
+                unique_results.push(result);
+            }
+        }
         assert!(unique_results.len() > 1, "Should have variety in game results");
     }
     
