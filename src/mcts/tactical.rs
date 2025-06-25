@@ -107,7 +107,7 @@ pub fn identify_tactical_moves(board: &Board, move_gen: &MoveGen) -> Vec<Tactica
 }
 
 /// Calculate MVV-LVA (Most Valuable Victim - Least Valuable Attacker) score
-fn calculate_mvv_lva(mv: Move, board: &Board) -> f64 {
+pub fn calculate_mvv_lva(mv: Move, board: &Board) -> f64 {
     let victim_value = get_piece_value_at_square(board, mv.to);
     let attacker_value = get_piece_value_at_square(board, mv.from);
     

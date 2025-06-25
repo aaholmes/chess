@@ -301,7 +301,7 @@ mod tests {
         // Create a mock child node for testing
         let board = Board::new();
         let move_gen = MoveGen::new();
-        let parent = MctsNode::new_root(board, &move_gen);
+        let parent = MctsNode::new_root(board.clone(), &move_gen);
         
         let child_board = board.apply_move_to_board(Move::new(12, 28, None)); // e2-e4
         let child = MctsNode::new_child(

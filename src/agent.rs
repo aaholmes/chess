@@ -138,7 +138,7 @@ impl Agent for HumanlikeAgent<'_> {
 
         #[cfg(test)] // Use mock_mate_search in test builds
         let (eval, m, nodes) =
-            mock_mate_search(board, self.move_gen, self.mate_search_depth, false);
+            mate_search(board, self.move_gen, self.mate_search_depth, false);
 
 
         if eval >= 1000000 { // Check for mate score
@@ -159,8 +159,8 @@ impl Agent for HumanlikeAgent<'_> {
             Some(std::time::Duration::from_millis(self.mcts_time_limit_ms)),
         );
 
-        #[cfg(test)] // Use mock_mcts_pesto_search in test builds
-        let mcts_move = mock_mcts_pesto_search(
+        #[cfg(test)] // Use mcts_pesto_search in test builds
+        let mcts_move = mcts_pesto_search(
             board.current_state().clone(),
             self.move_gen,
             self.pesto,
@@ -210,7 +210,8 @@ mod tests {
     use super::*;
     use crate::board::Board;
     use crate::boardstack::BoardStack;
-    use crate::egtb::{EgtbInfo, EgtbError, Wdl};
+    use crate::egtb::{EgtbInfo, EgtbError};
+    use shakmaty_syzygy::Wdl;
     use crate::move_generation::MoveGen;
     use crate::move_types::Move;
     use crate::eval::PestoEval;

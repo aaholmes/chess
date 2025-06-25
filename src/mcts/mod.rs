@@ -64,6 +64,8 @@ pub mod simulation; // Keep for testing/alternative use
 pub mod tactical;
 pub mod tactical_mcts;
 
+// Additional test modules are included within existing tests module at the bottom
+
 use crate::board::Board;
 use crate::boardstack::BoardStack; // Needed for mate_search
 use crate::eval::PestoEval; // Import PestoEval
@@ -369,6 +371,13 @@ pub fn mcts_pesto_search(
     };
 
     best_move
+}
+
+#[cfg(test)]
+mod unit_tests {
+    mod tactical_tests;
+    mod selection_tests; 
+    mod mcts_integration_tests;
 }
 
 #[cfg(test)]
