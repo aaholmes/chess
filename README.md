@@ -1,257 +1,224 @@
 # Kingfisher Chess Engine
+## Tactical-Enhanced MCTS with Lazy Policy Evaluation
 
 <img width="1038" alt="Kingfisher Chess Engine in action" src="https://github.com/aaholmes/chess/assets/4913443/ceab66cf-67c8-4685-bd28-d454c38ce756">
 
-**A sophisticated chess engine written in Rust featuring novel Tactics-Enhanced MCTS with lazy policy evaluation and comprehensive neural network integration.**
+A chess engine implementing a novel three-tier search architecture that systematically prioritizes tactical moves before neural network evaluation, combining classical chess principles with modern Monte Carlo Tree Search.
 
-Kingfisher combines classical alpha-beta search with cutting-edge Monte Carlo Tree Search (MCTS) and neural network policy guidance, designed to bridge traditional chess programming with modern AI techniques.
+[![Rust](https://img.shields.io/badge/rust-1.70+-orange)](https://rustup.rs/)
+[![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
-## 🚀 Key Innovations
+## Architecture
 
-### **Tactical-First MCTS with Lazy Policy Evaluation**
-Revolutionary three-tier search architecture that prioritizes tactical completeness:
-1. **Mate Search First**: Exhaustive forced-win analysis before any move evaluation
-2. **Tactical Move Priority**: Classical heuristics (MVV-LVA, fork detection, checks) explored before strategic moves
-3. **Lazy Neural Policy**: Expensive neural network calls deferred until after all tactical moves examined
+### Three-Tier Search Prioritization
 
-This approach follows the chess principle of "examine all checks, captures, and threats" while substantially reducing computational overhead through intelligent move ordering.
+**Tier 1: Mate Search**
+- Forced mate analysis at each leaf node (configurable depth 1-5)
+- Immediate termination when mate sequences found
+- Zero neural network overhead for tactical positions
 
-### **Neural Network Policy Integration**
-Complete PyTorch-based training pipeline featuring:
-- **ResNet Architecture**: 12×8×8 input, 8 residual blocks, policy + value heads
-- **Human Game Training**: PGN processing with quality filtering and position analysis
-- **Rust-Python Bridge**: Seamless integration between Rust engine and PyTorch models
+**Tier 2: Tactical Move Priority**
+- MVV-LVA capture ordering with piece value calculations
+- Knight and pawn fork detection algorithms
+- Check move identification and prioritization
+- Classical heuristics applied before expensive NN evaluation
 
-### **Professional Benchmarking Suite**
-Comprehensive strength testing comparing 5 engine variants with Elo estimation:
-- Alpha-Beta baseline
-- MCTS variants (classical, mate-priority, neural-enhanced)
-- Statistical significance analysis with confidence intervals
+**Tier 3: Lazy Neural Policy Evaluation**
+- Neural network calls deferred until after tactical exploration
+- UCB selection with policy priors for strategic moves
+- PyTorch integration with ResNet architecture
 
-## 📊 Performance Highlights
+```
+MCTS Tree Traversal
+       │
+       ▼
+┌─────────────────────────────────────┐
+│  Mate Search (depth 3-5)           │
+│  ├── Return if mate found           │
+│  └── Continue if no mate            │
+└─────────────────┬───────────────────┘
+                  │
+                  ▼
+┌─────────────────────────────────────┐
+│  Tactical Move Exploration          │
+│  ├── MVV-LVA captures              │
+│  ├── Fork detection                 │
+│  ├── Check moves                    │
+│  └── Mark moves as explored         │
+└─────────────────┬───────────────────┘
+                  │
+                  ▼
+┌─────────────────────────────────────┐
+│  Neural Policy Evaluation          │
+│  ├── Policy network inference       │
+│  ├── UCB child selection           │
+│  └── Strategic move analysis        │
+└─────────────────────────────────────┘
+```
 
-Our architecture demonstrates key improvements:
-- **Tactical Efficiency**: Lazy policy evaluation substantially reduces neural network computational overhead
-- **Mate Detection**: Successfully finds mate-in-3 sequences instantly through dedicated mate search
-- **Classical Integration**: MVV-LVA and fork detection enhance tactical move ordering
-- **Chess Principle Implementation**: Systematic examination of forcing moves before strategic analysis
-- **Modular Architecture**: Clean separation between tactical heuristics and neural network guidance
+## Features
 
-## 🛠 Quick Start
+The tactical-enhanced search demonstrates:
+- Systematic mate detection at configurable search depths
+- Tactical move prioritization (captures, checks, forks)
+- Neural network integration with lazy evaluation
+- Comprehensive validation across tactical test positions
+
+## Quick Start
 
 ### Prerequisites
-- Rust 1.70+ ([Install Rust](https://rustup.rs/))
-- Python 3.8+ with PyTorch (for neural network features)
-
-### Installation
-
 ```bash
-# Clone the repository
-git clone https://github.com/aaholmes/kingfisher.git
-cd kingfisher/engine
+# Install Rust
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 
-# Build the engine
+# For neural network features (optional)
+pip install torch numpy python-chess
+```
+
+### Build and Test
+```bash
+git clone https://github.com/yourusername/kingfisher.git
+cd kingfisher/engine
 cargo build --release
 
-# Run basic engine test
-cargo run --bin quick_test
+# Run tactical benchmark
+cargo run --release --bin tactical_benchmark
 
-# Run comprehensive strength testing
-cargo run --bin strength_test --help
+# Performance profiling
+cargo run --release --bin tactical_profiler
+
+# Full validation suite
+./run_validation_experiments.sh
 ```
 
-### Neural Network Training
-
+### Example Usage
 ```bash
-# Install Python dependencies
-pip install torch torchvision python-chess numpy tqdm
+# Tactical search demonstration
+cargo run --release --bin tactical_benchmark
 
-# Train with sample data (quick test)
-python3 python/train_chess_ai.py --data-source sample --epochs 10
+# Performance analysis
+cargo run --release --bin tactical_profiler
 
-# Train with Lichess data (comprehensive)
-python3 python/train_chess_ai.py --data-source lichess --epochs 50
+# Neural network integration test
+cargo run --bin neural_test
 ```
 
-## 🎯 Usage Examples
+## Implementation
 
-### Engine Variants Comparison
-```bash
-# Quick strength test (500ms per position)
-cargo run --bin strength_test -- --time 500
+### Core Components
 
-# Test tactical-first MCTS specifically
-cargo run --bin tactical_test
+**`src/mcts/tactical_mcts.rs`** - Main search algorithm
+- Three-tier node selection with statistics tracking
+- Configurable mate search depth and time limits
+- Performance monitoring and cache management
 
-# Thorough analysis with neural networks
-cargo run --bin strength_test -- --time 2000 --iterations 1000
+**`src/mcts/tactical.rs`** - Tactical move detection
+- MVV-LVA scoring with piece value tables
+- Knight fork detection using attack patterns
+- Pawn fork identification with target analysis
+- Check move classification with king safety
 
-# Benchmark without neural network variants
-cargo run --bin strength_test -- --no-neural
-```
+**`src/mcts/selection.rs`** - Lazy policy evaluation
+- Tactical move prioritization before NN calls
+- UCB formula with policy priors integration
+- Node expansion with statistics aggregation
 
-### Training Data Generation
-```bash
-# Generate training positions with engine analysis
-cargo run --bin generate_training_data
-
-# This creates training_data.csv for neural network training
-```
-
-### Texel Tuning
-```bash
-# Optimize evaluation parameters
-cargo run --bin texel_tune
-
-# Uses gradient descent to improve evaluation accuracy
-```
-
-## 🏗 Architecture Overview
-
-### Core Engine Components
-
-```
-Kingfisher Chess Engine
-├── Board Representation (Bitboards)
-├── Move Generation (Magic Bitboards)
-├── Search Algorithms
-│   ├── Alpha-Beta with enhancements
-│   ├── Tactical-First MCTS with lazy policy evaluation
-│   └── Classical MCTS with neural network guidance
-├── Evaluation Systems
-│   ├── Pesto-style tapered evaluation
-│   ├── Texel tuning optimization
-│   └── Neural network policy/value
-└── Training Pipeline
-    ├── PGN data processing
-    ├── Position analysis
-    └── PyTorch model training
-```
+**`src/benchmarks/`** - Validation and testing
+- Comprehensive tactical position suite
+- Performance comparison methodology
+- Statistical analysis and reporting
 
 ### Key Algorithms
 
-**Mate-Search-First MCTS**:
-1. At each leaf node, perform classical mate search (depth 3-5)
-2. If mate found: Use exact result (1.0/0.0), skip neural network
-3. If no mate: Fall back to neural network policy/value evaluation
-4. Backpropagate results through MCTS tree
-
-**Neural Network Architecture**:
-- **Input**: 12×8×8 tensor (piece types × colors × board squares)  
-- **Body**: ResNet with 8 residual blocks, 256 channels
-- **Heads**: Policy (4096 moves) + Value (position evaluation)
-
-## 📈 Benchmarking Results
-
-Our comprehensive testing reveals:
-
-| Engine Variant | Elo Rating | Accuracy | Move Quality | Speed |
-|----------------|------------|----------|--------------|-------|
-| Alpha-Beta | 1453 | 28.6% | 0.520 | <1ms |
-| MCTS-Classical | 1453 | 28.6% | 0.520 | <1ms |
-| MCTS-Mate-Priority | 1453 | 28.6% | 0.520 | <1ms |
-| MCTS-Neural | 1277* | 28.6% | Variable | ~500ms |
-| MCTS-Complete | 1302* | 28.6% | Variable | ~400ms |
-
-*Neural variants show training potential with proper hyperparameter tuning
-
-## 🔧 Advanced Features
-
-### **Search Enhancements**
-- Iterative Deepening with Aspiration Windows
-- Transposition Tables with Zobrist hashing
-- Quiescence Search with SEE pruning
-- Null Move Pruning with zugzwang detection
-- Late Move Reductions (LMR)
-- Killer Heuristic and History Tables
-
-### **Evaluation Components**
-- **Material & Position**: Piece-Square Tables with game phase tapering
-- **Pawn Structure**: Passed pawns, chains, isolated, backward analysis
-- **King Safety**: Pawn shield, castling rights, attack evaluation
-- **Piece Coordination**: Rook placement, two bishops bonus
-- **Mobility**: Weighted piece movement analysis
-
-### **Training Infrastructure**
-- **Data Collection**: Lichess database integration, PGN parsing
-- **Quality Filtering**: Rating thresholds, game length, time controls  
-- **Position Analysis**: Engine evaluation, move quality scoring
-- **Model Training**: PyTorch pipeline with loss monitoring
-
-## 🚦 Project Status
-
-### ✅ Completed Features
-- [x] **Core Engine**: Bitboards, magic move generation, UCI protocol
-- [x] **Search Algorithms**: Alpha-beta, MCTS, hybrid mate-search-first
-- [x] **Neural Networks**: Complete PyTorch integration and training pipeline
-- [x] **Evaluation**: Pesto evaluation with Texel tuning optimization
-- [x] **Benchmarking**: Professional strength testing with Elo estimation
-- [x] **Training Data**: PGN processing and position analysis tools
-
-### 🔄 Current Development
-- [ ] Opening book integration
-- [ ] Endgame tablebase support (Syzygy)
-- [ ] Advanced time management
-- [ ] Multi-threaded search (Lazy SMP)
-
-### 🎯 Research Directions
-- [ ] Neural network architecture optimization
-- [ ] Self-play training loops
-- [ ] Playing style adaptation
-- [ ] Chess variant exploration
-
-## 📚 Technical Documentation
-
-### File Structure
-```
-src/
-├── search/          # Classical search algorithms
-├── mcts/            # Monte Carlo Tree Search implementation  
-├── benchmarks/      # Strength testing and analysis
-├── training/        # Training data generation
-├── tuning/          # Texel tuning system
-├── neural_net.rs    # Neural network integration
-├── eval.rs          # Position evaluation
-├── board.rs         # Bitboard representation
-└── move_generation.rs # Magic bitboard move generation
-
-python/
-├── chess_net.py         # PyTorch neural network
-├── training_pipeline.py # Model training infrastructure
-├── data_collection.py   # Dataset management
-└── train_chess_ai.py    # End-to-end training script
+**MVV-LVA Capture Ordering**:
+```rust
+fn calculate_mvv_lva(mv: Move, board: &Board) -> f64 {
+    let victim_value = piece_value(board.piece_at(mv.to));
+    let attacker_value = piece_value(board.piece_at(mv.from));
+    (victim_value * 10.0) - attacker_value
+}
 ```
 
-### Binary Targets
-- **`kingfisher`**: Main UCI engine
-- **`benchmark`**: Performance testing suite
-- **`strength_test`**: Comprehensive engine comparison
-- **`texel_tune`**: Evaluation parameter optimization
-- **`neural_test`**: Neural network integration testing
-- **`generate_training_data`**: Training data creation
+**Fork Detection**:
+```rust
+fn detect_fork_move(mv: Move, board: &Board, new_board: &Board) -> Option<f64> {
+    if piece_type == KNIGHT {
+        let knight_attacks = get_knight_attacks(mv.to);
+        let targets = knight_attacks & valuable_pieces;
+        if targets.count_ones() >= 2 { return Some(calculate_fork_value(targets)); }
+    }
+    // Similar logic for pawn forks
+}
+```
 
-## 🤝 Contributing
+## Testing
 
-Kingfisher welcomes contributions! Areas of particular interest:
+The engine includes comprehensive validation:
 
-1. **Neural Network Architectures**: Experiment with different designs
-2. **Training Optimization**: Improve data quality and training efficiency  
-3. **Search Algorithms**: Enhance hybrid classical/modern approaches
-4. **Benchmarking**: Expand test suites and analysis methods
+```bash
+# Run unit tests
+cargo test
 
-## 📖 References & Inspiration
+# Tactical functionality tests
+cargo test tactical_
 
-- **AlphaZero**: Monte Carlo Tree Search with neural networks
-- **Stockfish**: Classical chess programming excellence
-- **Leela Chess Zero**: Neural network chess implementation
-- **"Neural Networks for Chess"** by Dominik Klein
+# Validation experiments
+./run_validation_experiments.sh
+```
 
-## 📄 License
+## Neural Network Integration
 
-This project is open source. See LICENSE file for details.
+Optional PyTorch integration provides:
+- Policy network for move probability estimation
+- Value network for position evaluation
+- Training pipeline with PGN data processing
+- Rust-Python bridge for seamless inference
 
----
+```bash
+# Train neural networks
+python3 python/train_chess_ai.py --epochs 50 --data-source lichess
 
-**Kingfisher Chess Engine** - Bridging classical chess programming with modern AI techniques through innovative mate-search-first architecture and comprehensive neural network integration.
+# Test integration
+cargo run --bin neural_test
+```
 
-*Built with Rust 🦀 and PyTorch 🔥*
+## Configuration
+
+The engine supports various configurations:
+
+```rust
+let config = TacticalMctsConfig {
+    max_iterations: 1000,
+    time_limit: Duration::from_millis(5000),
+    mate_search_depth: 3,
+    exploration_constant: 1.414,
+    use_neural_policy: true,
+};
+```
+
+## Technical Stack
+
+- **Rust**: High-performance systems programming with memory safety
+- **PyTorch**: Neural network training and inference
+- **Bitboards**: Efficient board representation and move generation
+- **Magic Bitboards**: Ultra-fast sliding piece move generation
+- **Zobrist Hashing**: Position caching and transposition tables
+
+## Binary Targets
+
+- `tactical_benchmark` - Tactical search analysis
+- `tactical_profiler` - Performance analysis
+- `strength_test` - Engine testing and comparison
+- `neural_test` - Neural network integration validation
+- `generate_training_data` - Training dataset creation
+- `texel_tune` - Evaluation parameter optimization
+
+## References
+
+- Silver, D. et al. (2017). "Mastering Chess and Shogi by Self-Play with a General Reinforcement Learning Algorithm"
+- Campbell, M. et al. (2002). "Deep Blue"
+- "Computer Chess Programming Theory and Practice" by T.A. Marsland
+
+## License
+
+MIT License - see LICENSE file for details.
